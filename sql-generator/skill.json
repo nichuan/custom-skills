@@ -1,0 +1,39 @@
+{
+  "name": "sql-generator",
+  "version": "1.0.0",
+  "description": "快速生成业务查询SQL,支持参考表结构、已有SQL模板和表关联关系",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "sql",
+    "database",
+    "query",
+    "generator",
+    "analysis"
+  ],
+  "supported_databases": [
+    "MySQL",
+    "PostgreSQL",
+    "SQL Server",
+    "Oracle"
+  ],
+  "features": {
+    "table_structure": "详细的表结构和字段说明",
+    "table_relations": "表之间的关联关系",
+    "sql_templates": "常用SQL模板和查询模式",
+    "sql_examples": "业务场景的完整SQL示例",
+    "progressive_disclosure": "渐进式披露,按需加载"
+  },
+  "entry_point": "SKILL.md",
+  "categories": [
+    "database",
+    "sql",
+    "development"
+  ],
+  "metadata": {
+    "tables_count": 9,
+    "sql_templates_count": 20,
+    "sql_examples_count": 4,
+    "last_updated": "2026-03-13"
+  }
+}
