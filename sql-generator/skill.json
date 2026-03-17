@@ -1,7 +1,7 @@
 {
   "name": "sql-generator",
   "version": "1.0.0",
-  "description": "快速生成业务查询SQL,支持参考表结构、已有SQL模板和表关联关系",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对SRM-AUX租户的询价单、报价单、评分、资格预审等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
