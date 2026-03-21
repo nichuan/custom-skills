@@ -234,6 +234,12 @@ SET rfx_status = 'SCORING'
 WHERE rfx_header_id = {rfx_header_id}
   AND tenant_id = {tenant_id};
 
+-- 步骤2.1: 同步更新扩展表状态（必须同步执行）
+UPDATE ssrc_rfx_header_expand
+SET rfx_real_status = 'SCORING'
+WHERE rfx_header_id = {rfx_header_id}
+  AND tenant_id = {tenant_id};
+
 -- 步骤3: 修复专家状态为未评分
 UPDATE ssrc_evaluate_expert
 SET scored_status = 'NEW'
