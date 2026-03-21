@@ -1,107 +1,272 @@
-# 寻源常用的数据修复场景SQL模板
+# SQL 通用模板
 
-***前置重要查询***
+本文件提供 SRM 采购寻源系统的常用 SQL 模板，按业务场景分类。所有模板使用占位符 `{...}` 表示需要替换的参数。
+
+## 占位符说明
+
+| 占位符 | 说明 | 示例 |
+|--------|------|------|
+| `{tenant_num}` | 租户编码 | SRM-AUX |
+| `{tenant_id}` | 租户ID（需先通过租户编码查询） | 155357 |
+| `{rfx_num}` | 询价单单号 | RFX2026022600014 |
+| `{rfx_header_id}` | 询价单头ID | 5923933 |
+| `{start_date}` | 开始日期 | 2026-03-01 |
+| `{end_date}` | 结束日期 | 2026-03-22 |
+| `{status}` | 状态值 | IN_QUOTATION |
+| `{expert_id}` | 专家ID | 520399 |
+| `{indic_id}` | 评分要素ID | 647869 |
+| `{score}` | 分数值 | 4.00 |
+
+---
+
+## 基础查询模板
+
+### 1. 查询租户ID
+
+所有业务查询的前置步骤，通过租户编码获取租户ID。
 
 ```sql
-#租户查询，其他的查询都要先查出租户ID，租户ID作为其它SQL的必要条件
-select tenant_id,tenant_name from hpfm_tenant where tenant_num = 'SRM-SINOFUSE';
+SELECT tenant_id, tenant_name
+FROM hpfm_tenant
+WHERE tenant_num = '{tenant_num}';
 ```
 
-1.修复报价方向
+### 2. 按单号查询询价单
 
 ```sql
-#先使用租户查询，查到tenant_id，然后使用tenant_Id+rfx_num查出询价单信息，然后进一步根据tenant_id+询价单id修复auction_direction
-select * from ssrc_rfx_header where tenant_id = 51070 and rfx_num = 'BID2026030200004';
-update ssrc_rfx_header set auction_direction = 'NONE' where tenant_id = 51070 and rfx_header_id = 5889091; 
+SELECT *
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+  AND rfx_num = '{rfx_num}';
 ```
 
-2.删除专家
+### 3. 按状态查询询价单列表
 
 ```sql
-#查询专家信息
-select 
-    see.evaluate_expert_id,
-    iu.login_name,
-    iu.real_name,
-    see.team,
-    see.sequence_num,
-    see.expert_user_id,
-    see.expert_status,
-    see.scored_status
-from ssrc_evaluate_expert see join iam_user iu on see.expert_user_id = iu.id
-where see.source_header_id = 5763857 and see.source_from = 'RFX' and see.tenant_id = 417088;
-#查询要素信息
-select * from ssrc_evaluate_insdic_assign where tenant_id = 417088 and source_header_id = 5763857 and evaluate_expert_id = 520399;
-#删除专家和这个专家的分配要素
-delete from ssrc_evaluate_indic_assign where tenant_id  = 417088 and indic_assgin_id in ();
-
+SELECT rfx_header_id, rfx_num, rfx_title, rfx_status, quotation_start_date, quotation_end_date
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+  AND rfx_status = '{status}'
+ORDER BY creation_date DESC;
 ```
 
-3.询价单修复采购员
-
-    #先查询出单据信息
-    select * from ssrc_rfx_header where tenant_id = 51070 and rfx_num = 'BID2026030200004';
-    #查出要修复成哪个采购员
-    select * from 
-    update ssrc_rfx_header set auction_direction = 'NONE' where tenant_id = 51070 and rfx_header_id = 5889091;
-
-4.修复评分要素最高分
+### 4. 按时间范围查询询价单
 
 ```sql
---1、查询租户id
-SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = 'SRM-ANQIJIAOMU'
---2、查询需要修复的要素数据
-SELECT 
-    h.rfx_header_id,
-    h.rfx_num,
-    i.evaluate_indic_id,
-    h.tenant_id,sq
-    i.indicate_name,
-    i.weight,
-    i.min_score,
-    i.max_score
+SELECT rfx_header_id, rfx_num, rfx_title, rfx_status, creation_date
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+  AND creation_date BETWEEN '{start_date}' AND '{end_date}'
+ORDER BY creation_date DESC;
+```
+
+---
+
+## 报价单查询模板
+
+### 5. 查询询价单下的所有报价单
+
+```sql
+SELECT qh.quotation_header_id, qh.supplier_company_name, qh.quotation_status,
+       qh.qtn_total_amount, qh.creation_date
+FROM ssrc_rfx_quotation_header qh
+WHERE qh.tenant_id = {tenant_id}
+  AND qh.rfx_header_id = {rfx_header_id}
+ORDER BY qh.qtn_total_amount ASC;
+```
+
+### 6. 询价单与报价单关联查询
+
+```sql
+SELECT h.rfx_num, h.rfx_title, h.rfx_status,
+       qh.supplier_company_name, qh.quotation_status, qh.qtn_total_amount
 FROM ssrc_rfx_header h
-LEFT JOIN ssrc_evaluate_indic i ON i.tenant_id = h.tenant_id and h.rfx_header_id = i.source_header_id and i.source_from  = 'RFX'
-WHERE h.tenant_id = 3546
-AND h.rfx_num = 'BID2026020400001';
---3、修复评分要素最高分SQL模板
-UPDATE ssrc_evaluate_indic 
-SET max_score = 4.00 
-WHERE evaluate_indic_id = 647869 AND tenant_id = 3546;
+INNER JOIN ssrc_rfx_quotation_header qh ON h.rfx_header_id = qh.rfx_header_id
+WHERE h.tenant_id = {tenant_id}
+  AND h.rfx_header_id = {rfx_header_id};
 ```
 
-5.征询单待确定供应商，退回至评分中
+---
+
+## 评分查询模板
+
+### 7. 查询询价单的评分专家
 
 ```sql
---先查租户
-select * from hpfm_tenant where tenant_num = 'SRM-COMAC01';
---查单据
-select * from ssrc_rf_header where rf_num = 'RFI2025102900001' and tenant_id = 36466;
---查征询专家表
-select * from ssrc_rf_expert where rf_header_id = 35139;
---查询真实专家表
-select * from ssrc_evaluate_expert where source_header_id = 35139;
---修复单据状态为评分中
-update ssrc_rf_header set display_rf_status ='SCORING' where rf_header_id = 35139 and tenant_id = 36466;
---修复专家状态为未评分
-update ssrc_evaluate_expert set scored_status = 'NEW' where tenant_id = 36466 and evaluate_expert_id in (492160,492158,492159);
+SELECT see.evaluate_expert_id, see.expert_user_id, see.team, see.scored_status
+FROM ssrc_evaluate_expert see
+WHERE see.tenant_id = {tenant_id}
+  AND see.source_header_id = {rfx_header_id}
+  AND see.source_from = 'RFX';
 ```
 
-6.寻源结果被占用了，释放寻源结果
+### 8. 查询评分要素
 
 ```sql
---查询当前寻源结果的数据
-select result_id,receipts_status,occupation_quantity,source_result_execute_status,result_execution_strategy,quantity,item_num,source_num from ssrc_source_result where tenant_id =1 and source_num='RFX2025051300005';
---查询寻源结果的历史占用
-select  history_id from ssrc_source_result_change_history where tenant_id=1 and source_result_id in (1537);
---删除占用历史
-DELETE from ssrc_source_result_change_history where history_id = 3302;
---更新寻源结果
-UPDATE ssrc_source_result set receipts_status = NULL,occupation_quantity = 0, source_result_execute_status ='UNEXECUTED',result_execution_strategy = 'BLANK'  where result_id = 1321
+SELECT sei.evaluate_indic_id, sei.indicate_name, sei.weight,
+       sei.min_score, sei.max_score
+FROM ssrc_evaluate_indic sei
+WHERE sei.tenant_id = {tenant_id}
+  AND sei.source_header_id = {rfx_header_id}
+  AND sei.source_from = 'RFX';
 ```
 
+### 9. 查询评分汇总（按供应商排名）
 
+```sql
+SELECT ses.evaluate_summary_id, qh.supplier_company_name,
+       ses.score, ses.score_rank, ses.invalid_flag
+FROM ssrc_evaluate_summary ses
+INNER JOIN ssrc_rfx_quotation_header qh ON ses.quotation_header_id = qh.quotation_header_id
+WHERE ses.tenant_id = {tenant_id}
+  AND ses.source_header_id = {rfx_header_id}
+  AND ses.source_from = 'RFX'
+ORDER BY ses.score_rank ASC;
+```
 
+---
 
+## 聚合统计模板
 
+### 10. 统计各状态询价单数量
 
+```sql
+SELECT rfx_status, COUNT(*) AS cnt
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+GROUP BY rfx_status;
+```
+
+### 11. 统计供应商反馈状态
+
+```sql
+SELECT feedback_status, COUNT(*) AS cnt
+FROM ssrc_rfx_line_supplier
+WHERE tenant_id = {tenant_id}
+  AND rfx_header_id = {rfx_header_id}
+GROUP BY feedback_status;
+```
+
+---
+
+## 数据修复模板
+
+> **重要**: 所有 UPDATE/DELETE 操作必须使用 `tenant_id` + 主键作为 WHERE 条件，确保操作范围可控。
+
+### 12. 修复询价单字段
+
+```sql
+-- 步骤1: 查询确认数据
+SELECT rfx_header_id, rfx_num, {field_name}
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+  AND rfx_num = '{rfx_num}';
+
+-- 步骤2: 执行修复
+UPDATE ssrc_rfx_header
+SET {field_name} = '{new_value}'
+WHERE tenant_id = {tenant_id}
+  AND rfx_header_id = {rfx_header_id};
+```
+
+### 13. 修复评分要素最高分
+
+```sql
+-- 步骤1: 查询要素信息
+SELECT h.rfx_header_id, h.rfx_num,
+       i.evaluate_indic_id, i.indicate_name, i.weight,
+       i.min_score, i.max_score
+FROM ssrc_rfx_header h
+LEFT JOIN ssrc_evaluate_indic i
+  ON i.tenant_id = h.tenant_id
+  AND h.rfx_header_id = i.source_header_id
+  AND i.source_from = 'RFX'
+WHERE h.tenant_id = {tenant_id}
+  AND h.rfx_num = '{rfx_num}';
+
+-- 步骤2: 修复要素最高分
+UPDATE ssrc_evaluate_indic
+SET max_score = {score}
+WHERE evaluate_indic_id = {indic_id}
+  AND tenant_id = {tenant_id};
+```
+
+### 14. 删除专家及其分配要素
+
+```sql
+-- 步骤1: 查询专家信息
+SELECT see.evaluate_expert_id, see.expert_user_id, see.team, see.scored_status
+FROM ssrc_evaluate_expert see
+WHERE see.source_header_id = {rfx_header_id}
+  AND see.source_from = 'RFX'
+  AND see.tenant_id = {tenant_id};
+
+-- 步骤2: 查询该专家的要素分配
+SELECT *
+FROM ssrc_evaluate_indic_assign
+WHERE tenant_id = {tenant_id}
+  AND source_header_id = {rfx_header_id}
+  AND evaluate_expert_id = {expert_id};
+
+-- 步骤3: 删除专家的分配要素
+DELETE FROM ssrc_evaluate_indic_assign
+WHERE tenant_id = {tenant_id}
+  AND indic_assgin_id IN ({indic_assign_ids});
+
+-- 步骤4: 删除专家
+DELETE FROM ssrc_evaluate_expert
+WHERE tenant_id = {tenant_id}
+  AND evaluate_expert_id = {expert_id};
+```
+
+### 15. 重置评分状态（退回评分中）
+
+```sql
+-- 步骤1: 查询单据信息
+SELECT rfx_header_id, rfx_num, rfx_status
+FROM ssrc_rfx_header
+WHERE tenant_id = {tenant_id}
+  AND rfx_num = '{rfx_num}';
+
+-- 步骤2: 修复单据状态为评分中
+UPDATE ssrc_rfx_header
+SET rfx_status = 'SCORING'
+WHERE rfx_header_id = {rfx_header_id}
+  AND tenant_id = {tenant_id};
+
+-- 步骤3: 修复专家状态为未评分
+UPDATE ssrc_evaluate_expert
+SET scored_status = 'NEW'
+WHERE tenant_id = {tenant_id}
+  AND evaluate_expert_id IN ({expert_ids});
+```
+
+### 16. 释放寻源结果占用
+
+```sql
+-- 步骤1: 查询当前寻源结果
+SELECT result_id, receipts_status, occupation_quantity,
+       source_result_execute_status, result_execution_strategy
+FROM ssrc_source_result
+WHERE tenant_id = {tenant_id}
+  AND source_num = '{rfx_num}';
+
+-- 步骤2: 查询占用历史
+SELECT history_id
+FROM ssrc_source_result_change_history
+WHERE tenant_id = {tenant_id}
+  AND source_result_id = {result_id};
+
+-- 步骤3: 删除占用历史
+DELETE FROM ssrc_source_result_change_history
+WHERE history_id = {history_id};
+
+-- 步骤4: 释放寻源结果
+UPDATE ssrc_source_result
+SET receipts_status = NULL,
+    occupation_quantity = 0,
+    source_result_execute_status = 'UNEXECUTED',
+    result_execution_strategy = 'BLANK'
+WHERE result_id = {result_id}
+  AND tenant_id = {tenant_id};
+```

@@ -1,7 +1,7 @@
 {
   "name": "sql-generator",
   "version": "1.0.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对SRM-AUX租户的询价单、报价单、评分、资格预审等核心业务场景。",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对询价单、报价单、评分、资格预审等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -12,10 +12,7 @@
     "analysis"
   ],
   "supported_databases": [
-    "MySQL",
-    "PostgreSQL",
-    "SQL Server",
-    "Oracle"
+    "MySQL"
   ],
   "features": {
     "table_structure": "详细的表结构和字段说明",
@@ -31,9 +28,9 @@
     "development"
   ],
   "metadata": {
-    "tables_count": 9,
-    "sql_templates_count": 20,
-    "sql_examples_count": 4,
-    "last_updated": "2026-03-13"
+    "tables_count": 17,
+    "sql_templates_count": 16,
+    "sql_examples_count": 0,
+    "last_updated": "2026-03-22"
   }
 }

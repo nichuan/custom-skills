@@ -53,12 +53,7 @@ sql-generator/
 │       ├── ssrc_source_result.md              # 寻源结果表
 │       └── ssrc_source_template.md            # 寻源模板表
 ├── assets/                                     # 资源文件目录
-│   └── sql_template_examples/                 # SQL 示例文件
-│       ├── user_order_analysis.sql
-│       ├── product_sales_analysis.sql
-│       ├── user_purchase_frequency.sql
-│       └── product_category_statistics.sql
-└── scripts/                                    # 脚本目录(可选)
+│   └── sql_template_examples/                 # SQL 示例文件（按需添加）
 ```
 
 ## 快速开始
@@ -260,9 +255,15 @@ ORDER BY r.create_time DESC;
 
 ## 版本历史
 
+### v1.1 (2026-03-22)
+- 优化 SQL 模板格式，统一占位符规范
+- 修复模板中的语法错误和硬编码值
+- 修正 metadata 中的表数量和数据库类型
+- 移除不存在的示例文件引用
+
 ### v1.0 (2026-03-13)
 - 初始版本
-- 包含 9 个核心表的详细结构
+- 包含 17 个核心表的详细结构
 - 提供常用 SQL 模板和示例
 - 完全符合 Anthropic Skill 设计原则
 
