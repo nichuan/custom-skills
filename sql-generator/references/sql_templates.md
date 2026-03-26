@@ -10,8 +10,13 @@
 | `{tenant_id}` | 租户ID（需先通过租户编码查询） | 155357 |
 | `{rfx_num}` | 询价单单号 | RFX2026022600014 |
 | `{rfx_header_id}` | 询价单头ID | 5923933 |
+| `{rf_num}` | 征询单单号 | RF2026010100001 |
+| `{rf_header_id}` | 征询单头ID | 31285 |
+| `{rf_conf_rule_id}` | 征询单配置规则ID | 31285 |
 | `{start_date}` | 开始日期 | 2026-03-01 |
 | `{end_date}` | 结束日期 | 2026-03-22 |
+| `{new_end_date}` | 新的报价截止时间 | 2025-09-10 18:00:00 |
+| `{duration_seconds}` | 报价时长（秒） | 79287 |
 | `{status}` | 状态值 | IN_QUOTATION |
 | `{expert_id}` | 专家ID | 520399 |
 | `{indic_id}` | 评分要素ID | 647869 |
@@ -274,5 +279,44 @@ SET receipts_status = NULL,
     source_result_execute_status = 'UNEXECUTED',
     result_execution_strategy = 'BLANK'
 WHERE result_id = {result_id}
+  AND tenant_id = {tenant_id};
+```
+
+### 17. 修复征询单（延长报价时间）
+
+> **业务场景**: 将已过期的征询单状态恢复为"报价中"，并延长报价截止时间
+> **涉及表**: `ssrc_rf_header`（征询单头表）、`ssrc_rf_conf_rule`（征询单配置规则表）
+
+```sql
+-- 步骤1: 查询租户ID
+SELECT tenant_id
+FROM hpfm_tenant
+WHERE tenant_num = '{tenant_num}';
+
+-- 步骤2: 查询征询单信息
+SELECT rf_header_id, rf_num, display_rf_status, current_node, rf_title
+FROM ssrc_rf_header
+WHERE tenant_id = {tenant_id}
+  AND rf_num = '{rf_num}';
+
+-- 步骤3: 查询配置规则信息
+SELECT rf_conf_rule_id, quotation_end_date, quotation_running_duration
+FROM ssrc_rf_conf_rule
+WHERE tenant_id = {tenant_id}
+  AND rf_header_id = {rf_header_id};
+
+-- 步骤4: 修复征询单状态为"报价中"
+UPDATE ssrc_rf_header
+SET display_rf_status = 'IN_QUOTATION',
+    current_node = 'IN_QUOTATION'
+WHERE rf_header_id = {rf_header_id}
+  AND tenant_id = {tenant_id};
+
+-- 步骤5: 延长报价截止时间
+-- 说明: quotation_running_duration 单位为秒，79287秒 = 22小时27分钟
+UPDATE ssrc_rf_conf_rule
+SET quotation_end_date = '{new_end_date}',
+    quotation_running_duration = {duration_seconds}
+WHERE rf_conf_rule_id = {rf_conf_rule_id}
   AND tenant_id = {tenant_id};
 ```

@@ -40,6 +40,10 @@
 ### 寻源模板
 - **ssrc_source_template**: template_id(主键)、tenant_id、template_num、template_name、template_status、source_category
 
+### 征询单
+- **ssrc_rf_header**: rf_header_id(主键)、tenant_id(关联hpfm_tenant)、rf_num(单号)、display_rf_status(显示状态)、current_node(当前节点)、rf_title(标题)
+- **ssrc_rf_conf_rule**: rf_conf_rule_id(主键)、rf_header_id(关联ssrc_rf_header)、tenant_id、quotation_end_date(报价截止时间)、quotation_running_duration(报价时长)
+
 ---
 
 ## 维护说明
@@ -53,6 +57,7 @@
 ### 表命名规范
 - **hpfm_** 前缀：平台基础数据表
 - **ssrc_rfx_** 前缀：询价单相关表
+- **ssrc_rf_** 前缀：征询单相关表
 - **ssrc_evaluate_** 前缀：评分相关表
 - **ssrc_prequal_** 前缀：资格预审相关表
 - **ssrc_source_** 前缀：寻源相关表
