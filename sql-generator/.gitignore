@@ -1,0 +1,50 @@
+# IDE配置文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 依赖目录
+node_modules/
+vendor/
+
+# 编译输出
+dist/
+build/
+out/
+
+# 包管理器文件
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 其他
+*.cache
+*.pid
+*.seed
+*.pid.lock

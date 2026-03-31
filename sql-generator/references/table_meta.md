@@ -11,6 +11,7 @@
 
 ### 基础平台
 - **hpfm_tenant**: tenant_id(主键)、tenant_num(租户编码)、tenant_name(租户名)、enabled_flag
+- **hpfm_company**: company_id(主键)、tenant_id(关联hpfm_tenant)、company_num(公司编码)、company_name(公司名称)、unified_social_code(统一社会信用码)、duns_code(邓白氏编码)
 
 ### 询价单
 - **ssrc_rfx_header**: rfx_header_id(主键)、tenant_id(关联hpfm_tenant)、rfx_num(单号)、rfx_status、rfx_title、quotation_start_date、quotation_end_date

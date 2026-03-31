@@ -28,6 +28,14 @@ hpfm_tenant (租户)
 | 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
 |------|----------|--------|----------|------|
 | hpfm_tenant | tenant_id | ssrc_rfx_header | tenant_id | 租户下的询价单 |
+| hpfm_tenant | tenant_id | hpfm_company | tenant_id | 租户下的公司信息 |
+
+### 1.5. 公司信息关联
+| 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
+|------|----------|--------|----------|------|
+| hpfm_company | company_id | ssrc_rfx_header | company_id | 询价单的采购方公司 |
+| hpfm_company | company_id | ssrc_rfx_line_supplier | supplier_company_id | 询价单供应商行的供应商公司 |
+| hpfm_company | company_id | ssrc_rfx_quotation_header | supplier_company_id | 报价单的供应商公司 |
 
 ### 2. 询价单头与扩展/子表
 | 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
