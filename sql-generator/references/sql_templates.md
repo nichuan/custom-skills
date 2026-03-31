@@ -447,6 +447,53 @@ WHERE  result_id = {result_id}
   AND  tenant_id = {tenant_id};
 ```
 
+#### 2.6.6 修复供应商物料分配
+
+**业务场景**: 修复询价单中供应商的物料分配情况，将未邀请的物料设置为已邀请状态。
+
+**涉及表**: `ssrc_rfx_header`（询价单头表）、`ssrc_rfx_line_supplier`（供应商行表）、`ssrc_rfx_item_sup_assign`（物料供应商分配表）
+
+```sql
+-- 步骤1: 查询询价单信息
+SELECT rfx_header_id,
+       rfx_num,
+       rfx_title,
+       rfx_status
+FROM   ssrc_rfx_header
+WHERE  tenant_id = {tenant_id}
+  AND  rfx_num = '{rfx_num}';
+
+-- 步骤2: 查询供应商行信息
+SELECT rfx_line_supplier_id,
+       supplier_company_id,
+       supplier_company_name,
+       feedback_status
+FROM   ssrc_rfx_line_supplier
+WHERE  tenant_id = {tenant_id}
+  AND  rfx_header_id = {rfx_header_id}
+  AND  supplier_company_id = {supplier_company_id};
+
+-- 步骤3: 查询该供应商的物料分配情况
+SELECT item_sup_assign_id,
+       rfx_line_item_id,
+       invite_flag
+FROM   ssrc_rfx_item_sup_assign
+WHERE  tenant_id = {tenant_id}
+  AND  rfx_header_id = {rfx_header_id}
+  AND  rfx_line_supplier_id = {rfx_line_supplier_id};
+
+-- 步骤4: 更新物料分配状态为已邀请
+UPDATE ssrc_rfx_item_sup_assign
+SET    invite_flag = 1
+WHERE  tenant_id = {tenant_id}
+  AND  item_sup_assign_id IN ({item_sup_assign_ids});
+```
+
+**说明**:
+- `invite_flag = 1` 表示已邀请
+- `invite_flag = 0` 表示未邀请
+- 需要先查询出需要更新的`item_sup_assign_id`列表
+
 ---
 
 ## 三、征询单（RF）SQL模板
@@ -549,6 +596,10 @@ WHERE  tenant_id = {tenant_id}
 
 **涉及表**: `ssrc_rf_header`（征询单头表）、`ssrc_evaluate_expert`（专家表）、`ssrc_evaluate_score`（评分头表）、`ssrc_evaluate_score_line`（评分行表）
 
+**征询单类型说明**:
+- RFI开头（如RFI2025112000002）：信息征询，`source_from = 'RFI'`
+- RFP开头（如RFP2025112000002）：方案征询，`source_from = 'RFP'`
+
 ```sql
 -- 步骤1: 查询租户ID
 SELECT tenant_id
@@ -565,53 +616,69 @@ FROM   ssrc_rf_header
 WHERE  tenant_id = {tenant_id}
   AND  rf_num = '{rf_num}';
 
--- 步骤3: 查询征询专家表
+-- 步骤3: 判断征询单类型并设置source_from
+-- RFI开头：source_from = 'RFI'（信息征询）
+-- RFP开头：source_from = 'RFP'（方案征询）
+-- 示例：RFI2025112000002 -> source_from = 'RFI'
+
+-- 步骤4: 查询征询专家表
 SELECT *
 FROM   ssrc_rf_expert
 WHERE  rf_header_id = {rf_header_id};
 
--- 步骤4: 查询真实专家表
-SELECT *
+-- 步骤5: 查询真实专家表
+SELECT evaluate_expert_id,
+       expert_user_id,
+       team,
+       scored_status
 FROM   ssrc_evaluate_expert
 WHERE  source_header_id = {rf_header_id}
-  AND  source_from = 'RF';
+  AND  source_from = '{source_from}'
+  AND  tenant_id = {tenant_id};
 
--- 步骤5: 查询评分头表
-SELECT *
+-- 步骤6: 查询评分头表
+SELECT evaluate_score_id,
+       quotation_header_id,
+       evaluate_expert_id,
+       score_status,
+       sum_indic_score
 FROM   ssrc_evaluate_score
 WHERE  tenant_id = {tenant_id}
   AND  source_header_id = {rf_header_id}
-  AND  source_from = 'RF';
+  AND  source_from = '{source_from}';
 
--- 步骤6: 查询评分行表
-SELECT *
+-- 步骤7: 查询评分行表
+SELECT evaluate_line_id,
+       evaluate_score_id,
+       evaluate_indic_id,
+       indic_score
 FROM   ssrc_evaluate_score_line
 WHERE  evaluate_score_id IN (
     SELECT evaluate_score_id
     FROM   ssrc_evaluate_score
     WHERE  tenant_id = {tenant_id}
       AND  source_header_id = {rf_header_id}
-      AND  source_from = 'RF'
+      AND  source_from = '{source_from}'
 );
 
--- 步骤7: 修复单据状态为评分中
+-- 步骤8: 修复单据状态为评分中
 UPDATE ssrc_rf_header
 SET    display_rf_status = 'SCORING'
 WHERE  rf_header_id = {rf_header_id}
   AND  tenant_id = {tenant_id};
 
--- 步骤8: 修复专家状态为未评分
+-- 步骤9: 修复专家状态为未评分
 UPDATE ssrc_evaluate_expert
 SET    scored_status = 'NEW'
 WHERE  tenant_id = {tenant_id}
   AND  evaluate_expert_id IN ({expert_ids});
 
--- 步骤9: 删除已存在的评分行
+-- 步骤10: 删除已存在的评分行
 DELETE FROM ssrc_evaluate_score_line
 WHERE  tenant_id = {tenant_id}
   AND  evaluate_line_id IN ({evaluate_line_ids});
 
--- 步骤10: 删除已存在的评分头
+-- 步骤11: 删除已存在的评分头
 DELETE FROM ssrc_evaluate_score
 WHERE  tenant_id = {tenant_id}
   AND  evaluate_score_id IN ({evaluate_score_ids});

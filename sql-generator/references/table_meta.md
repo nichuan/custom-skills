@@ -18,6 +18,7 @@
 - **ssrc_rfx_header_expand**: rfx_header_expand_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、rfx_real_status
 - **ssrc_rfx_line_item**: rfx_line_item_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、item_code、item_name、rfx_quantity
 - **ssrc_rfx_line_supplier**: rfx_line_supplier_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、supplier_company_id、supplier_company_name、feedback_status
+- **ssrc_rfx_item_sup_assign**: item_sup_assign_id(主键)、rfx_header_id(关联ssrc_rfx_header)、rfx_line_supplier_id(关联ssrc_rfx_line_supplier)、tenant_id、rfx_line_item_id、invite_flag
 - **ssrc_rfx_member**: rfx_member_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、rfx_role、user_id
 
 ### 报价单
