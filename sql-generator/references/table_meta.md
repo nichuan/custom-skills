@@ -37,14 +37,22 @@
 - **ssrc_prequal_line**: prequal_line_id(主键)、prequal_header_id(关联ssrc_prequal_header)、tenant_id、supplier_company_id、prequal_line_status
 
 ### 寻源结果
-- **ssrc_source_result**: result_id(主键)、source_header_id(关联rfx_header_id)、tenant_id、source_from、supplier_company_id、item_code、unit_price
+- **ssrc_source_result**: result_id(主键)、source_header_id(关联rfx_header_id)、tenant_id、source_from、supplier_company_id、item_code、unit_price、receipts_status、occupation_quantity、source_result_execute_status、result_execution_strategy
+- **ssrc_source_result_change_history**: history_id(主键)、source_result_id(关联ssrc_source_result)、tenant_id、change_type、order_num、occupation_quantity
 
 ### 寻源模板
 - **ssrc_source_template**: template_id(主键)、tenant_id、template_num、template_name、template_status、source_category
 
+### 延时消息
+- **spfm_pending_message**: pending_message_id(主键)、tenant_id、biz_id、biz_type、server_name、execute_type、execute_time、executed_flag、expand_param、adaptor_code
+
 ### 征询单
 - **ssrc_rf_header**: rf_header_id(主键)、tenant_id(关联hpfm_tenant)、rf_num(单号)、display_rf_status(显示状态)、current_node(当前节点)、rf_title(标题)
 - **ssrc_rf_conf_rule**: rf_conf_rule_id(主键)、rf_header_id(关联ssrc_rf_header)、tenant_id、quotation_end_date(报价截止时间)、quotation_running_duration(报价时长)
+- **ssrc_rf_quotation_header**: quotation_header_id(主键)、rf_header_id(关联ssrc_rf_header)、tenant_id、supplier_company_id、quotation_status、display_quotation_status
+- **ssrc_rf_line_item**: rf_line_item_id(主键)、rf_header_id(关联ssrc_rf_header)、tenant_id、item_code、item_name、demand_quantity、uom_id
+- **ssrc_rf_line_supplier**: rf_line_supplier_id(主键)、rf_header_id(关联ssrc_rf_header)、tenant_id、supplier_company_id、supplier_company_name、feedback_status
+- **ssrc_rf_item_sup_assign**: rf_item_sup_assign_id(主键)、rf_line_item_id(关联ssrc_rf_line_item)、rf_line_supplier_id(关联ssrc_rf_line_supplier)、tenant_id
 
 ---
 
@@ -63,3 +71,4 @@
 - **ssrc_evaluate_** 前缀：评分相关表
 - **ssrc_prequal_** 前缀：资格预审相关表
 - **ssrc_source_** 前缀：寻源相关表
+- **spfm_** 前缀：平台消息/待办相关表（如 spfm_pending_message 延时消息表）

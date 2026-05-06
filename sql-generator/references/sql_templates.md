@@ -38,6 +38,8 @@
 | `{quotation_header_id_2}` | 报价单头ID（多个中的第一个） | 4002 |
 | `{quotation_header_id_3}` | 报价单头ID（多个中的第二个） | 4003 |
 | `{quotation_header_id_4}` | 报价单头ID（多个中的第三个） | 4004 |
+| `{result_id}` | 寻源结果ID | 8001 |
+| `{history_id}` | 寻源结果变更历史ID | 8002 |
 
 ---
 
@@ -412,9 +414,37 @@ WHERE  tenant_id = {tenant_id}
   AND  evaluate_expert_id = {expert_id};
 ```
 
-#### 2.6.5 释放寻源结果占用
+#### 2.6.5 删除寻源结果
 
-**业务场景**: 释放寻源结果的占用状态，用于取消或重置寻源结果。
+**业务场景**: 普通删除/清除寻源结果，用于取消或重置寻源结果。此场景仅操作 `ssrc_source_result` 表，不涉及 `ssrc_source_result_change_history`。
+
+**涉及表**: `ssrc_source_result`（寻源结果表）
+
+```sql
+-- 步骤1: 查询当前寻源结果
+SELECT result_id,
+       source_from,
+       source_num,
+       supplier_company_name,
+       item_code,
+       item_name,
+       result_status
+FROM   ssrc_source_result
+WHERE  tenant_id = {tenant_id}
+AND soruce_from = 'RFX'
+AND  source_header_id = '{source_header_id}';
+
+-- 步骤2: 删除寻源结果
+DELETE FROM ssrc_source_result
+WHERE  result_id = {result_id}
+  AND  tenant_id = {tenant_id};
+```
+
+#### 2.6.7 释放被订单错误占用的寻源结果
+
+**业务场景**: 当寻源结果被订单错误占用（如订单错误引用了寻源结果），需要同时清理占用历史记录。**此场景才需要操作 `ssrc_source_result_change_history` 表**，普通删除寻源结果不需要。
+
+**涉及表**: `ssrc_source_result`（寻源结果表）、`ssrc_source_result_change_history`（寻源结果变更历史表）
 
 ```sql
 -- 步骤1: 查询当前寻源结果
@@ -433,7 +463,7 @@ FROM   ssrc_source_result_change_history
 WHERE  tenant_id = {tenant_id}
   AND  source_result_id = {result_id};
 
--- 步骤3: 删除占用历史
+-- 步骤3: 删除占用历史（仅在被订单错误占用时执行此步骤）
 DELETE FROM ssrc_source_result_change_history
 WHERE  history_id = {history_id};
 
@@ -447,7 +477,70 @@ WHERE  result_id = {result_id}
   AND  tenant_id = {tenant_id};
 ```
 
-#### 2.6.6 修复供应商物料分配
+#### 2.6.6 询价单回退至报价中（延时消息）
+
+**业务场景**: 当询价单状态回退至"报价中"(IN_QUOTATION)时（如核价回退、评分回退、修复报价截止时间等），必须执行3条SQL：修复主表状态、修复扩展表状态、插入延时消息。
+
+**涉及表**: `ssrc_rfx_header`（询价单头表）、`ssrc_rfx_header_expand`（询价单扩展表）、`spfm_pending_message`（延时消息表）
+
+```sql
+-- 步骤1: 查询租户ID
+SELECT tenant_id
+FROM   hpfm_tenant
+WHERE  tenant_num = '{tenant_num}';
+
+-- 步骤2: 联合查询询价单主表和扩展表信息
+SELECT srh.rfx_header_id,
+       srh.rfx_num,
+       srh.rfx_status,
+       srh.quotation_end_date,
+       srh.created_by,
+       srhe.rfx_header_expand_id,
+       srhe.rfx_real_status
+FROM   ssrc_rfx_header srh
+       INNER JOIN ssrc_rfx_header_expand srhe ON srh.rfx_header_id = srhe.rfx_header_id
+WHERE  srh.tenant_id = {tenant_id}
+  AND  srh.rfx_num = '{rfx_num}';
+
+-- 步骤3: 更新询价单主表状态和报价截止时间
+UPDATE ssrc_rfx_header
+SET    rfx_status = 'IN_QUOTATION',
+       quotation_end_date = '{new_end_date}',
+       latest_quotation_end_date = '{new_end_date}'
+WHERE  rfx_header_id = {rfx_header_id}
+  AND  tenant_id = {tenant_id};
+
+-- 步骤4: 同步更新扩展表状态
+UPDATE ssrc_rfx_header_expand
+SET    rfx_real_status = 'IN_QUOTATION'
+WHERE  rfx_header_expand_id = {rfx_header_expand_id}
+  AND  tenant_id = {tenant_id};
+
+-- 步骤5: 插入延时消息（必须执行，用于报价截止时间到达后自动刷新状态）
+INSERT INTO spfm_pending_message (tenant_id, biz_id, biz_type, server_name, execute_type, execute_time,
+                                  executed_flag, expand_param, object_version_number, creation_date,
+                                  created_by, last_updated_by, last_update_date, adaptor_code)
+VALUES ({tenant_id}, {rfx_header_id}, 'RFX', 'srm-source', 'QUOTATION_END_REFRESH_RFX_STATUS', '{new_end_date}', '0',
+        null, '1', now(), {user_id}, {user_id}, now(), null);
+```
+
+**占位符说明**:
+- `{user_id}`: 操作人用户ID（可通过询价单的 created_by 字段获取）
+
+**延时消息字段说明**:
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| biz_id | {rfx_header_id} | 询价单头ID |
+| biz_type | 'RFX' | 固定值，表示询价单业务 |
+| server_name | 'srm-source' | 固定值，表示SRM寻源服务 |
+| execute_type | 'QUOTATION_END_REFRESH_RFX_STATUS' | 固定值，报价截止刷新 |
+| execute_time | {new_end_date} | 新的报价截止时间 |
+| executed_flag | '0' | 未执行 |
+| expand_param | null | 无扩展参数 |
+| object_version_number | '1' | 固定版本号 |
+| adaptor_code | null | 无适配器 |
+
+#### 2.6.8 修复供应商物料分配
 
 **业务场景**: 修复询价单中供应商的物料分配情况，将未邀请的物料设置为已邀请状态。
 

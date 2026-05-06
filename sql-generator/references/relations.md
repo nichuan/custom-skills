@@ -4,22 +4,30 @@
 
 ```
 hpfm_tenant (租户)
-    └── ssrc_rfx_header (询价单头) [tenant_id]
-            ├── ssrc_rfx_header_expand (询价单头拓展) [rfx_header_id]
-            ├── ssrc_rfx_line_item (询价单物料行) [rfx_header_id]
-            ├── ssrc_rfx_line_supplier (询价单供应商行) [rfx_header_id]
-            ├── ssrc_rfx_member (寻源小组成员) [rfx_header_id]
-            ├── ssrc_source_template (寻源模板) [template_id]
-            ├── ssrc_prequal_header (资格预审头) [rfx_header_id]
-            │       └── ssrc_prequal_line (资格预审行) [prequal_header_id]
-            ├── ssrc_rfx_quotation_header (报价单头) [rfx_header_id]
-            │       └── ssrc_rfx_quotation_line (报价单行) [quotation_header_id]
-            ├── ssrc_evaluate_expert (评分专家) [source_header_id]
-            ├── ssrc_evaluate_indic (评分要素) [source_header_id]
-            ├── ssrc_evaluate_score (评分头) [source_header_id]
-            │       └── ssrc_evaluate_score_line (评分行) [evaluate_score_id]
-            ├── ssrc_evaluate_summary (评分汇总) [source_header_id]
-            └── ssrc_source_result (寻源结果) [source_header_id]
+    ├── ssrc_rfx_header (询价单头) [tenant_id]
+    │       ├── ssrc_rfx_header_expand (询价单头拓展) [rfx_header_id]
+    │       ├── ssrc_rfx_line_item (询价单物料行) [rfx_header_id]
+    │       ├── ssrc_rfx_line_supplier (询价单供应商行) [rfx_header_id]
+    │       ├── ssrc_rfx_member (寻源小组成员) [rfx_header_id]
+    │       ├── ssrc_source_template (寻源模板) [template_id]
+    │       ├── ssrc_prequal_header (资格预审头) [rfx_header_id]
+    │       │       └── ssrc_prequal_line (资格预审行) [prequal_header_id]
+    │       ├── ssrc_rfx_quotation_header (报价单头) [rfx_header_id]
+    │       │       └── ssrc_rfx_quotation_line (报价单行) [quotation_header_id]
+    │       ├── ssrc_evaluate_expert (评分专家) [source_header_id]
+    │       ├── ssrc_evaluate_indic (评分要素) [source_header_id]
+    │       ├── ssrc_evaluate_score (评分头) [source_header_id]
+    │       │       └── ssrc_evaluate_score_line (评分行) [evaluate_score_id]
+    │       ├── ssrc_evaluate_summary (评分汇总) [source_header_id]
+    │       ├── ssrc_source_result (寻源结果) [source_header_id]
+    │       │       └── ssrc_source_result_change_history (变更历史) [source_result_id]
+    └── ssrc_rf_header (征询单头) [tenant_id]
+            ├── ssrc_rf_conf_rule (征询单配置规则) [rf_header_id]
+            ├── ssrc_rf_line_item (征询单物料行) [rf_header_id]
+            │       └── ssrc_rf_item_sup_assign (物料供应商分配) [rf_line_item_id]
+            ├── ssrc_rf_line_supplier (征询单供应商行) [rf_header_id]
+            │       └── ssrc_rf_item_sup_assign (物料供应商分配) [rf_line_supplier_id]
+            └── ssrc_rf_quotation_header (征询单报价头) [rf_line_supplier_id]
 ```
 
 ## 详细关联关系
@@ -84,9 +92,26 @@ hpfm_tenant (租户)
 | ssrc_rfx_quotation_line | quotation_line_id | ssrc_source_result | quotation_line_id | 报价行与寻源结果 |
 | ssrc_rfx_line_item | rfx_line_item_id | ssrc_source_result | source_line_item_id | 询价物料行与寻源结果 |
 
+### 7.5 寻源结果变更历史关联
+| 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
+|------|----------|--------|----------|------|
+| ssrc_source_result | result_id | ssrc_source_result_change_history | source_result_id | 寻源结果变更历史，仅在释放被订单错误占用的寻源结果时操作 |
+
+### 8. 征询单关联
+| 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
+|------|----------|--------|----------|------|
+| ssrc_rf_header | rf_header_id | ssrc_rf_conf_rule | rf_header_id | 征询单配置规则，1对1 |
+| ssrc_rf_header | rf_header_id | ssrc_rf_line_item | rf_header_id | 征询单物料行，1对多 |
+| ssrc_rf_header | rf_header_id | ssrc_rf_line_supplier | rf_header_id | 征询单供应商行，1对多 |
+| ssrc_rf_line_item | rf_line_item_id | ssrc_rf_item_sup_assign | rf_line_item_id | 物料供应商分配，1对多 |
+| ssrc_rf_line_supplier | rf_line_supplier_id | ssrc_rf_item_sup_assign | rf_line_supplier_id | 物料供应商分配，1对多 |
+| ssrc_rf_line_supplier | rf_line_supplier_id | ssrc_rf_quotation_header | rf_line_supplier_id | 征询单报价头，1对多 |
+| hpfm_company | company_id | ssrc_rf_quotation_header | supplier_company_id | 报价单的供应商公司 |
+
 ## 注意事项
 
 1. **source_from 过滤**：`ssrc_evaluate_expert`、`ssrc_evaluate_indic`、`ssrc_evaluate_score`、`ssrc_evaluate_summary`、`ssrc_source_result` 均需加 `source_from = 'RFX'` 条件（区分询价单与招标单）。
 2. **tenant_id 过滤**：所有表均需加 `tenant_id` 条件过滤租户数据（通过 `hpfm_tenant` 查询获取具体值）。
 3. **1对1 关系**：`ssrc_rfx_header` ↔ `ssrc_rfx_header_expand`；`ssrc_rfx_quotation_header` ↔ `ssrc_evaluate_score`（同一供应商同一轮）；`ssrc_rfx_quotation_header` ↔ `ssrc_evaluate_summary`。
 4. **状态同步**：`ssrc_rfx_header.rfx_status` 与 `ssrc_rfx_header_expand.rfx_real_status` 必须同步更新。修改询价单状态时，必须同时 UPDATE 两张表，否则会导致状态不一致。
+5. **延时消息**：当询价单状态回退至"报价中"(IN_QUOTATION)时，必须插入 `spfm_pending_message` 延时消息，确保报价截止时间到达后系统自动刷新状态。

@@ -44,6 +44,10 @@
 | tax_id | bigint | 税率ID |
 | exchange_rate | decimal | 汇率 |
 | price_category | varchar | 价格类型：STANDARD/标准、SAMPLE/样品 |
+| receipts_status | varchar | 收货状态：UN_RECEIVED/未收货、PARTIAL_RECEIVED/部分收货、FULL_RECEIVED/完全收货 |
+| occupation_quantity | decimal | 订单占用数量 |
+| source_result_execute_status | varchar | 寻源结果执行状态：UNEXECUTED/未执行、EXECUTING/执行中、EXECUTED/已执行 |
+| result_execution_strategy | varchar | 结果执行策略：BLANK/空、SPLIT/分批执行、FULL/全部执行 |
 | erp_number | varchar | ERP反馈编码 |
 | import_erp_status | varchar | 导入ERP状态 |
 | object_version_number | bigint | 行版本号（乐观锁） |
