@@ -81,7 +81,7 @@ WHERE  tenant_id = {tenant_id}
 
 ## 二、询价单（RFX）/ 新招标单（BID）SQL模板
 
-> 以下模板适用于询价单（RFX）和新招标单（BID）相关的查询、统计和数据修复操作。两者共用同一套表（`ssrc_rfx_*`），且**共用同一 `source_from = 'RFX'` 上下文**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不用的老招标）。区分新招标单与询价单的字段是 `ssrc_rfx_header.second_source_category = 'NEW_BID'`，SQL 中的状态值、关联写法与询价单完全一致。
+> 以下模板适用于询价单（RFX）和新招标单（BID）相关的查询、统计和数据修复操作。两者共用同一套表（`ssrc_rfx_*`），且**共用同一 `source_from = 'RFX'` 上下文**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不用的老招标）。区分新招标单与询价单的字段是 `ssrc_rfx_header.secondary_source_category = 'NEW_BID'`，SQL 中的状态值、关联写法与询价单完全一致。
 
 ### 2.1 询价单基础查询
 
@@ -225,7 +225,7 @@ WHERE  h.tenant_id = {tenant_id}
 
 ### 2.4 询价单/招标单评分查询
 
-> **注意**: 询价单与新招标单在评标相关表中**均使用 `source_from = 'RFX'`**（新招标与询价单共用同一上下文，不要写成 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。其他关联方式、字段完全相同，仅术语叫法不同（评标≈评分、投标≈报价）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'`。
+> **注意**: 询价单与新招标单在评标相关表中**均使用 `source_from = 'RFX'`**（新招标与询价单共用同一上下文，不要写成 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。其他关联方式、字段完全相同，仅术语叫法不同（评标≈评分、投标≈报价）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `secondary_source_category = 'NEW_BID'`。
 
 #### 2.4.1 查询询价单/招标单的评分专家
 
@@ -916,7 +916,7 @@ WHERE  tenant_id = {tenant_id}
 
 ### 招标单(BID)与询价单(RFX)术语映射
 
-> 新招标单（BID开头）与询价单（RFX开头）共用同一套 `ssrc_rfx_*` 表，数据库中的状态值完全相同，仅前端术语叫法不同。在评标/结果等关联表中两者**统一使用 `source_from = 'RFX'`**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'`。
+> 新招标单（BID开头）与询价单（RFX开头）共用同一套 `ssrc_rfx_*` 表，数据库中的状态值完全相同，仅前端术语叫法不同。在评标/结果等关联表中两者**统一使用 `source_from = 'RFX'`**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `secondary_source_category = 'NEW_BID'`。
 
 | 招标单(BID)术语 | 询价单(RFX)术语 | 状态值（枚举常量） |
 |:---|---:|:---|
@@ -959,4 +959,4 @@ WHERE  tenant_id = {tenant_id}
 - 编写招标单SQL时，SQL注释中可以使用招标术语以便理解（如"查询待定标的招标单"）
 - 但SQL代码中的状态值必须使用上述枚举常量（如 `rfx_status = 'CHECK_PENDING'`）
 - 关联评分、结果表时统一使用 `source_from = 'RFX'`（新招标与询价单共用此上下文；`'BID'` 仅为几乎不用的老招标）
-- 如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'` 而非 `source_from`
+- 如需在 `ssrc_rfx_header` 上区分新招标单，使用 `secondary_source_category = 'NEW_BID'` 而非 `source_from`

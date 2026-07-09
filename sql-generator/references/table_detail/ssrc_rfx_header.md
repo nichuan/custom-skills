@@ -19,7 +19,7 @@
 | rfx_status               | varchar   | 询价单状态（值集 SSRC.RFX_STATUS）：NEW/新建、RELEASE_APPROVING/发布审批中、NOT_START/未开始、IN_QUOTATION/报价中、SCORING/评分中、CHECK_PENDING/待核价 等 |
 | secondary_status         | varchar   | 询价单二级状态（SSRC.RFX_SECONDARY_STATUS）                                                  |
 | source_category          | varchar   | 寻源类别（SSRC.SOURCE_CATEGORY）：RFQ/询价、RFA/竞价、BID/招投标                            |
-| second_source_category    | varchar   | 次级寻源类别（SSRC.SECONDARY_SOURCE_CATEGORY）：RFQ/询价、RFA/竞价、BID/招投标、NEW_BID/新招投标。**区分新招标单与常规询价单的关键字段：新招标单 = 'NEW_BID'**（注意：与此表 `source_from` 单据来源字段不同） |
+| secondary_source_category    | varchar   | 次级寻源类别（SSRC.SECONDARY_SOURCE_CATEGORY）：RFQ/询价、RFA/竞价、BID/招投标、NEW_BID/新招投标。**区分新招标单与常规询价单的关键字段：新招标单 = 'NEW_BID'**（注意：与此表 `source_from` 单据来源字段不同） |
 | source_method            | varchar   | 询价方式（SSRC.SOURCE_METHOD）：INVITE/邀请、OPEN/合作伙伴公开、ALL_OPEN/全平台公开          |
 | quotation_type           | varchar   | 报价方式（SSRC.QUOTATION_TYPE）：ONLINE/线上报价、OFFLINE/线下报价、ON_OFF/线上线下并行      |
 | template_id              | bigint    | 寻源模板ID（关联 ssrc_source_template）                                                     |

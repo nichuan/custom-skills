@@ -33,7 +33,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 2. **按需加载详细结构**: 仅读取用户需求中涉及的 `table_detail/[表名].md` 文件
 3. **补充关联关系**: 参考 `relations.md` 确认SRM表之间的关联键。⚠️ 招标单与询价单共用关联关系
 4. **应用SQL模板**: 从 `sql_templates.md` 中匹配适用于SRM业务的SQL例子然后改写条件
-5. **生成/调整SQL**: 结合SRM表结构、关联关系和模板,生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.second_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
+5. **生成/调整SQL**: 结合SRM表结构、关联关系和模板,生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
 6. **标注信息**: 在SQL注释中标注使用的SRM表、关联关系和核心业务字段
 
 ## 核心规则
@@ -177,11 +177,11 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
             srhe.rfx_real_status
       from ssrc_rfx_header srh
       join ssrc_rfx_header_expand srhe on srh.rfx_header_id = srhe.rfx_header_id
-      where srh.tenant_id = ? and srh.rfx_num = ?;"
+      where srh.tenant_id = ? and srh.rfx_num = ?;
     ```
 - **招标单(BID)与询价单(RFX)共用表体系规则（必须严格遵守）**:
   - SRM系统中，招标单/新招标单（单号以 `BID` 开头）与询价单（单号以 `RFX` 开头）**共用同一套数据库表**（`ssrc_rfx_*` 系列表），只是**术语叫法不同**（如"定标"对应"核价"、"评标"对应"评分"、"投标"对应"报价"等）
-  - **区分询价单与新招标的字段是 `ssrc_rfx_header.second_source_category`**：
+  - **区分询价单与新招标的字段是 `ssrc_rfx_header.secondary_source_category`**：
     - `'NEW_BID'` = 新招标单
     - 常规询价单 = 该字段的非 `NEW_BID` 取值
     - （如存在竞价等其它类型，可见 `RFA` 等取值）
@@ -228,11 +228,11 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
   | 多轮投标 | 多轮报价 | `ROUND_QUOTATION` |
   | 未寻源 | 未寻源 | `UN_SOURCE` |
 
-  - 查询新招标单时：单号用 `BID` 前缀匹配；如需在 `ssrc_rfx_header` 上区分，使用 `second_source_category = 'NEW_BID'`；**关联评标/结果表时 `source_from` 仍使用 `'RFX'`（`'BID'` 仅指几乎不用的老招标，不要误用）**；其他表关联、字段、状态值均与询价单一致，仅术语翻译不同
+  - 查询新招标单时：单号用 `BID` 前缀匹配；如需在 `ssrc_rfx_header` 上区分，使用 `secondary_source_category = 'NEW_BID'`；**关联评标/结果表时 `source_from` 仍使用 `'RFX'`（`'BID'` 仅指几乎不用的老招标，不要误用）**；其他表关联、字段、状态值均与询价单一致，仅术语翻译不同
   - 生成招标单SQL时，注释中可以使用招标术语（如"待定标""评标"等），但SQL中的状态值、关联字段值与询价单完全一致
   - 示例：
     ```sql
-    -- 查询新招标单BID2026070100001的评标汇总（与询价单完全共用：ssrc_rfx_header用second_source_category区分，评标表source_from仍为'RFX'）
+    -- 查询新招标单BID2026070100001的评标汇总（与询价单完全共用：ssrc_rfx_header用secondary_source_category区分，评标表source_from仍为'RFX'）
     SELECT ses.evaluate_summary_id,
            qh.supplier_company_name  AS 投标供应商,
            ses.score                 AS 评标得分,
@@ -332,7 +332,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
   - 字段是否存在于对应表(对照 `table_detail/[表名].md`)
   - **字段命名是否符合下划线格式**（snake_case）
   - **拓展字段（attribute前缀）是否按规则命名**
-  - ⚠️ **source_from 是否正确**：评标/结果表中 `'RFX'` 同时覆盖询价单与新招标（新招标不再使用 `'BID'`），`'BID'` 仅指几乎不再使用的老招标；征询单用 `'RFI'`/`'RFP'`。另需注意 `ssrc_rfx_header.source_from` 是**单据来源**，不是单据类型区分字段（区分用 `second_source_category`）
+  - ⚠️ **source_from 是否正确**：评标/结果表中 `'RFX'` 同时覆盖询价单与新招标（新招标不再使用 `'BID'`），`'BID'` 仅指几乎不再使用的老招标；征询单用 `'RFI'`/`'RFP'`。另需注意 `ssrc_rfx_header.source_from` 是**单据来源**，不是单据类型区分字段（区分用 `secondary_source_category`）
 - 对于复杂的查询逻辑,建议分步生成并验证
 
 ## 参考文件指引
@@ -362,7 +362,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 - **通用SQL模板**: `references/sql_templates.md`
   - 按业务场景分类的SQL模板，包含三大类：
     - **通用基础查询模板**: 租户、公司等基础信息查询
-    - **询价单（RFX）SQL模板**: 询价单和新招标单相关的查询、统计和数据修复（两者共用同一套模板与 `source_from='RFX'` 上下文，仅 `ssrc_rfx_header.second_source_category` 不同）
+    - **询价单（RFX）SQL模板**: 询价单和新招标单相关的查询、统计和数据修复（两者共用同一套模板与 `source_from='RFX'` 上下文，仅 `ssrc_rfx_header.secondary_source_category` 不同）
     - **征询单（RF）SQL模板**: 征询单相关的查询和数据修复
   - 每个模板都包含业务场景说明、占位符说明和状态值参考
   - 用途: 快速生成符合规范的SQL片段
@@ -383,7 +383,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 生成的SQL应包含以下信息:
 ```sql
 -- 业务场景: [描述用户需求]
--- 单据类型: [询价单(RFX/常规) / 新招标单(BID, second_source_category='NEW_BID') / 征询单(RF)]
+-- 单据类型: [询价单(RFX/常规) / 新招标单(BID, secondary_source_category='NEW_BID') / 征询单(RF)]
 -- 涉及表: [表1, 表2, ...]
 -- 关联关系: [表1.key = 表2.key, ...]
 -- 核心字段: [主要查询和统计字段]
@@ -489,13 +489,13 @@ GROUP BY ...
 - **业务需求**: 查询或修复新招标单（BID开头）的数据，如评标结果查询、修复为待定标状态等
 - **共用表**: 新招标单与询价单共用 `ssrc_rfx_*` 系列表（详见"招标单与询价单共用表体系规则"）
 - **关键区分**: 
-  - `ssrc_rfx_header.second_source_category = 'NEW_BID'` 标识新招标单（注意：不是 `source_from`，`source_from` 是单据来源字段）
+  - `ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 标识新招标单（注意：不是 `source_from`，`source_from` 是单据来源字段）
   - 评标/结果等关联表 `source_from = 'RFX'`（与询价单相同，新招标不再使用 `'BID'`；`'BID'` 仅指几乎不用的老招标）
   - 状态值与询价单相同，仅术语叫法不同（如"待定标"实质是 `CHECK_PENDING`）
 - **处理流程**:
   1. 按BID单号前缀识别新招标单（如 `BID2026070100001`）
   2. 使用相同的 `ssrc_rfx_header` 表查询，状态值使用询价单的枚举值
-  3. 在 `ssrc_rfx_header` 上区分单据类型时使用 `second_source_category = 'NEW_BID'`
+  3. 在 `ssrc_rfx_header` 上区分单据类型时使用 `secondary_source_category = 'NEW_BID'`
   4. 关联评分/结果表时统一使用 `source_from = 'RFX'`
   5. SQL注释中使用招标术语便于理解（如"待定标"而非"待核价"），但SQL字段值不变
 
@@ -557,6 +557,6 @@ GROUP BY ...
    - `bid_result_statistics.sql` (招标单定标结果统计)
    - `quotation_comparison.sql` (报价单对比分析)
    - `expert_scoring_statistics.sql` (专家评分统计)
-3. **注释说明**: 在文件头部添加详细的业务逻辑注释，新招标单SQL需标注 `second_source_category = 'NEW_BID'`，评标/结果表 `source_from` 仍为 `'RFX'`
+3. **注释说明**: 在文件头部添加详细的业务逻辑注释，新招标单SQL需标注 `secondary_source_category = 'NEW_BID'`，评标/结果表 `source_from` 仍为 `'RFX'`
 
 

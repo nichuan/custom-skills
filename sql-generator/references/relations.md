@@ -115,7 +115,7 @@ hpfm_tenant (租户)
    - `source_from = 'BID'`：**老招标**上下文（老招标几乎已不再使用，无特殊说明时一律按 `'RFX'` 处理）
    - `source_from = 'RFI'`：信息征询单（RFI开头）
    - `source_from = 'RFP'`：方案征询单（RFP开头）
-   - ⚠️ 注意：`ssrc_rfx_header.source_from` 是**单据来源**（手工新建/申请转单/立项转单等），**不是**区分询价单/新招标的字段；区分字段是 `ssrc_rfx_header.second_source_category`（新招标 = `'NEW_BID'`）
+   - ⚠️ 注意：`ssrc_rfx_header.source_from` 是**单据来源**（手工新建/申请转单/立项转单等），**不是**区分询价单/新招标的字段；区分字段是 `ssrc_rfx_header.secondary_source_category`（新招标 = `'NEW_BID'`）
 2. **tenant_id 过滤**：所有表均需加 `tenant_id` 条件过滤租户数据（通过 `hpfm_tenant` 查询获取具体值）。
 3. **1对1 关系**：`ssrc_rfx_header` ↔ `ssrc_rfx_header_expand`；`ssrc_rfx_quotation_header` ↔ `ssrc_evaluate_score`（同一供应商同一轮）；`ssrc_rfx_quotation_header` ↔ `ssrc_evaluate_summary`。
 4. **状态同步**：`ssrc_rfx_header.rfx_status` 与 `ssrc_rfx_header_expand.rfx_real_status` 必须同步更新。修改询价单状态时，必须同时 UPDATE 两张表，否则会导致状态不一致。

@@ -15,8 +15,8 @@
 
 ### 询价单 / 招标单（共用表体系）
 
-> **重要**: 招标单/新招标单（BID开头）与询价单（RFX开头）共用以下 `ssrc_rfx_*` 系列表。两者通过 `ssrc_rfx_header.second_source_category` 字段区分：**新招标单 = `'NEW_BID'`**，常规询价单为该字段的非 `NEW_BID` 取值（如存在竞价等其它类型可见 `RFA` 等取值）。数据库结构完全一致，仅业务术语不同。⚠️ `ssrc_rfx_header.source_from` 是**单据来源**（手工新建/申请转单/立项转单），并非单据类型区分字段。
-- **ssrc_rfx_header**: rfx_header_id(主键)、tenant_id(关联hpfm_tenant)、rfx_num(单号)、rfx_status、rfx_title、second_source_category(次级寻源类别，**新招标单='NEW_BID'**)、quotation_start_date、quotation_end_date
+> **重要**: 招标单/新招标单（BID开头）与询价单（RFX开头）共用以下 `ssrc_rfx_*` 系列表。两者通过 `ssrc_rfx_header.secondary_source_category` 字段区分：**新招标单 = `'NEW_BID'`**，常规询价单为该字段的非 `NEW_BID` 取值（如存在竞价等其它类型可见 `RFA` 等取值）。数据库结构完全一致，仅业务术语不同。⚠️ `ssrc_rfx_header.source_from` 是**单据来源**（手工新建/申请转单/立项转单），并非单据类型区分字段。
+- **ssrc_rfx_header**: rfx_header_id(主键)、tenant_id(关联hpfm_tenant)、rfx_num(单号)、rfx_status、rfx_title、secondary_source_category(次级寻源类别，**新招标单='NEW_BID'**)、quotation_start_date、quotation_end_date
 - **ssrc_rfx_header_expand**: rfx_header_expand_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、rfx_real_status
 - **ssrc_rfx_line_item**: rfx_line_item_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、item_code、item_name、rfx_quantity
 - **ssrc_rfx_line_supplier**: rfx_line_supplier_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、supplier_company_id、supplier_company_name、feedback_status
