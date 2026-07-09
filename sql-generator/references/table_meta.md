@@ -13,19 +13,23 @@
 - **hpfm_tenant**: tenant_id(主键)、tenant_num(租户编码)、tenant_name(租户名)、enabled_flag
 - **hpfm_company**: company_id(主键)、tenant_id(关联hpfm_tenant)、company_num(公司编码)、company_name(公司名称)、unified_social_code(统一社会信用码)、duns_code(邓白氏编码)
 
-### 询价单
-- **ssrc_rfx_header**: rfx_header_id(主键)、tenant_id(关联hpfm_tenant)、rfx_num(单号)、rfx_status、rfx_title、quotation_start_date、quotation_end_date
+### 询价单 / 招标单（共用表体系）
+
+> **重要**: 招标单/新招标单（BID开头）与询价单（RFX开头）共用以下 `ssrc_rfx_*` 系列表。两者通过 `ssrc_rfx_header.second_source_category` 字段区分：**新招标单 = `'NEW_BID'`**，常规询价单为该字段的非 `NEW_BID` 取值（如存在竞价等其它类型可见 `RFA` 等取值）。数据库结构完全一致，仅业务术语不同。⚠️ `ssrc_rfx_header.source_from` 是**单据来源**（手工新建/申请转单/立项转单），并非单据类型区分字段。
+- **ssrc_rfx_header**: rfx_header_id(主键)、tenant_id(关联hpfm_tenant)、rfx_num(单号)、rfx_status、rfx_title、second_source_category(次级寻源类别，**新招标单='NEW_BID'**)、quotation_start_date、quotation_end_date
 - **ssrc_rfx_header_expand**: rfx_header_expand_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、rfx_real_status
 - **ssrc_rfx_line_item**: rfx_line_item_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、item_code、item_name、rfx_quantity
 - **ssrc_rfx_line_supplier**: rfx_line_supplier_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、supplier_company_id、supplier_company_name、feedback_status
 - **ssrc_rfx_item_sup_assign**: item_sup_assign_id(主键)、rfx_header_id(关联ssrc_rfx_header)、rfx_line_supplier_id(关联ssrc_rfx_line_supplier)、tenant_id、rfx_line_item_id、invite_flag
 - **ssrc_rfx_member**: rfx_member_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、rfx_role、user_id
 
-### 报价单
+### 报价单 / 投标单（共用表体系）
 - **ssrc_rfx_quotation_header**: quotation_header_id(主键)、rfx_header_id(关联ssrc_rfx_header)、tenant_id、supplier_company_id、quotation_status、qtn_total_amount
 - **ssrc_rfx_quotation_line**: quotation_line_id(主键)、quotation_header_id(关联ssrc_rfx_quotation_header)、tenant_id、rfx_line_item_id、valid_quotation_price、total_amount
 
-### 评分
+### 评分 / 评标
+
+> **注意**: 评分表通过 `source_from` 区分上下文字段：`'RFX'` = 询价单评分，`'BID'` = 老招标单评标，老招标几乎已经不用了，没有特殊说明都是RFX，新招标也是RFX。
 - **ssrc_evaluate_expert**: evaluate_expert_id(主键)、source_header_id(关联rfx_header_id)、tenant_id、source_from、expert_user_id、team、scored_status
 - **ssrc_evaluate_indic**: evaluate_indic_id(主键)、source_header_id(关联rfx_header_id)、tenant_id、source_from、indicate_name、weight、max_score
 - **ssrc_evaluate_score**: evaluate_score_id(主键)、source_header_id(关联rfx_header_id)、quotation_header_id、tenant_id、evaluate_expert_id、sum_indic_score
@@ -37,6 +41,8 @@
 - **ssrc_prequal_line**: prequal_line_id(主键)、prequal_header_id(关联ssrc_prequal_header)、tenant_id、supplier_company_id、prequal_line_status
 
 ### 寻源结果
+
+> **注意**: `source_from` 区分：`'RFX'` = 询价场景，`'BID'` = 老招标场景。
 - **ssrc_source_result**: result_id(主键)、source_header_id(关联rfx_header_id)、tenant_id、source_from、supplier_company_id、item_code、unit_price、receipts_status、occupation_quantity、source_result_execute_status、result_execution_strategy
 - **ssrc_source_result_change_history**: history_id(主键)、source_result_id(关联ssrc_source_result)、tenant_id、change_type、order_num、occupation_quantity
 

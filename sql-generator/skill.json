@@ -1,7 +1,7 @@
 {
   "name": "sql-generator",
-  "version": "1.0.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对询价单、报价单、评分、资格预审等核心业务场景。",
+  "version": "1.3.0",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对询价单(含招标单)、报价单、评分、资格预审等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -9,7 +9,9 @@
     "database",
     "query",
     "generator",
-    "analysis"
+    "analysis",
+    "bid",
+    "tendering"
   ],
   "supported_databases": [
     "MySQL"
@@ -19,7 +21,8 @@
     "table_relations": "表之间的关联关系",
     "sql_templates": "常用SQL模板和查询模式",
     "sql_examples": "业务场景的完整SQL示例",
-    "progressive_disclosure": "渐进式披露,按需加载"
+    "progressive_disclosure": "渐进式披露,按需加载",
+    "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射"
   },
   "entry_point": "SKILL.md",
   "categories": [
@@ -31,6 +34,6 @@
     "tables_count": 17,
     "sql_templates_count": 16,
     "sql_examples_count": 0,
-    "last_updated": "2026-03-22"
+    "last_updated": "2026-07-09"
   }
 }

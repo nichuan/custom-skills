@@ -13,6 +13,8 @@
 | `{company_num}` | 公司编码 | C0001 |
 | `{company_id}` | 公司ID | 12345 |
 | `{rfx_num}` | 询价单单号 | RFX2026022600014 |
+| `{bid_num}` | 招标单单号 | BID2026070100001 |
+| `{source_from}` | 评标/结果表上下文（RFX=询价单/新招标单共用, BID=老招标[极少用], RFI=信息征询, RFP=方案征询） | RFX |
 | `{rfx_header_id}` | 询价单头ID | 5923933 |
 | `{rfx_header_expand_id}` | 询价单扩展表ID | 5923933 |
 | `{rf_num}` | 征询单单号 | RF2026010100001 |
@@ -77,9 +79,9 @@ WHERE  tenant_id = {tenant_id}
 
 ---
 
-## 二、询价单（RFX）SQL模板
+## 二、询价单（RFX）/ 新招标单（BID）SQL模板
 
-> 以下模板适用于询价单相关的查询、统计和数据修复操作。
+> 以下模板适用于询价单（RFX）和新招标单（BID）相关的查询、统计和数据修复操作。两者共用同一套表（`ssrc_rfx_*`），且**共用同一 `source_from = 'RFX'` 上下文**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不用的老招标）。区分新招标单与询价单的字段是 `ssrc_rfx_header.second_source_category = 'NEW_BID'`，SQL 中的状态值、关联写法与询价单完全一致。
 
 ### 2.1 询价单基础查询
 
@@ -221,11 +223,13 @@ WHERE  h.tenant_id = {tenant_id}
   AND  h.rfx_header_id = {rfx_header_id};
 ```
 
-### 2.4 询价单评分查询
+### 2.4 询价单/招标单评分查询
 
-#### 2.4.1 查询询价单的评分专家
+> **注意**: 询价单与新招标单在评标相关表中**均使用 `source_from = 'RFX'`**（新招标与询价单共用同一上下文，不要写成 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。其他关联方式、字段完全相同，仅术语叫法不同（评标≈评分、投标≈报价）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'`。
 
-**业务场景**: 查询参与询价单评分的专家列表，用于了解评分团队组成。
+#### 2.4.1 查询询价单/招标单的评分专家
+
+**业务场景**: 查询参与询价单/招标单评标（评分）的专家列表，用于了解评标（评分）团队组成。
 
 ```sql
 SELECT see.evaluate_expert_id,
@@ -240,7 +244,7 @@ WHERE  see.tenant_id = {tenant_id}
 
 #### 2.4.2 查询评分要素
 
-**业务场景**: 查询询价单的评分要素及权重，用于了解评分标准。
+**业务场景**: 查询询价单/招标单的评分要素及权重，用于了解评标（评分）标准。
 
 ```sql
 SELECT sei.evaluate_indic_id,
@@ -431,7 +435,7 @@ SELECT result_id,
        result_status
 FROM   ssrc_source_result
 WHERE  tenant_id = {tenant_id}
-AND soruce_from = 'RFX'
+AND source_from = '{source_from}'
 AND  source_header_id = '{source_header_id}';
 
 -- 步骤2: 删除寻源结果
@@ -909,3 +913,50 @@ WHERE  tenant_id = {tenant_id}
 |--------|------|
 | `NEW` | 未评分 |
 | `SCORED` | 已评分 |
+
+### 招标单(BID)与询价单(RFX)术语映射
+
+> 新招标单（BID开头）与询价单（RFX开头）共用同一套 `ssrc_rfx_*` 表，数据库中的状态值完全相同，仅前端术语叫法不同。在评标/结果等关联表中两者**统一使用 `source_from = 'RFX'`**（新招标不再使用 `'BID'`；`'BID'` 仅指几乎不再使用的老招标）。如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'`。
+
+| 招标单(BID)术语 | 询价单(RFX)术语 | 状态值（枚举常量） |
+|:---|---:|:---|
+| 招标单 | 询价单 | — |
+| 投标 | 报价 | — |
+| 投标人 | 供应商 | — |
+| 评标 | 评分 | — |
+| 中标 | 选用/中标 | — |
+| 待定标 | 待核价 | `CHECK_PENDING` |
+| 定标审批中 | 核价审批中 | `CHECK_APPROVING` |
+| 定标审批拒绝 | 核价审批拒绝 | `CHECK_REJECTED` |
+| 定标中 | 核价中 | `CHECKING` |
+| 投标中 | 报价中 | `IN_QUOTATION` |
+| 投标响应不足 | 报价响应不足 | `LACK_QUOTED` |
+| 评标中 | 评分中 | `SCORING` |
+| 已完成 | 已完成 | `FINISHED` |
+| 已开标 | 已开标 | `OPENED` |
+| 待开标 | 待开标 | `OPEN_BID_PENDING` |
+| 已取消 | 已取消 | `CANCELED` |
+| 已关闭 | 已关闭 | `CLOSED` |
+| 新建 | 新建 | `NEW` |
+| 未开始 | 未开始 | `NOT_START` |
+| 暂停 | 暂停 | `PAUSED` |
+| 待初审 | 待初审 | `PRETRIAL_PENDING` |
+| 资格预审中 | 资格预审中 | `IN_PREQUAL` |
+| 资格后审中 | 资格后审中 | `IN_POSTQUAL` |
+| 资格后审截止 | 资格后审截止 | `POSTQUAL_CUTOFF` |
+| 待预审审批 | 待预审审批 | `PENDING_PREQUAL` |
+| 待定候选人 | 待定候选人 | `PRE_EVALUATION_PENDING` |
+| 候选人审批中 | 候选人审批中 | `PRE_EVALUATION_APPROVING` |
+| 候选人审批拒绝 | 候选人审批拒绝 | `PRE_EVALUATION_PENDING_REJECT` |
+| 待评分汇总 | 待评分汇总 | `RFX_EVALUATION_PENDING` |
+| 发布审批中 | 发布审批中 | `RELEASE_APPROVING` |
+| 发布审批拒绝 | 发布审批拒绝 | `RELEASE_REJECTED` |
+| 再次招标 | 再次询价 | `ROUNDED` |
+| 多轮投标 | 多轮报价 | `ROUND_QUOTATION` |
+| 未寻源 | 未寻源 | `UN_SOURCE` |
+
+**使用说明**:
+- 编写招标单SQL时，SQL注释中可以使用招标术语以便理解（如"查询待定标的招标单"）
+- 但SQL代码中的状态值必须使用上述枚举常量（如 `rfx_status = 'CHECK_PENDING'`）
+- 关联评分、结果表时统一使用 `source_from = 'RFX'`（新招标与询价单共用此上下文；`'BID'` 仅为几乎不用的老招标）
+- 如需在 `ssrc_rfx_header` 上区分新招标单，使用 `second_source_category = 'NEW_BID'` 而非 `source_from`

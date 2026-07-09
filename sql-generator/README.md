@@ -4,6 +4,8 @@
 
 本 Skill 是专门为 SRM(Supplier Relationship Management)采购寻源系统设计的 SQL 查询生成助手。基于 Anthropic Skill 设计原则,采用"渐进式披露"和"精简上下文"的核心策略,能够快速生成符合 SRM 业务逻辑的准确 SQL 查询。
 
+> **重要**: 本 Skill 同时覆盖询价单(RFX开头)和新招标单(BID开头)两种寻源场景。两者共用同一套 `ssrc_rfx_*` 数据库表。区分字段是 `ssrc_rfx_header.second_source_category`（新招标单 = `'NEW_BID'`），评标/结果等关联表中两者**共用同一 `source_from = 'RFX'` 上下文**（新招标不再使用 `'BID'`，`'BID'` 仅指几乎不用的老招标），仅前端术语叫法不同（如"待定标"="待核价"、"评标"="评分"等）。
+
 ## 核心特性
 
 ### 1. 渐进式披露
@@ -62,11 +64,12 @@ sql-generator/
 
 本Skill专门处理SRM采购寻源系统的SQL需求，当用户提出以下需求时自动触发:
 
-1. **询价单查询**: "租户SRM-AUX查询询价单"
-2. **报价单分析**: "生成SRM-AUX租户近7天的报价统计"
+1. **询价单/招标单查询**: "租户SRM-AUX查询询价单"、"查询招标单BID2026070100001的投标情况"
+2. **报价单/投标单分析**: "生成SRM-AUX租户近7天的报价统计"
 3. **关联关系查询**: "列出询价单表和报价单表的关联关系"
-4. **数据修复**: "修复报价单状态不一致的数据"
-5. **评分统计**: "统计专家评分情况和排名"
+4. **数据修复**: "修复报价单状态不一致的数据"、"将招标单修复为待定标状态"
+5. **评分/评标统计**: "统计专家评分情况和排名"
+6. **寻源结果查询**: "查询XX询价单的寻源结果"、"查询XX招标单的中标结果"
 
 ### 工作流程
 
@@ -228,6 +231,7 @@ ORDER BY r.create_time DESC;
 - 时间范围过滤优先使用 `sql_templates.md` 中的模板
 - 聚合统计时明确 GROUP BY 字段和聚合函数
 - 生成的 SQL 必须包含关键注释说明
+- ⚠️ 新招标单(BID)查询时与询价单完全共用：评标/结果表 `source_from` 仍为 `'RFX'`（不要写成 `'BID'`），单据类型区分用 `ssrc_rfx_header.second_source_category = 'NEW_BID'`
 
 ### 上下文加载规则
 - 严格按需加载,只读取 `table_detail/[表名].md` 中涉及的表
@@ -239,6 +243,7 @@ ORDER BY r.create_time DESC;
   - 表名拼写是否正确(对照 `table_meta.md`)
   - 关联键是否匹配(对照 `relations.md`)
   - 字段是否存在于对应表(对照 `table_detail/[表名].md`)
+  - ⚠️ **source_from 是否正确**: 评标/结果表中 `'RFX'` 同时覆盖询价单与新招标（新招标不再用 `'BID'`），`'BID'` 仅指几乎不用的老招标；征询单用 `'RFI'`/`'RFP'`。另：`ssrc_rfx_header.source_from` 是单据来源，区分单据类型用 `second_source_category`
 - 对于复杂的查询逻辑,建议分步生成并验证
 
 ## 维护建议
@@ -254,6 +259,21 @@ ORDER BY r.create_time DESC;
 - 如果发现某些字段不再使用,从详细结构中移除,保持轻量化
 
 ## 版本历史
+
+### v1.3 (2026-07-09)
+- 修正招标单(BID)与询价单(RFX)的区分规则：区分字段为 `ssrc_rfx_header.second_source_category`（新招标 = `'NEW_BID'`），而非 `source_from`
+- 修正评标/结果表上下文：`source_from = 'RFX'` 同时覆盖询价单与新招标，新招标不再使用 `'BID'`；`'BID'` 仅指几乎不用的老招标
+- 明确 `ssrc_rfx_header.source_from` 是单据来源字段，并非单据类型区分字段
+- 同步修正 SKILL.md / sql_templates.md / relations.md / table_meta.md / README.md 中的相关表述
+
+### v1.2 (2026-07-09)
+- 新增招标单(BID)与询价单(RFX)共用表体系规则及完整术语映射表
+- 新增场景9: 招标单(BID)查询与数据修复
+- 优化 SKILL.md 执行步骤、准确性验证、输出格式，全面覆盖 BID 场景
+- 更新 sql_templates.md 附录，新增 BID/RFX 术语映射对照表
+- 更新 relations.md source_from 过滤说明
+- 更新 table_meta.md 各节标题，标注询价单/招标单共用关系
+- 更新 skill.json 版本号及描述
 
 ### v1.1 (2026-03-22)
 - 优化 SQL 模板格式，统一占位符规范
