@@ -29,12 +29,13 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 
 ## 执行步骤
 
-1. **识别涉及的表**: 从用户需求中提取SRM表名,对照 `table_meta.md` 确认表是否存在。⚠️ 注意判断单据类型：单号BID开头→招标单（共用询价单表），RFX开头→询价单
-2. **按需加载详细结构**: 仅读取用户需求中涉及的 `table_detail/[表名].md` 文件
-3. **补充关联关系**: 参考 `relations.md` 确认SRM表之间的关联键。⚠️ 招标单与询价单共用关联关系
-4. **应用SQL模板**: 从 `sql_templates.md` 中匹配适用于SRM业务的SQL例子然后改写条件
-5. **生成/调整SQL**: 结合SRM表结构、关联关系和模板,生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
-6. **标注信息**: 在SQL注释中标注使用的SRM表、关联关系和核心业务字段
+1. **查询租户id**: 如果用户告知了租户编码，默认输出查询租户的SQL，示例 `SELECT *FROM hpfm_tenant WHERE tenant_num ='SRM-AUSNUTRIA';` 确认租户id
+2. **识别涉及的表**: 从用户需求中提取SRM表名,对照 `table_meta.md` 确认表是否存在。⚠️ 注意判断单据类型：单号BID开头→招标单（共用询价单表），RFX开头→询价单
+3. **按需加载详细结构**: 仅读取用户需求中涉及的 `table_detail/[表名].md` 文件
+4. **补充关联关系**: 参考 `relations.md` 确认SRM表之间的关联键。⚠️ 招标单与询价单共用关联关系
+5. **应用SQL模板**: 从 `sql_templates.md` 中匹配适用于SRM业务的SQL例子然后改写条件
+6. **生成/调整SQL**: 结合SRM表结构、关联关系和模板，生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
+7. **标注信息**: 在SQL注释中标注使用的SRM表、关联关系和核心业务字段
 
 ## 核心规则
 
@@ -42,6 +43,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 - 必须先确认表关联键的正确性(参考 `relations.md`)
 - 使用明确的表别名避免字段歧义
 - 生成的SQL必须包含关键注释说明
+- 如果用户已经告知了租户id，则直接SQL中使用租户id，无需再输出查询租户id的SQL
 - **字段命名规则（必须严格遵守）**:
   - 所有字段名必须使用**下划线格式**（snake_case），不能使用驼峰格式（camelCase）
   - 表名必须使用下划线格式，例如：`ssrc_rfx_quotation_line`（不是 `ssrcRfxQuotationLine`）
@@ -58,8 +60,8 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
   - 常见的拓展字段格式：
     - 数字类型：`attribute_decimal1` ~ `attribute_decimal10`
     - 时间类型：`attribute_datetime1` ~ `attribute_datetime10`
-    - 文本类型：`attribute_char1` ~ `attribute_char10`
-    - 长文本类型：`attribute_varchar1` ~ `attribute_varchar10`
+    - 文本类型：`attribute_varchar1` ~ `attribute_varchar10`
+    - 长文本类型：`attribute_longtext1` ~ `attribute_longtext10`
   - 使用拓展字段时，直接按上述命名规则构造字段名，无需查询表结构
   - 示例：
     ```sql
@@ -297,7 +299,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
     - `executed_flag` = '0'
     - `expand_param` = null
     - `object_version_number` = '1'
-    - `created_by` 和 `last_updated_by` = 操作人user_id
+    - `created_by` 和 `last_updated_by` = 操作人user_id(数据修复场景没有特殊说明可以直接默认0)
     - `adaptor_code` = null
   - 完整示例：
     ```sql
@@ -316,7 +318,7 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
                                       executed_flag, expand_param, object_version_number, creation_date,
                                       created_by, last_updated_by, last_update_date, adaptor_code)
     VALUES ({tenant_id}, {rfx_header_id}, 'RFX', 'srm-source', 'QUOTATION_END_REFRESH_RFX_STATUS', '{new_end_date}', '0',
-            null, '1', now(), {user_id}, {user_id}, now(), null);
+            null, '1', now(), 0, 0, now(), null);
     ```
 
 ### 上下文加载规则
