@@ -12,6 +12,7 @@
 ### 基础平台
 - **hpfm_tenant**: tenant_id(主键)、tenant_num(租户编码)、tenant_name(租户名)、enabled_flag
 - **hpfm_company**: company_id(主键)、tenant_id(关联hpfm_tenant)、company_num(公司编码)、company_name(公司名称)、unified_social_code(统一社会信用码)、duns_code(邓白氏编码)
+- **iam_user**: id(主键，**所有业务表中的人员ID都指向此id**)、organization_id(**租户ID，等价其他表的tenant_id，本表无tenant_id字段**)、login_name(用户名,全局唯一)、tenant_login_name(租户内用户名,与organization_id组合唯一)、real_name(真实姓名)、email、phone、user_type(用户类型P/C)
 
 ### 询价单 / 招标单（共用表体系）
 

@@ -38,6 +38,23 @@ hpfm_tenant (租户)
 | hpfm_tenant | tenant_id | ssrc_rfx_header | tenant_id | 租户下的询价单 |
 | hpfm_tenant | tenant_id | hpfm_company | tenant_id | 租户下的公司信息 |
 
+### 1.2. 用户（人员）关联 —— 核心基础表 iam_user
+> ⚠️ **极重要规则**
+> - **所有 SRM 业务表中存储的人员ID，最终都指向 `iam_user.id`**（如 `user_id`、`expert_user_id`、`created_by`、`last_updated_by`、`process_user_id`、`deliver_from_user_id`、`deliver_to_user_id`、`pur_user_id`、`prequal_user_id`、`request_user_id`、`contact_user_id`、`recipient_user_id` 等）。
+> - `iam_user.organization_id` 即为租户ID，**等价其他表的 `tenant_id`**；但本表**没有 `tenant_id` 字段**，查询本表时必须用 `organization_id = {tenant_id}` 过滤，不能用 `tenant_id`。
+> - 任何"涉及修复数据中人员"的需求，都必须先查询 `iam_user` 得到正确的 `id`，再用该 `id` 去更新业务表的人员字段。
+
+| 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
+|------|----------|--------|----------|------|
+| iam_user | id | ssrc_rfx_member | user_id | 寻源小组成员用户 |
+| iam_user | id | ssrc_evaluate_expert | expert_user_id | 评分专家子账户 |
+| iam_user | id | ssrc_rfx_header | pur_user_id / created_by / last_updated_by | 采购联系人、创建人、更新人 |
+| iam_user | id | ssrc_rfx_action | process_user_id / deliver_from_user_id / deliver_to_user_id | 处理人、转交人 |
+| iam_user | id | ssrc_rf_action | deliver_from_user_id / deliver_to_user_id | 征询单转交人 |
+| iam_user | id | ssrc_prequal_header | prequal_user_id | 资格预审人 |
+| iam_user | id | ssrc_prequal_line | user_id | 资审成员 |
+| iam_user | id | 任意业务表 | created_by / last_updated_by | 创建人/更新人（审计字段，几乎每张表都有） |
+
 ### 1.5. 公司信息关联
 | 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
 |------|----------|--------|----------|------|

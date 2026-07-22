@@ -108,6 +108,11 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
     WHERE  tenant_id = {tenant_id}
       AND  quotation_header_id = {quotation_header_id};
     ```
+- **人员ID修复规则（必须严格遵守）**:
+  - 所有SRM业务表中存储的人员ID（`user_id`、`expert_user_id`、`created_by`、`last_updated_by`、`process_user_id`、`deliver_from_user_id`、`deliver_to_user_id`、`pur_user_id`、`prequal_user_id`、`request_user_id`、`contact_user_id`、`recipient_user_id` 等）**最终都指向 `iam_user.id`**
+  - `iam_user.organization_id` 即为租户ID，**等价其他表的 `tenant_id`**；但 `iam_user` 表本身**没有 `tenant_id` 字段**，过滤租户必须用 `organization_id = {tenant_id}`
+  - 任何"涉及修复数据中人员"的需求，都必须先查 `iam_user` 把账号/姓名解析为 `id`，再用该 `id` 更新业务表的人员字段，不要直接写入账号字符串
+  - 详细结构见 `references/table_detail/iam_user.md`，关联关系见 `relations.md` 的"1.2 用户（人员）关联"
 - **UPDATE/DELETE 安全规则（必须严格遵守）**:
   - UPDATE 和 DELETE 必须是单表操作，必须包含 WHERE 条件
   - **WHERE 条件必须使用 `tenant_id` + 表主键**，禁止使用任何非主键字段（包括外键、业务单号等）
