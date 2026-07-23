@@ -1,7 +1,7 @@
 {
   "name": "sql-generator",
-  "version": "1.3.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对询价单(含招标单)、报价单、评分、资格预审等核心业务场景。",
+  "version": "1.4.0",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 sql-ops MCP 对接真实数据库：不确定的表名/字段名必须先校验，逐步执行只读查询获取真实值后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用渐进式披露设计，按需加载表详细结构。专门针对询价单(含招标单)、报价单、评分、资格预审等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -22,8 +22,21 @@
     "sql_templates": "常用SQL模板和查询模式",
     "sql_examples": "业务场景的完整SQL示例",
     "progressive_disclosure": "渐进式披露,按需加载",
-    "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射"
+    "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射",
+    "mcp_validation": "通过 sql-ops MCP 校验表/字段真实存在，禁止编造",
+    "stepwise_execution": "逐步执行只读查询获取真实值（租户->单据->业务），异常回退占位符"
   },
+  "mcp_servers": [
+    {
+      "name": "sql-ops",
+      "tools": [
+        "execute_sql",
+        "validate_table_columns",
+        "describe_table"
+      ],
+      "description": "对接 Archery 平台，执行只读查询与表/字段结构校验"
+    }
+  ],
   "entry_point": "SKILL.md",
   "categories": [
     "database",
@@ -34,6 +47,6 @@
     "tables_count": 17,
     "sql_templates_count": 16,
     "sql_examples_count": 0,
-    "last_updated": "2026-07-09"
+    "last_updated": "2026-07-23"
   }
 }

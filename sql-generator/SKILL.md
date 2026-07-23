@@ -1,6 +1,6 @@
 ---
 name: sql-generator
-description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。采用渐进式披露设计，按需加载表详细结构，避免上下文臃肿。专门针对租户的询价单（招标单）、报价单、评分、资格预审等核心业务场景。
+description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 sql-ops MCP 对接真实数据库：不确定的表名/字段名必须先校验，逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用渐进式披露设计，按需加载表详细结构。专门针对租户的询价单（招标单）、报价单、评分、资格预审等核心业务场景。
 ---
 
 # SQL生成助手
@@ -27,20 +27,52 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 - "查询招标单BID2026070100001的投标情况"
 - "将招标单BID2026070100001修复为待定标状态"
 
+## 工具能力 (sql-ops MCP)
+
+本技能通过 `sql-ops` MCP 服务对接真实数据库（Archery 平台），**所有表/字段验证与只读查询都必须走该服务，严禁凭空臆造表名或字段名**。包含三个工具：
+
+- **`validate_table_columns(tb_name, columns?, instance_name?, db_name?, schema_name?)`**
+  校验表与字段是否存在。不传 `columns` → 仅校验表是否存在并返回全部字段；传 `columns`（字段名列表）→ 返回每个字段的命中/缺失及类型定义。用于生成 SQL 前确认表名、字段名拼写是否正确。
+- **`describe_table(tb_name, instance_name?, db_name?, schema_name?)`**
+  获取表完整结构（DDL + 字段列表），用于确认字段拼写、类型与注释。
+- **`execute_sql(sql, instance_name?, db_name?, limit_num=100, schema_name?, tb_name?)`**
+  在 Archery 执行**只读查询**（SELECT/SHOW/EXPLAIN/WITH/DESC 等），返回真实数据（Markdown 表格 + 行数/耗时/脱敏标记）。
+
+默认实例/库：实例 `SAAS-SRM-PROD数据库`、库 `srm`，`instance_name`/`db_name` 一般不传即用默认值。
+
 ## 执行步骤
 
-1. **查询租户id**: 如果用户告知了租户编码，默认输出查询租户的SQL，示例 `SELECT *FROM hpfm_tenant WHERE tenant_num ='SRM-AUSNUTRIA';` 确认租户id，注意调用调用 MCP 工具 `execute_sql` 执行查询，得到准确的tenant_id，如果未能得到结果，再输出查询租户的SQL，得到了准确的tenant_id后，后续的生成的SQL中的tenant_id替换为准确的tenant_id，而非占位符
-2. **识别涉及的表**: 从用户需求中提取SRM表名,对照 `table_meta.md` 确认表是否存在。⚠️ 注意判断单据类型：单号BID开头→招标单（共用询价单表），RFX开头→询价单
-3. **按需加载详细结构**: 仅读取用户需求中涉及的 `table_detail/[表名].md` 文件
-4. **补充关联关系**: 参考 `relations.md` 确认SRM表之间的关联键。⚠️ 招标单与询价单共用关联关系
-5. **应用SQL模板**: 从 `sql_templates.md` 中匹配适用于SRM业务的SQL例子然后改写条件
-6. **生成/调整SQL**: 结合SRM表结构、关联关系和模板，生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
-7. **标注信息**: 在SQL注释中标注使用的SRM表、关联关系和核心业务字段
-8. **执行查询验证（只读查询必须执行）**: 当第6步生成的是「只读查询 SQL」（SELECT时，**必须主动调用 MCP 工具 `execute_sql` 在 Archery 平台执行**，用真实数据校验 SQL 正确性与业务逻辑，并据结果组织回答：
-   - 调用示例：`execute_sql(sql="<生成的SELECT语句>", instance_name="SAAS-SRM-PROD数据库", db_name="srm")`
-   - 参数说明：`sql` 必填；`instance_name`/`db_name` 不传则取 `.env` 默认值（SAAS-SRM-PROD数据库 / srm）；`limit_num` 默认 100
-   - 返回内容为 Markdown 表格（列名+行数据）+ 行数/耗时/脱敏标记；据此确认字段存在、数据符合预期、业务理解正确
-   - ⚠️ 该工具**仅支持只读查询**，**写操作（UPDATE/DELETE/INSERT）会被拒绝**。若本技能生成的是数据修复类 SQL，**不要**用此工具执行，只输出 SQL 文本交人工/后续流程处理即可
+> **核心原则（铁律）**
+> 1. **不确定就验证**：任何你将在 SQL 中用到的、不确定的表名或字段名，生成前必须先用 `validate_table_columns` / `describe_table` 校验；`references/table_detail/*.md` 仅供参考，**真实字段以 `sql-ops` 返回为准，禁止靠记忆编造**。
+> 2. **逐步生成、逐步验证**：按依赖顺序分步（如先解析租户 → 再解析单据主键 → 再执行业务查询），每一步都先调用 `execute_sql` 拿到真实结果，再推进下一步；不要一次性臆测所有参数。
+> 3. **异常即占位**：若某一步 MCP 返回异常或查询无结果，该步应填入的具体值改用占位符（`{tenant_id}` / `{rfx_header_id}` 等），并在注释标注异常原因，**绝不编造**。
+
+0. **工具与约定**：确认使用 `sql-ops` 的 `execute_sql` / `validate_table_columns` / `describe_table`；默认实例 `SAAS-SRM-PROD数据库`、库 `srm`。
+
+1. **识别单据类型**：单号 `BID`→招标单，`RFX`→询价单，`RFI`/`RFP`→征询单；招标单与询价单共用 `ssrc_rfx_*` 表，区分字段 `ssrc_rfx_header.secondary_source_category = 'NEW_BID'`；评标/结果表 `source_from` 统一 `'RFX'`。
+
+2. **校验表与字段（强制）**：
+   - 列出你将在 SELECT/WHERE/JOIN 中用到的所有表与字段，对**不确定是否存在**的逐一校验：
+     - 校验整表：`validate_table_columns(tb_name="ssrc_rfx_header")`
+     - 校验字段：`validate_table_columns(tb_name="ssrc_rfx_header", columns=["rfx_num","rfx_status","secondary_source_category"])`
+   - 需要完整结构确认拼写/类型时：`describe_table(tb_name="ssrc_rfx_header")`。
+   - ✅ 校验通过的表/字段才允许写进最终 SQL；🚫 未校验且不敢确定的，**必须校验，不得臆造**。
+
+3. **逐步查询（一步步推进，每步带入真实值）**：
+   - **步骤 A 解析租户**：若只有租户编码、无 `tenant_id`，先调用：
+     `execute_sql(sql="SELECT tenant_id, tenant_num FROM hpfm_tenant WHERE tenant_num = 'SRM-AUX';")`
+     取得真实 `tenant_id` 后，后续 SQL 一律用真实值，不再写 `{tenant_id}`。
+   - **步骤 B 解析单据主键**：若只有业务单号，用步骤 A 的真实 `tenant_id` 查主键：
+     `execute_sql(sql="SELECT rfx_header_id, rfx_status FROM ssrc_rfx_header WHERE tenant_id = <真实id> AND rfx_num = 'RFX20260...';")`
+   - **步骤 C 业务查询/统计**：基于 A、B 已取得真实值构造并执行真正的业务 SQL（只读查询在此步用 `execute_sql` 验证）。
+   - 每一步都依据上一步返回的真实值生成下一步 SQL，**禁止并行臆测全部参数**。
+
+4. **汇总生成最终可执行 SQL**：将各步真实结果代入，产出带注释头的完整 SQL（业务场景/涉及表/关联/核心字段/source_from/字段命名）。只读查询已在步骤 3 用真实数据验证，可交付并附结论。
+
+5. **MCP 异常回退（占位符模式）**：若某步 `execute_sql` / `validate_table_columns` / `describe_table` 返回异常或查询无结果：
+   - 该步本应填入的具体值**改用占位符** `{tenant_id}` / `{rfx_header_id}` / `{字段名}`；
+   - 在 SQL 注释/回复明确标注：`⚠️ 以下占位符因 sql-ops 校验/查询异常未能获取真实值，请人工确认后替换：xxx`；
+   - 写操作（UPDATE/DELETE/INSERT）**禁止**用 `execute_sql` 执行，保持占位符交人工处理。
 
 ## 核心规则
 
@@ -338,14 +370,16 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 - ⚠️ 招标单(BID开头)与询价单共用 `ssrc_rfx_*` 系列表，加载表结构时无需区分
 
 ### 准确性保障
+- **验证优先级（务必遵守）**：`sql-ops` MCP 返回的真实结构 **> 本地参考文件**。`table_meta.md` / `table_detail/*.md` / `relations.md` 只作为快速索引与业务语义参考；**只要对表名或字段名有任何不确定，就必须用 `validate_table_columns` / `describe_table` 向真实库确认，严禁凭记忆或猜测编造表/字段**。
 - 生成SQL前必须验证:
-  - 表名拼写是否正确(对照 `table_meta.md`)
-  - 关联键是否匹配(对照 `relations.md`)
-  - 字段是否存在于对应表(对照 `table_detail/[表名].md`)
+  - 表名是否真实存在(先查 `table_meta.md` 索引，**不确定则用 `validate_table_columns` / `describe_table` 确认**)
+  - 关联键是否匹配(参考 `relations.md`，涉及的关联字段不确定时用 `validate_table_columns` 校验两侧字段存在)
+  - 字段是否存在于对应表(参考 `table_detail/[表名].md`，**不确定则用 `validate_table_columns(tb_name, columns=[...])` 逐字段校验，以返回结果为准**)
   - **字段命名是否符合下划线格式**（snake_case）
   - **拓展字段（attribute前缀）是否按规则命名**
   - ⚠️ **source_from 是否正确**：评标/结果表中 `'RFX'` 同时覆盖询价单与新招标（新招标不再使用 `'BID'`），`'BID'` 仅指几乎不再使用的老招标；征询单用 `'RFI'`/`'RFP'`。另需注意 `ssrc_rfx_header.source_from` 是**单据来源**，不是单据类型区分字段（区分用 `secondary_source_category`）
-- 对于复杂的查询逻辑,建议分步生成并验证
+- **逐步验证**：复杂查询必须分步生成并逐步用 `execute_sql` 验证（先租户、再单据主键、再业务查询），每步以上一步真实结果为输入。
+- **异常回退**：任一验证/查询步骤 MCP 异常或无结果时，对应值改用占位符并显式标注，绝不编造真实值。
 
 ## 参考文件指引
 
@@ -536,6 +570,14 @@ GROUP BY ...
 ### 字段变更检测
 - **情况**: 用户提到的字段在当前表中不存在
 - **处理**: 参考 `columns_202603131733.md` 检查字段历史，提示可能的字段变更
+
+### MCP (sql-ops) 工具异常或返回空结果
+- **情况**: `execute_sql` / `validate_table_columns` / `describe_table` 调用失败、超时、鉴权异常，或查询返回 0 行/无匹配字段
+- **处理（必须遵循，禁止编造）**:
+  - 该步骤本应取得的真实值（如 `tenant_id`、`rfx_header_id`、字段值）**一律改用占位符** `{tenant_id}` / `{rfx_header_id}` / `{字段名}` 等
+  - 在 SQL 注释/回复中显式标注：`⚠️ 以下占位符因 sql-ops 校验/查询异常未能获取真实值，请人工确认后替换：xxx`
+  - 若关键前置值（如 `tenant_id`）缺失，且后续逻辑强依赖它，应**停止生成可执行 SQL**，先向用户说明异常并请求确认，不要臆造串联
+  - 写操作（UPDATE/DELETE/INSERT）本就禁止用 `execute_sql` 执行，异常时更应保留占位符交人工处理
 
 ## SRM系统扩展指南
 
