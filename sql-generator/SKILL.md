@@ -29,13 +29,18 @@ description: 基于SRM采购寻源系统的SQL生成助手，支持快速生成�
 
 ## 执行步骤
 
-1. **查询租户id**: 如果用户告知了租户编码，默认输出查询租户的SQL，示例 `SELECT *FROM hpfm_tenant WHERE tenant_num ='SRM-AUSNUTRIA';` 确认租户id
+1. **查询租户id**: 如果用户告知了租户编码，默认输出查询租户的SQL，示例 `SELECT *FROM hpfm_tenant WHERE tenant_num ='SRM-AUSNUTRIA';` 确认租户id，注意调用调用 MCP 工具 `execute_sql` 执行查询，得到准确的tenant_id，如果未能得到结果，再输出查询租户的SQL，得到了准确的tenant_id后，后续的生成的SQL中的tenant_id替换为准确的tenant_id，而非占位符
 2. **识别涉及的表**: 从用户需求中提取SRM表名,对照 `table_meta.md` 确认表是否存在。⚠️ 注意判断单据类型：单号BID开头→招标单（共用询价单表），RFX开头→询价单
 3. **按需加载详细结构**: 仅读取用户需求中涉及的 `table_detail/[表名].md` 文件
 4. **补充关联关系**: 参考 `relations.md` 确认SRM表之间的关联键。⚠️ 招标单与询价单共用关联关系
 5. **应用SQL模板**: 从 `sql_templates.md` 中匹配适用于SRM业务的SQL例子然后改写条件
 6. **生成/调整SQL**: 结合SRM表结构、关联关系和模板，生成符合SRM业务逻辑的SQL。⚠️ 新招标单与询价单完全共用（`ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 区分单据类型，评标/结果表 `source_from` 仍为 `'RFX'`）
 7. **标注信息**: 在SQL注释中标注使用的SRM表、关联关系和核心业务字段
+8. **执行查询验证（只读查询必须执行）**: 当第6步生成的是「只读查询 SQL」（SELECT时，**必须主动调用 MCP 工具 `execute_sql` 在 Archery 平台执行**，用真实数据校验 SQL 正确性与业务逻辑，并据结果组织回答：
+   - 调用示例：`execute_sql(sql="<生成的SELECT语句>", instance_name="SAAS-SRM-PROD数据库", db_name="srm")`
+   - 参数说明：`sql` 必填；`instance_name`/`db_name` 不传则取 `.env` 默认值（SAAS-SRM-PROD数据库 / srm）；`limit_num` 默认 100
+   - 返回内容为 Markdown 表格（列名+行数据）+ 行数/耗时/脱敏标记；据此确认字段存在、数据符合预期、业务理解正确
+   - ⚠️ 该工具**仅支持只读查询**，**写操作（UPDATE/DELETE/INSERT）会被拒绝**。若本技能生成的是数据修复类 SQL，**不要**用此工具执行，只输出 SQL 文本交人工/后续流程处理即可
 
 ## 核心规则
 
