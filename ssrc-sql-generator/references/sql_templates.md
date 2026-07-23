@@ -4,6 +4,35 @@
 
 ---
 
+## 场景检索速查表（先在此定位可复用模板）
+
+> 收到新任务时，**先在本表按业务关键词 / 单据类型定位模板编号**，跳转到对应章节复用，避免重复写 SQL。
+> 模板中的表 / 字段若已标注「✅ 已验证」且近期结构无变更，生成同类 SQL 时可免 MCP 校验（详见 `SKILL.md` 分级校验策略）。新增 / 修改模板后，请在对应位置补充「✅ 已验证」标记及日期。
+
+| 业务场景 / 关键词 | 单据类型 | 涉及核心表 | 模板编号 |
+|---|---|---|---|
+| 获取租户 ID（tenant_id） | 通用 | hpfm_tenant | 1.1 |
+| 查询公司 / 供应商信息 | 通用 | hpfm_company | 1.2 |
+| 询价单基础查询（单号/状态/时间） | 询价/招标 | ssrc_rfx_header | 2.1 |
+| 询价单关联公司信息查询 | 询价/招标 | ssrc_rfx_header, hpfm_company | 2.2 |
+| 报价单 / 投标单查询 | 询价/招标 | ssrc_rfx_quotation_header/line | 2.3 |
+| 评分 / 评标查询 | 询价/招标 | ssrc_evaluate_* | 2.4 |
+| 询价单聚合统计（数量/金额） | 询价/招标 | ssrc_rfx_* | 2.5 |
+| 修复询价单字段（非状态） | 询价/招标 | ssrc_rfx_header | 2.6.1 |
+| 修复询价单状态（rfx_status 同步） | 询价/招标 | ssrc_rfx_header, _expand | 2.6.2 |
+| 修复评分要素最高分 | 询价/招标 | ssrc_evaluate_indic | 2.6.3 |
+| 删除专家及其分配要素 | 询价/招标 | ssrc_evaluate_expert/score_line | 2.6.4 |
+| 删除寻源结果（未被占用） | 询价/招标 | ssrc_source_result | 2.6.5 |
+| 释放被订单错误占用的寻源结果 | 询价/招标 | ssrc_source_result_change_history | 2.6.7 |
+| 询价单回退至报价中（插延时消息） | 询价/招标 | spfm_pending_message | 2.6.6 |
+| 修复供应商物料分配 | 询价/招标 | ssrc_rfx_item_sup_assign | 2.6.8 |
+| 征询单基础查询 | 征询(RF) | ssrc_rf_header | 3.1 |
+| 征询单报价查询 | 征询(RF) | ssrc_rf_quotation_* | 3.2 |
+| 征询单数据修复 | 征询(RF) | ssrc_rf_* | 3.3 |
+| 状态值 / 枚举速查 | 通用 | — | 附录 |
+
+> 更复杂、独立的完整修复 SQL 示例沉淀在 `assets/sql_template_examples/`（按 `<场景>.sql` 命名，文件头含场景 / 涉及表 / 占位符 / 已验证标记）。
+
 ## 占位符说明
 
 | 占位符 | 说明 | 示例 |

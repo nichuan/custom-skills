@@ -1,6 +1,10 @@
 # 核心表元数据
 
-本文件仅维护表的**极简元数据**，用于快速匹配表名和确认基本信息。如需详细字段信息，请查看 `table_detail/[表名].md`。
+本文件是 **业务语义 / 速查层**：仅沉淀数据库拿不到、或高频复用容易写错的业务语义（主键、关联、状态/枚举速查、常见租户）。
+**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 sql-ops MCP 实时获取**（详见 `SKILL.md`）：
+
+- `describe_table('<表名>')` —— 返回完整字段清单与表注释
+- `validate_table_columns('<表名>', ['字段A','字段B'])` —— 校验字段是否存在
 
 ## 元数据格式
 - **表名**: 主键、核心字段1、核心字段2、关联键(外键)
@@ -69,7 +73,8 @@
 1. 按照上述格式添加表元数据
 2. 确保标注主键和外键关联
 3. 仅列出**高频使用的3-5个核心字段**
-4. 在 `table_detail/` 中创建对应的详细结构文件
+4. 关联、状态语义等数据库拿不到的业务知识沉淀在此文件（而非 `table_detail/`）
+5. 复杂/数据修复场景的**完整 SQL 示例**沉淀到 `assets/sql_template_examples/`（见 `SKILL.md` 模板维护章节）
 
 ### 表命名规范
 - **hpfm_** 前缀：平台基础数据表
@@ -79,3 +84,24 @@
 - **ssrc_prequal_** 前缀：资格预审相关表
 - **ssrc_source_** 前缀：寻源相关表
 - **spfm_** 前缀：平台消息/待办相关表（如 spfm_pending_message 延时消息表）
+
+---
+
+## 常用参考租户（使用前务必先查真实值）
+
+> SRM 多租户，绝大多数 SQL 都要带 `tenant_id`。历史示例中常见业务租户：
+> - `tenant_num = 'SRM-JDENERGY'` 历史上对应 `tenant_id = 155357`（**仅供参考，绝不硬编码**）
+>
+> ✅ 正确做法：先用 `SELECT tenant_id, tenant_num FROM hpfm_tenant WHERE tenant_num = '目标租户'` 获取真实 `tenant_id` 后再代入。
+
+## 易错枚举速查（数据库注释通常含值集，以下为高频易错项）
+
+- **team（评标专家/指标分组）**：`BUSINESS`(商务) / `TECHNOLOGY`(技术) / `BUSINESS_TECHNOLOGY`(商务+技术)
+- **rfx_role（ssrc_rfx_member 成员角色）**：`RFX_BY`(寻源负责人) / `CHECKED_BY`(审批人) / `PRETRIAL_BY`(预审人) / `OPENED_BY`(开标人)
+- **ssrc_rf_header.source_from（征询单来源）**：`RFI`(信息征询) / `RFP`(方案征询) / `RFQ`(价格征询)
+- 其余状态枚举（rfx_status / quotation_status / feedback_status / 寻源结果状态等）见 `references/sql_templates.md` 附录「常用状态值参考」。
+
+## 拓展字段补充（iam_user 特例）
+
+- 标准 SRM 业务表拓展字段为 `attribute_decimal/datetime/varchar/longtext` 各 `1~10`（见 `SKILL.md` 拓展字段规则）。
+- **`iam_user` 例外**：其拓展字段为 `attribute1 ~ attribute15`（均为 `varchar(150)`），处理 iam_user 时以 `describe_table` 实际返回为准，不要套用 1~10 规则。
