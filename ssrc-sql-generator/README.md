@@ -18,11 +18,11 @@
 ### 2. 业务语义分层（本地只沉淀拿不到的知识）
 - `table_meta.md`：表名-主键-关联键速查 + 常见租户 + 易错枚举（数据库拿不到或高频易错）。
 - `relations.md`：表关联与业务规则（纯业务知识）。
-- `sql_templates.md`：模板库（含场景检索速查表）。
+- 模板库已迁移至 **DB（sql-template MCP / Supabase）**：检索复用与沉淀走 MCP，不再本地维护（详见下方「模板库 + 分级校验」）。
 
 ### 3. 模板库 + 分级校验（正确性与效率兼顾）
-- `sql_templates.md`（模板库，顶部有「场景检索速查表」）与 `assets/sql_template_examples/`（复杂/数据修复完整 SQL 示例）是可检索、可沉淀的入口。
-- 「已验证」模板/示例中的表字段免 MCP 校验以提效；表名/字段名不明确时仍必校验（详见 `SKILL.md` 分级校验策略）。
+- 模板库存于 **Supabase（sql-template MCP）**，提供 `search_sql_template`（生成前检索复用）与 `save_sql_template`（生成后沉淀）闭环。
+- 模板随使用增长，越用越强；「✅ 已验证」模板（`verified=true`）的表字段免 MCP 校验以提效（详见 `SKILL.md` 分级校验策略）。
 
 ### 4. 维护成本低、可持续沉淀
 - 新场景完成即沉淀为模板/示例，后续同类任务快速复用。
@@ -172,6 +172,7 @@ ORDER BY r.create_time DESC;
 - 聚合统计时明确 GROUP BY 字段和聚合函数
 - 生成的 SQL 必须包含关键注释说明
 - ⚠️ 新招标单（BID）查询与询价单完全共用：评标/结果表 `source_from` 仍为 `'RFX'`（不要写成 `'BID'`），单据类型区分用 `ssrc_rfx_header.secondary_source_category = 'NEW_BID'`
+- ⚠️ **写入类 SQL 输出规范**（详见 `SKILL.md`「SQL 输出格式规范」）：每条 UPDATE/DELETE 之前必须保留一段用一致 WHERE 条件的「原始数据核查 SELECT」，供提交前人工确认；**禁止输出**「执行前备份」(`CREATE TABLE bak_...`) 与「回滚方案」段。
 
 ### 结构获取规则（替代原"上下文加载规则"）
 - 结构事实统一走 MCP：`describe_table` / `validate_table_columns` / `execute_sql`
@@ -198,6 +199,13 @@ ORDER BY r.create_time DESC;
 - 保持本地文件精简：结构事实一律走 MCP
 
 ## 版本历史
+
+### v1.6.0
+- **SQL 输出格式规范（写入类操作）**：新增专章，明确 UPDATE/DELETE 类输出的格式要求
+  - ✅ 每条 UPDATE/DELETE 之前必须保留用一致 WHERE 条件的「原始数据核查 SELECT」，便于提交前人工跑查询确认数据正确
+  - ✅ 推荐保留「执行后校验 SELECT」
+  - ❌ 禁止输出「执行前备份」(`CREATE TABLE bak_...`) 与「回滚方案」段，生产修复以「先核查→人工确认→事务可控提交」为准
+  - 同步更新「数据库约束与安全规则」第 3 条与 README 最佳实践
 
 ### v1.5.0
 - **精简**：删除 `references/table_detail/` 全部 41 个本地表结构文件，不再在仓库中暴露表结构与字段信息
