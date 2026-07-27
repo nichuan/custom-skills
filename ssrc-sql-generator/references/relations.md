@@ -43,6 +43,7 @@ hpfm_tenant (租户)
 > - **所有 SRM 业务表中存储的人员ID，最终都指向 `iam_user.id`**（如 `user_id`、`expert_user_id`、`created_by`、`last_updated_by`、`process_user_id`、`deliver_from_user_id`、`deliver_to_user_id`、`pur_user_id`、`prequal_user_id`、`request_user_id`、`contact_user_id`、`recipient_user_id` 等）。
 > - `iam_user.organization_id` 即为租户ID，**等价其他表的 `tenant_id`**；但本表**没有 `tenant_id` 字段**，查询本表时必须用 `organization_id = {tenant_id}` 过滤，不能用 `tenant_id`。
 > - 任何"涉及修复数据中人员"的需求，都必须先查询 `iam_user` 得到正确的 `id`，再用该 `id` 去更新业务表的人员字段。
+> - 没有特殊说明，默认所有表中的supplier_company_id字段都是对应hpfm_company表的company_id字段，supplier_id字段是对应sslm_external_supplier表的supplier_id字段，如果平台供应商和本地供应商已关联，sslm_external_supplier中的link_id则为hpfm_company表的company_id字段。
 
 | 主表 | 主表字段 | 关联表 | 关联字段 | 说明 |
 |------|----------|--------|----------|------|

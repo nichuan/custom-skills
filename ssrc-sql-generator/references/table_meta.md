@@ -84,7 +84,7 @@
 - **ssrc_prequal_** 前缀：资格预审相关表
 - **ssrc_source_** 前缀：寻源相关表
 - **spfm_** 前缀：平台消息/待办相关表（如 spfm_pending_message 延时消息表）
-
+- **smdm_** 前缀：主数据数据相关表，这些都是公用表（如 smdm_item 物料主数据表，smdm_item_category 物料品类表）
 ---
 
 ## 常用参考租户（使用前务必先查真实值）
