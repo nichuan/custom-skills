@@ -25,8 +25,8 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 | `validate_table_columns("<表名>", ["字段A","字段B"])` | 校验字段是否存在 | 生成 UPDATE/WHERE 前确认字段名拼写 |
 | `describe_table("<表名>")` | 返回完整字段清单与表注释（含拓展字段） | 不确定字段、需要完整结构时 |
 
-> 结构信息（字段/类型/注释）一律用上述工具实时获取；**不要引用任何本地表结构文件**，因为本仓库已不维护 `table_detail/`。
-> 模板库已迁移至 **DB（sql-template MCP / Supabase）**，**不再维护本地 `references/sql_templates.md` 与 `assets/sql_template_examples/`**，检索与沉淀一律走 MCP。
+> 结构信息（字段/类型/注释）一律用上述工具实时获取；不要引用本地表结构文档。
+> 模板库已迁移至 **DB（sql-template MCP / Supabase）**，不再维护本地模板文件，检索与沉淀一律走 MCP。
 
 ## 工具能力（sql-template MCP，模板库）
 
@@ -48,7 +48,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 生成任何 SQL 前，按以下顺序执行，**严禁跳步**：
 
 1. **先检索模板库**：调用 `search_sql_template`，按业务关键词 / 单据类型 / 涉及表名检索已有模板；优先复用 `verified=true`（✅ 已验证）模板，其表/字段可纳入下方「免校验」范围。若 MCP 不可用则跳过本步继续。
-2. **澄清租户 source_from**：确认业务单据类型与 `source_from`（见术语映射表第 5 条），避免混淆单据来源与单据类型。
+2. **确认业务上下文**：按术语映射表判断单据类型和关联表的 `source_from`；只有用户描述不足以判断时才澄清，避免把单据来源误当成单据类型。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'` 获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `155357`/`SRM-JDENERGY` 仅供参考）。
 4. **确认涉及表与字段（分级校验）**：按下方「分级校验策略」判断哪些表/字段可直接使用、哪些需 MCP 校验；命中已验证模板的表/字段免校验。需要完整结构时调 `describe_table`。
 5. **逐步获取真实值**：按「先租户 → 再单据（rfx_header_id / rf_header_id）→ 再业务明细」的顺序，用 `execute_sql` 取真实主键/关联键，**禁止用硬编码 ID 直接生成修改 SQL**。
@@ -62,7 +62,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 > 目标：**已知可信的来源免校验以提效；不明确或存疑的必校验以保证正确**。
 
 ### ✅ 可直接使用，无需 MCP 校验
-- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的模板的表名与字段（检索时返回已携带验证状态，命中即纳入免校验）；
+- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的模板的表名与字段（检索结果会携带验证状态，命中即纳入免校验）；
 - 在 **`references/table_meta.md`（业务语义/速查层）** 中明确列出的表名、主键、关联键（如 `rfx_header_id`、`tenant_id`、`supplier_company_id`）；
 - 在 **`references/relations.md`** 中明确给出的关联与规则；
 - **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`，按命名规则直接使用（注意 `iam_user` 为 `attribute1~15` 特例，见 table_meta.md）；
@@ -100,16 +100,15 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 - 常见数据修复场景（如核价/评分回退至报价中、修复报价截止时间）还需**插入 `spfm_pending_message` 延时消息**触发状态刷新。
 
 ### 4. 附件字段处理规则
-- **所有附件 UUID 字段（如 `business_attachment_uuid`、`tech_attachment_uuid`、`current_business_attachment_uuid` 等）都必填**，不允许为空。
-- **附件删除 = 将对应 UUID 字段更新为 `NULL`**（非物理删除行）。
-- 改这些字段前必须确认字段名存在（属「可用 validate_table_columns 校验」的情形，因不同表的附件字段命名不一）。
+- 业务需要保留附件时，对应 UUID 字段必须写入有效值；不同表的附件字段命名不一，必须先校验字段存在。
+- 明确执行附件删除时，将对应 UUID 字段更新为 `NULL`（不物理删除业务行），并在输出中说明这是有意清空而非漏填。
 
-### 5. source_from 澄清（必问）
-- 用户只说「询价单/招标单/报价单」时，先确认 `source_from`：
-  - 询价单 → `RFX`
-  - 老招标单 → `BID`
-  - 新招标单 → 仍归 RFX 上下文，但 `secondary_source_category = 'NEW_BID'`
-- 不确定时**必须向用户澄清**，避免后续 SQL 关联错表或错条件。
+### 5. 业务上下文判定（仅在不明确时澄清）
+- `ssrc_rfx_header.secondary_source_category = 'NEW_BID'` 用于区分新招标单；它不是 `source_from`。
+- `ssrc_rfx_header.source_from` 表示单据来源（如手工新建、申请转单、立项转单），不是询价单/招标单类型。
+- 评分、评标、寻源结果等关联表中，`source_from = 'RFX'` 同时覆盖询价单和新招标；`'BID'` 仅表示历史老招标上下文。
+- 征询单使用独立的 `ssrc_rf_*` 表，按业务类型使用 `RFI` / `RFP` / `RFQ`。
+- 用户已明确单据类型或单号前缀时直接采用上述规则；仅当上下文仍无法判断时再向用户澄清。
 
 ### 6. 人员 ID 修复规则
 - SRM 中**所有业务表的「人员 ID」都指向 `iam_user.id`**（如 `user_id`、`expert_user_id`、`created_by` 等）。
@@ -138,7 +137,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 | `references/relations.md` | 表关联关系 + 业务规则（纯业务知识，数据库拿不到） | 不确定表间关系、关联键、状态同步规则时 |
 | `references/table_meta.md` | 业务语义/速查层：表名-主键-关联键速查、常见租户、易错枚举、拓展字段特例 | 快速确认表/主键/关联键、高频枚举值时 |
 
-> 模板库已迁移至 **DB（sql-template MCP / Supabase）**：检索复用走 `search_sql_template`，沉淀走 `save_sql_template`，**不再维护本地 `sql_templates.md` 与 `assets/sql_template_examples/`**。字段级结构（字段名、类型、注释、索引）一律 `describe_table` / `validate_table_columns` 实时获取，不在此列文件内。
+> 模板库已迁移至 **DB（sql-template MCP / Supabase）**：检索复用走 `search_sql_template`，沉淀走 `save_sql_template`，不再维护本地模板文件。字段级结构（字段名、类型、注释、索引）一律 `describe_table` / `validate_table_columns` 实时获取，不在此列文件内。
 
 ## 模板维护与检索（DB 模板库闭环）
 
@@ -181,7 +180,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 2. **沉淀业务语义**：把数据库拿不到的关联/规则补充到 `references/relations.md` 或 `references/table_meta.md`（而非创建本地表结构文件）。
 3. **沉淀可复用模板**：复杂场景完成生成后，询问用户并调用 `save_sql_template` 沉淀到 DB 模板库（校验通过的表/字段置 `verified=true`），不再写入本地文件。
 4. **更新本 SKILL**：在术语映射表或参考文件指引中补充新概念。
-5. **禁止**：不要为每张表创建 `table_detail/*.md` 之类的本地结构文件——结构事实统一走 MCP。
+5. **禁止**：不要为每张表创建本地结构文件——结构事实统一走 MCP。
 
 ## 核心业务概念（背景知识）
 

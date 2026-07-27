@@ -13,7 +13,7 @@
   - `describe_table('<表名>')` 取完整字段
   - `validate_table_columns('<表名>', ['字段'])` 校验字段存在性
   - `execute_sql('<SQL>')` 取真实值（租户ID、单据主键、状态值等）
-- 仓库不再包含 `table_detail/` 这类暴露表结构的大文件，更精简、更安全。
+- 仓库不再包含暴露表结构的本地单表文档，更精简、更安全。
 
 ### 2. 业务语义分层（本地只沉淀拿不到的知识）
 - `table_meta.md`：表名-主键-关联键速查 + 常见租户 + 易错枚举（数据库拿不到或高频易错）。
@@ -25,7 +25,7 @@
 - 模板随使用增长，越用越强；「✅ 已验证」模板（`verified=true`）的表字段免 MCP 校验以提效（详见 `SKILL.md` 分级校验策略）。
 
 ### 4. 维护成本低、可持续沉淀
-- 新场景完成即沉淀为模板/示例，后续同类任务快速复用。
+- 新场景完成即沉淀为模板，后续同类任务快速复用。
 - 业务规则变化只需更新 `relations.md` / `table_meta.md`，无需维护逐表结构文件。
 
 ## 目录结构
@@ -35,16 +35,12 @@ ssrc-sql-generator/
 ├── SKILL.md                              # Skill 入口文件（必填）
 ├── README.md                             # 本文件
 ├── skill.json                            # Skill 配置文件
-├── references/                           # SRM 系统参考文档（仅业务语义层）
-│   ├── table_meta.md                     # 业务语义/速查层（表名-主键-关联键、常见租户、易错枚举）
-│   ├── relations.md                      # 表关联关系与业务规则
-│   └── sql_templates.md                  # SQL 模板库（含场景检索速查表 + 状态值附录）
-└── assets/                               # 资源文件目录
-    └── sql_template_examples/            # 复杂/数据修复场景完整 SQL 示例（可增长）
-        └── rfx_rollback_to_quotation.sql # 示例：询价单回退至报价中（状态同步 + 延时消息）
+└── references/                           # SRM 业务语义参考文档
+    ├── table_meta.md                     # 表名、主键、关联键、常见枚举
+    └── relations.md                      # 表关联关系与业务规则
 ```
 
-> 表结构由 sql-ops MCP 实时提供，**`references/` 下不再有单表结构文件**。
+> 表结构由 sql-ops MCP 实时提供；SQL 模板由 sql-template MCP（Supabase）维护，均不在 Skill 目录中复制。
 
 ## 快速开始
 
@@ -64,7 +60,7 @@ ssrc-sql-generator/
 1. **识别涉及的表**：从用户需求中提取表名，对照 `table_meta.md` 确认表与关联键。
 2. **实时获取结构（MCP）**：对不明确的表/字段调 `describe_table` / `validate_table_columns` 确认。
 3. **补充关联关系**：参考 `relations.md` 确认关联键与业务规则。
-4. **检索复用模板**：先查 `sql_templates.md` 顶部「场景检索速查表」，复杂修复查 `assets/sql_template_examples/`。
+4. **检索复用模板**：调用 sql-template MCP 的 `search_sql_template`，按业务关键词、单据类型和涉及表检索；不要读取本地模板文件。
 5. **分级校验**：按 `SKILL.md` 分级校验策略，已验证内容免校验、不明确必校验。
 6. **逐步取真实值并执行**：用 `execute_sql` 先租户→再单据→再业务明细，确认影响范围后生成 SQL。
 
@@ -90,18 +86,11 @@ Skill 入口文件，定义：
 - 关联键与 SQL 关联示例
 - 状态同步、人员 ID 指向、延时消息等业务规则
 
-### references/sql_templates.md
-模板库：
-- 顶部 **场景检索速查表**：按业务关键词/单据类型快速定位模板编号
-- 通用基础、询价单/招标单、征询单三类模板 + 数据修复模板
-- 附录：常用状态值参考
-- 「✅ 已验证」标记约定（用于启用免校验）
-
-### assets/sql_template_examples/[场景名].sql
-复杂 / 特定数据修复场景的**完整可执行 SQL 示例**入口：
-- 文件头注释含：场景说明、涉及表、关键关联、占位符清单、已验证标记
-- 命名规范：`<场景>.sql`（如 `rfx_rollback_to_quotation.sql`）
-- 随业务增长持续沉淀，是可检索复用的正式资产
+### sql-template MCP
+SQL 模板库由 MCP 统一维护：
+- 生成前调用 `search_sql_template` 检索可复用模板，优先使用 `verified=true` 的模板
+- 复杂场景完成后，经用户确认调用 `save_sql_template` 沉淀
+- 复用模板后调用 `record_template_usage` 记录使用次数
 
 ## 扩展指南
 
@@ -110,11 +99,11 @@ Skill 入口文件，定义：
 2. 结构信息一律用 MCP 获取，不要本地维护表字段。
 
 ### 新增 SQL 模板
-1. 通用/中等复杂度 → 写入 `sql_templates.md`（含业务场景说明 + 占位符 SQL）。
-2. 复杂/特定修复 → 新增 `assets/sql_template_examples/<场景>.sql`。
+1. 通用、复杂或数据修复场景都通过 `save_sql_template` 写入模板库。
+2. 模板内容保留业务场景说明、涉及表、占位符和验证状态；不要在 Skill 目录新增模板文件。
 
 ### 标记「已验证」
-首次生成并经 `describe_table` / `validate_table_columns` 校验通过后，在模板/示例内标注「✅ 已验证」+ 日期，后续同类任务即可免校验提效。若结构可能已变更，重新校验或去掉标记。
+首次生成并经 `describe_table` / `validate_table_columns` 校验通过后，调用 `update_sql_template` 将模板标记为 `verified=true` 并记录验证时间，后续同类任务即可免校验提效。若结构可能已变更，重新校验并取消验证标记。
 
 ## 使用示例
 
@@ -126,7 +115,7 @@ Skill 入口文件，定义：
 1. 从 `table_meta.md` 识别涉及表：`hpfm_tenant`、`ssrc_rfx_header`
 2. 用 MCP `execute_sql` 取 `tenant_id`：`SELECT tenant_id FROM hpfm_tenant WHERE tenant_num='SRM-AUX'`
 3. 从 `relations.md` 确认关联：`hpfm_tenant.tenant_id` ↔ `ssrc_rfx_header.tenant_id`
-4. 从 `sql_templates.md` 匹配时间过滤模板
+4. 调用 `search_sql_template` 匹配时间过滤模板
 5. 生成 SQL：
 
 ```sql
@@ -168,7 +157,7 @@ ORDER BY r.create_time DESC;
 ### SQL 生成规则
 - 必须先确认表关联键的正确性（参考 `relations.md`）
 - 使用明确的表别名避免字段歧义
-- 时间范围过滤优先使用 `sql_templates.md` 中的模板
+- 时间范围过滤优先复用 sql-template MCP 中已验证的模板
 - 聚合统计时明确 GROUP BY 字段和聚合函数
 - 生成的 SQL 必须包含关键注释说明
 - ⚠️ 新招标单（BID）查询与询价单完全共用：评标/结果表 `source_from` 仍为 `'RFX'`（不要写成 `'BID'`），单据类型区分用 `ssrc_rfx_header.secondary_source_category = 'NEW_BID'`
@@ -191,10 +180,10 @@ ORDER BY r.create_time DESC;
 
 ### 定期更新
 - 定期检查 `table_meta.md` / `relations.md` 中的业务规则是否仍准确
-- 模板/示例随业务演进补充「✅ 已验证」状态
+- 模板随业务演进补充 `verified=true` 验证状态
 
 ### 优化建议
-- 若某类 SQL 频繁出错，补充模板到 `sql_templates.md` 或 `assets/sql_template_examples/`
+- 若某类 SQL 频繁出错，修正或新增 sql-template MCP 模板，并标注验证状态
 - 若用户常问某些关联，补充到 `relations.md`
 - 保持本地文件精简：结构事实一律走 MCP
 
@@ -208,12 +197,12 @@ ORDER BY r.create_time DESC;
   - 同步更新「数据库约束与安全规则」第 3 条与 README 最佳实践
 
 ### v1.5.0
-- **精简**：删除 `references/table_detail/` 全部 41 个本地表结构文件，不再在仓库中暴露表结构与字段信息
+- **精简**：删除本地单表结构文件，不再在仓库中暴露表结构与字段信息
 - **结构事实走 MCP**：表字段/类型/注释/拓展字段/索引统一通过 sql-ops MCP（`describe_table` / `validate_table_columns` / `execute_sql`）实时获取
 - **业务语义分层**：将数据库拿不到或高频易错的知识沉淀到 `table_meta.md`（含常见租户、易错枚举、拓展字段特例）
-- **分级校验策略**：已验证模板/示例、table_meta/relations 明确列出的表字段免 MCP 校验提效；表名/字段名不明确时必校验
-- **模板维护入口**：`sql_templates.md` 顶部新增「场景检索速查表」；正式确立 `assets/sql_template_examples/` 为复杂/数据修复场景完整 SQL 示例入口（含「✅ 已验证」标记约定），新增首个示例 `rfx_rollback_to_quotation.sql`
-- **清理死链**：移除 `columns_202603131733.md`、本地 `table_detail/` 等失效引用
+- **分级校验策略**：已验证模板、table_meta/relations 明确列出的表字段免 MCP 校验提效；表名/字段名不明确时必校验
+- **模板维护入口**：模板统一迁移到 sql-template MCP，支持检索、验证标记和使用统计
+- **清理死链**：移除历史表结构、模板文件和示例文件引用
 - 同步更新 SKILL.md / README.md / skill.json
 
 ### v1.4.0
