@@ -25,6 +25,18 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 | `validate_table_columns("<表名>", ["字段A","字段B"])` | 校验字段是否存在 | 生成 UPDATE/WHERE 前确认字段名拼写 |
 | `describe_table("<表名>")` | 返回完整字段清单与表注释（含拓展字段） | 不确定字段、需要完整结构时 |
 
+## 工具能力（table-catalog MCP，数据字典目录）
+
+> **用途**：不知道表名时，用业务语义检索候选表、发现 join 关系，避免凭空猜表。目录只存表结构语义，不含业务数据。**当前已收录 `ssrc`（寻源，约 400 张）/`sslm`（供应商）/`hpfm`/`smdm` 等域**，寻源场景命中率最高。
+
+| 工具 | 用途 | 典型场景 |
+|------|------|----------|
+| `search_tables("<业务描述>", domain?)` | 语义检索候选表（域前缀：`ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据） | 只知道业务语义、不知道表名时第一步调用 |
+| `get_table_relations("<表名>")` | 返回该表的一跳/二跳关联表与 join 字段 | 写多表 JOIN 前确认关联路径 |
+| `add_table_relation(from, to, join_on, type, desc)` | 沉淀一条验证过的表关联 | 推断出关联并 `execute_sql` 验证成功后沉淀 |
+| `record_table_usage("<表1,表2>")` | 记录本次实际用到的表（使用次数 +1） | SQL 生成完成后调用，优化目录排序 |
+| `upsert_table_knowledge(...)` | 修正/补录表描述或补录未入库的表 | 目录描述缺失/有误时修正 |
+
 > 结构信息（字段/类型/注释）一律用上述工具实时获取；不要引用本地表结构文档。
 > 模板库已迁移至 **DB（sql-template MCP / Supabase）**，不再维护本地模板文件，检索与沉淀一律走 MCP。
 
@@ -34,8 +46,8 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
-| `search_sql_template(keyword, doc_type, category, verified_only, limit)` | 检索可复用模板 | 生成前先按关键词/单据类型/表名定位已有模板 |
-| `save_sql_template(title, category, scenario, sql_text, ...)` | 沉淀本次生成的 SQL 为模板 | 复杂场景完成后询问用户并保存 |
+| `search_sql_template(keyword, doc_type, category, verified_only, limit)` | 检索可复用模板（结果含 `execution_flow` 执行过程伪代码与 `example_case` 示例） | 生成前先按关键词/单据类型/表名定位已有模板 |
+| `save_sql_template(title, category, scenario, sql_text, execution_flow, example_case, ...)` | 沉淀本次生成的 SQL 为模板（数据修复类必须附执行过程伪代码与脱敏示例） | 复杂场景完成后询问用户并保存 |
 | `get_sql_template(id)` / `list_sql_templates(...)` | 按 id 获取 / 总览模板库 | 查看某模板或全量浏览 |
 | `update_sql_template(id, ...)` | 更新模板（如补「✅ 已验证」） | 复核后标记验证 |
 | `delete_sql_template(id)` | 删除模板 | 清理错误/过期模板 |
@@ -48,14 +60,44 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 生成任何 SQL 前，按以下顺序执行，**严禁跳步**：
 
 1. **先检索模板库**：调用 `search_sql_template`，按业务关键词 / 单据类型 / 涉及表名检索已有模板；优先复用 `verified=true`（✅ 已验证）模板，其表/字段可纳入下方「免校验」范围。若 MCP 不可用则跳过本步继续。
+   **⚡ 若命中的模板包含 `execution_flow`（执行过程伪代码），必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `execute_sql` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
 2. **确认业务上下文**：按术语映射表判断单据类型和关联表的 `source_from`；只有用户描述不足以判断时才澄清，避免把单据来源误当成单据类型。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'` 获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `155357`/`SRM-JDENERGY` 仅供参考）。
-4. **确认涉及表与字段（分级校验）**：按下方「分级校验策略」判断哪些表/字段可直接使用、哪些需 MCP 校验；命中已验证模板的表/字段免校验。需要完整结构时调 `describe_table`。
+4. **确认涉及表与字段（分级校验）**：
+   - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 ssrc/sslm/主数据等多个域时），**必须先用 `table-catalog.search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径，最后才 `describe_table` 校验字段。SQL 生成完成后调用 `record_table_usage("<表1,表2>")` 沉淀。
+   - 按下方「分级校验策略」判断哪些表/字段可直接使用、哪些需 MCP 校验；命中已验证模板的表/字段免校验。需要完整结构时调 `describe_table`。
 5. **逐步获取真实值**：按「先租户 → 再单据（rfx_header_id / rf_header_id）→ 再业务明细」的顺序，用 `execute_sql` 取真实主键/关联键，**禁止用硬编码 ID 直接生成修改 SQL**。
 6. **生成 SQL**：基于已验证的真实值生成；占位符用 `<...>` 标注，并在输出中给出「替换为真实值的方法」。生成UPDATE SQL注意不要画蛇添足，仅修复用户要求修复的字段，不要添加如last_update_date,last_update_by等无关字段，where条件仅需要tenant_id和主键即可。
 7. **自检安全规则**：套用下方「术语映射表与状态码」「数据库约束与安全规则」逐条核对（多租户、主键、附件删除、状态同步、附件 UUID 必填、人员 ID 指向 iam_user、延时消息、征询单类型、寻源结果删除）。
 8. **MCP 异常回退**：若 MCP 工具调用失败或无返回，改用占位符并明确标注「未经过数据库验证」，绝不编造字段或值。
 9. **完成后询问沉淀**：向用户展示结果后，**主动询问是否将本次 SQL 沉淀为模板**；用户确认则调用 `save_sql_template`（填场景/关键词/涉及表/SQL/占位符/是否验证），并按需 `record_template_usage`；用户拒绝则跳过。
+
+## 执行过程驱动模式（execution_flow，命中即强制）
+
+> 目标：让大模型像资深 DBA 一样「按部就班、有据可查」，杜绝跳过前置校验、猜测主键/状态直接生成修复 SQL。
+
+### 触发条件
+检索到的模板包含 `execution_flow` 字段时**强制进入本模式**；模板无 `execution_flow` 时仍按铁律逐步取真实值。
+
+### 伪代码语法（模板约定）
+```text
+[INPUT] <tenant_num>, <rfx_num>              ← 需向用户确认的入参
+[STEP n: 步骤名]
+  QUERY: <前置查询 SQL>                       ← 必须通过 execute_sql 真实执行
+  ASSERT: <断言>                              ← 对 QUERY 结果的硬性校验（行数/取值），并提取 {变量}
+  CONDITION: IF <条件> THEN RETURN <结论>     ← 条件短路，满足则终止并向用户报告
+  ACTION: <UPDATE/DELETE/INSERT 语句>         ← 不执行，仅在所有前置 STEP 通过后代入真实值生成
+```
+
+### 执行规则（逐条强制）
+1. **解析模板**：读取 `execution_flow`，识别全部 `[STEP]` 及其 `QUERY` / `ASSERT` / `CONDITION` / `ACTION`。
+2. **逐步执行 QUERY**：按 STEP 顺序逐个调用 `execute_sql`，把真实结果（如 `tenant_id=155357`）填入上下文变量 `{...}`，供后续 STEP 引用。
+3. **校验 ASSERT**：每步执行后立即核对断言（如「必须返回 1 行」）；**不满足则立即向用户报告并停止，绝不盲目继续**（如查到 0 行/多行、状态不符合修复前提）。
+4. **CONDITION 短路**：条件命中（如「单据已在目标状态」）时直接返回结论，不生成修复 SQL。
+5. **生成最终 SQL**：所有前置 QUERY 成功、ASSERT 全部通过后，才将真实值代入 `ACTION` 生成 UPDATE/DELETE/INSERT（仍遵循「SQL 输出格式规范」：附核查 SELECT 与执行后校验 SELECT）。
+6. **输出结构化报告**：包含 ① 执行轨迹（每个 STEP 的查询与真实中间结果）② 最终 SQL（带真实值或明确标注的占位符供人工复核）③ 执行后校验 SELECT。
+7. **参考 example_case**：模板携带 `example_case` 时，对照示例中的思考链路执行，消除猜测。
+8. **降级**：sql-ops MCP 不可用导致 QUERY 无法执行时，**不得**假装执行通过；改为输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
 
 ## 分级校验策略（核心：正确性与效率兼顾）
 
@@ -69,7 +111,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 - `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表的高频字段（id、tenant_id、name 类、num 类）。
 
 ### ⚠️ 必须调 MCP 校验后再用
-- **表名/字段名不明确**、不在上述可信来源中出现的；
+- **表名不明确**、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**，命中后必须 `describe_table`/`validate_table_columns` 校验字段真实存在。
 - **用户口头描述或自定义**的字段（如「那个价格的字段」需先确认是 `valid_quotation_price` 还是 `qtn_total_amount`）；
 - 对**拼写、存在性有任何怀疑**；
 - 需要完整字段清单或字段注释时，调 `describe_table('<表名>')`；生成 UPDATE/WHERE 前对关键字段调 `validate_table_columns` 确认。
@@ -151,8 +193,11 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 - 完成一次**复杂场景或数据修复**后，**主动询问用户是否沉淀**，确认后调用 `save_sql_template`：
   - `title` / `category` / `scenario`：标题、分类（通用基础查询/询价单RFX/征询单RF/数据修复）、业务场景描述；
   - `sql_text`：完整 SQL（保留 `<...>` 或 `{...}` 占位符原样）；
+  - `execution_flow`：**数据修复类模板必填**。按「执行过程驱动模式」的伪代码语法，把本次实际执行过的前置查询、断言、修复动作整理为 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION），供后续复用时分步执行；
+  - `example_case`：**数据修复类模板必填**。写入本次真实执行轨迹的脱敏版：输入参数 → 各 STEP 中间结果（如「Step 1 结果: tenant_id = 155357」）→ 最终 SQL，作为 Few-Shot 示例；
   - `doc_type` / `keywords` / `core_tables` / `placeholders`：单据类型、标签、涉及表、占位符清单（便于检索）；
   - `verified`：若该表/字段已 `describe_table`/`validate_table_columns` 校验通过，置 `true` 并填 `verified_at`，后续可免 MCP 校验。
+- 存量高频模板可用 `update_sql_template(id, execution_flow=..., example_case=...)` 渐进式补充执行过程（优先 Top 高频数据修复场景）。
 - 复用某模板生成后，调用 `record_template_usage(id)` 累加使用次数，优化检索排序。
 
 ### 去重
@@ -247,4 +292,5 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 - 结构事实 → `describe_table` / `validate_table_columns` / `execute_sql`
 - 业务语义 → `relations.md` / `table_meta.md`
 - 复用提效 → `search_sql_template`（生成前检索，✅ 已验证模板免校验）+ `save_sql_template`（生成后沉淀），模板库随使用增长
+- 执行安全 → 模板含 `execution_flow` 时强制「执行过程驱动模式」：逐 STEP 执行 QUERY、校验 ASSERT、提取真实变量后才生成修复 SQL，杜绝猜测主键/状态
 - 所有铁律（多租户、主键、状态同步、附件删除、人员 ID 指向 iam_user、延时消息、征询单类型、寻源结果删除、禁止编造）**始终生效**。
