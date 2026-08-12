@@ -73,9 +73,12 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
    **⚡ 若命中的模板包含 `execution_flow`（执行过程伪代码），必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `execute_sql` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
 2. **确认业务上下文**：按「术语映射表」判断单据体系（订单 sodr / 收货事务 sinv_rcv / 发货工作台 slod / 老送货单 sinv_asn），**特别注意老送货单与发货工作台送货单是两套表**；上下文不足时才向用户澄清。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'`（或按 tenant_name 模糊）获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `46997`/`151025` 等仅供参考）。
-4. **确认涉及表与字段（分级校验）**：
-   - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 SPUC/SODR/主数据/物流发货等多个域时），**必须先用 `table-catalog.search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径，最后才 `describe_table` 校验字段。命中 `slod_*`（属 `srm_logistics_delivery` 库）时注意结果中的 `db_name`，跨库 JOIN 需带库前缀。仅 `SINV` 等仍未入库的表直接 `describe_table` 校验，并通过 `upsert_table_knowledge` 补录。
-   - 按「分级校验策略」判断哪些可直接使用、哪些需 MCP 校验；命中已验证模板的表/字段免校验。需要完整结构时调 `describe_table`。
+4. **确认涉及表与字段（分级校验 + 校验门禁）**：
+   - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 SPUC/SODR/主数据/物流发货等多个域时），**必须先用 `table-catalog.search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径。
+   - **🚦 检索到即视为「已验证」，无需再 `describe_table`**：`search_tables` 返回的候选表、`get_table_relations` 返回的关联表、以及 `search_sql_template` 命中的 `verified=true` 模板的 `core_tables`，都是可信来源。**在调用 `execute_sql` 时，把这些表名通过 `trusted_tables` 参数传入（跨库表写成 `db.table`，如 `srm_logistics_delivery.slod_asn_header`），门禁会直接放行，不会要求你再 `describe_table`。** 这既能避免无依据的猜测，又能省掉大量重复的 `describe_table` 调用。
+   - **`describe_table` 仅作兜底**：只有 catalog 未收录、模板也没有的偏表/新表（如部分 `SINV` 表）才直接 `describe_table` 校验；成功后门禁会自动登记该表，后续 `execute_sql` 引用将放行，并通过 `upsert_table_knowledge` 补录。
+   - 字段层面同理：catalog 的 `entry_columns`、模板字段、`get_table_relations` 的 `join_on` 字段，通过 `execute_sql` 的 `trusted_columns` 参数传入即可放行；不确定或编造的字段才用 `validate_table_columns` 确认。
+   - 命中已验证模板的表/字段免校验（直接走 `trusted_tables`/`trusted_columns`）。
    - SQL 生成完成后调用 `record_table_usage("<表1,表2>")` 沉淀。
 5. **逐步获取真实值**：按「先租户 → 再单据主键（po_header_id / rcv_trx_header_id / asn_header_id）→ 再行/发运行/记录表」的顺序，用 `execute_sql` 取真实主键/关联键，**禁止用硬编码 ID 直接生成修改 SQL**。
 6. **生成 SQL**：基于已验证的真实值生成；占位符用 `<...>` 标注，并给出「替换为真实值的方法」。生成 UPDATE 注意：
@@ -116,15 +119,18 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 分级校验策略（正确性与效率兼顾）
 
-### ✅ 可直接使用，无需 MCP 校验
-- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段；
-- 在 **`references/table_meta.md`** 中明确列出的表名、主键、关联键（如 `po_header_id`、`rcv_trx_line_id`、`asn_line_id`、`tenant_id`）；
-- 在 **`references/relations.md`** 中明确给出的关联与规则；
-- **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`（部分物流表留痕用到 `attribute_longtext60`，使用前需校验存在性）；
-- `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表的高频字段。
+> **🚦 校验门禁（sql-ops-mcp）**：`execute_sql` 执行前会拦截「无依据」的表——即既未从 `table-catalog` 检索到、也不在 `verified` 模板 `core_tables` 中、也未在本会话 `describe_table`/`validate_table_columns` 成功过。**「检索到」即视为已验证**：把 catalog 表名 / 模板 `core_tables` 通过 `execute_sql` 的 `trusted_tables` 传入即可放行，不必再 `describe_table`。门禁目的不是「强制每次 describe」，而是「强制先有依据」，依据可来自 catalog / 模板 / describe 任意一处。
 
-### ⚠️ 必须调 MCP 校验后再用
-- 表名不明确、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**，命中后必须 `describe_table`/`validate_table_columns` 校验字段真实存在；目录未收录（如 SINV/SLOD/SIEC）则直接 `describe_table`。
+### ✅ 已确认（无需再 describe_table，但须通过 trusted_tables/trusted_columns 声明）
+- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段 —— 其 `core_tables` 直接作为 `trusted_tables` 传入；
+- 来自 **`table-catalog.search_tables` 检索命中**的候选表（注意结果中的 `db_name`，跨库表写成 `db.table`）；以及 `get_table_relations` 返回的关联表与 `join_on` 字段；
+- 在 **`references/table_meta.md`** 中明确列出的表名、主键、关联键（如 `po_header_id`、`rcv_trx_line_id`、`asn_line_id`、`tenant_id`）—— 与 catalog/模板结论一致时直接信任，若与 catalog/模板冲突以 catalog/模板为准，并修正本文件；
+- 在 **`references/relations.md`** 中明确给出的关联与规则；
+- `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表高频字段（已内置白名单，门禁自动放行）。
+
+### ⚠️ 必须确认后再用（门禁会拦截未声明的）
+- **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`：仅当目标表经 `describe_table`/`validate_table_columns` 确认存在该字段时才使用（部分物流表用到 `attribute_longtext60`）；这些字段**不要仅凭命名规则假设存在**，使用前需校验，并把确认字段通过 `trusted_columns` 传入。
+- 表名不明确、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**；命中后直接将表名传入 `trusted_tables` 即可（无需 `describe_table`）；目录未收录（如部分 SINV 表）才直接 `describe_table`。
 - 用户口头描述或自定义的字段（如「那个含税金额」需确认是 `tax_included_amount` 还是 `tax_include_amount`——**订单头是 `tax_include_amount`、收货事务行是 `tax_included_amount`，极易写错**）；
 - 对拼写、存在性有任何怀疑的；生成 UPDATE/WHERE 前对关键字段调 `validate_table_columns` 确认。
 

@@ -102,16 +102,18 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 ## 分级校验策略（核心：正确性与效率兼顾）
 
 > 目标：**已知可信的来源免校验以提效；不明确或存疑的必校验以保证正确**。
+> **🚦 校验门禁（sql-ops-mcp）**：`execute_sql` 执行前会拦截「无依据」的表——即既未从 `table-catalog` 检索到、也不在 `verified` 模板 `core_tables` 中、也未在本会话 `describe_table`/`validate_table_columns` 成功过。**「检索到」即视为已验证**：把 catalog 表名 / 模板 `core_tables` 通过 `execute_sql` 的 `trusted_tables` 传入即可放行，不必再 `describe_table`。门禁目的不是「强制每次 describe」，而是「强制先有依据」，依据可来自 catalog / 模板 / describe 任意一处。
 
-### ✅ 可直接使用，无需 MCP 校验
-- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的模板的表名与字段（检索结果会携带验证状态，命中即纳入免校验）；
-- 在 **`references/table_meta.md`（业务语义/速查层）** 中明确列出的表名、主键、关联键（如 `rfx_header_id`、`tenant_id`、`supplier_company_id`）；
+### ✅ 已确认（无需再 describe_table，但须通过 trusted_tables/trusted_columns 声明）
+- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的模板的表名与字段（检索结果会携带 `core_tables`，直接作为 `trusted_tables` 传入）；
+- 来自 **`table-catalog.search_tables` 检索命中**的候选表（注意结果中的 `db_name`，跨库表写成 `db.table`）；以及 `get_table_relations` 返回的关联表与 `join_on` 字段；
+- 在 **`references/table_meta.md`（业务语义/速查层）** 中明确列出的表名、主键、关联键（如 `rfx_header_id`、`tenant_id`、`supplier_company_id`）—— 与 catalog/模板结论一致时直接信任，若冲突以 catalog/模板为准并修正本文件；
 - 在 **`references/relations.md`** 中明确给出的关联与规则；
-- **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`，按命名规则直接使用（注意 `iam_user` 为 `attribute1~15` 特例，见 table_meta.md）；
-- `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表的高频字段（id、tenant_id、name 类、num 类）。
+- `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表高频字段（已内置白名单，门禁自动放行）。
 
-### ⚠️ 必须调 MCP 校验后再用
-- **表名不明确**、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**，命中后必须 `describe_table`/`validate_table_columns` 校验字段真实存在。
+### ⚠️ 必须确认后再用（门禁会拦截未声明的）
+- **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`：**不要仅凭命名规则假设存在**，仅当目标表经 `describe_table`/`validate_table_columns` 确认存在该字段时才使用（注意 `iam_user` 为 `attribute1~15` 特例）；将确认字段通过 `trusted_columns` 传入。
+- **表名不明确**、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**，命中后直接将表名传入 `trusted_tables` 即可（无需 `describe_table`）；目录未收录才直接 `describe_table`。
 - **用户口头描述或自定义**的字段（如「那个价格的字段」需先确认是 `valid_quotation_price` 还是 `qtn_total_amount`）；
 - 对**拼写、存在性有任何怀疑**；
 - 需要完整字段清单或字段注释时，调 `describe_table('<表名>')`；生成 UPDATE/WHERE 前对关键字段调 `validate_table_columns` 确认。
