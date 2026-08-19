@@ -8,7 +8,7 @@
 |---|---|---|
 | 1（最新，优先） | 适配器 JS 脚本（存库） | 查 `sada_adaptor_task_*`，有 `enabled_flag=1` 即命中 |
 | 2 | 配置表（虚拟表） | 物理库找不到目标表时，用 `table_code` 查 `spfm_rel_table_definition` / `spfm_rel_table_record`（或租户分表 `spfm_rel_table_record_srm_{租户}`） |
-| 3（较老） | Git 二开仓库 `operation-srm-{租户}/srm-{模块}-{租户}` | `search_projects` 探测，有则查 `release` 分支 |
+| 3（较老） | Git 二开仓库 `operation-srm-{租户}/srm-{模块}-{租户}` | `gitlab_search_projects` 探测，有则查 `release` 分支 |
 | 4 | 无二开 | 以上都查不到 → 走标准逻辑 |
 
 ## 判定口径

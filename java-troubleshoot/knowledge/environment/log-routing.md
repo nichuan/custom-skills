@@ -1,6 +1,6 @@
 # 日志平台路由知识
 
-> 本文件是企业事实（Knowledge 层），由 MCP `zhenyun-pangun-mcp` 实际承载平台/数据源选择。
+> 本文件是企业事实（Knowledge 层），由 MCP `zhenyun-pangu-mcp` 实际承载平台/数据源选择。
 > 排障 Agent 只需理解"何时选哪个工具"，**不需要也不能替代 MCP 去拼装 Project/Logstore/namespace/AccessKey**。
 
 ## 平台归属

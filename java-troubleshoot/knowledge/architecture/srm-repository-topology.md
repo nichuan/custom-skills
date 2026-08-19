@@ -1,6 +1,6 @@
 # SRM 代码库拓扑（标准库 + 租户二开）
 
-> 企业事实层。Agent 据此收敛代码搜索范围，但**具体仓库名/分支名/版本号应以 MCP `search_projects` / `list_branches` 实时返回为准，不要硬编码**。
+> 企业事实层。Agent 据此收敛代码搜索范围，但**具体仓库名/分支名/版本号应以 MCP `gitlab_search_projects` / `gitlab_list_branches` 实时返回为准，不要硬编码**。
 
 ## 1. 标准业务代码：单一 Group
 
@@ -13,7 +13,7 @@
 - 形式：`operation-srm-{租户}` 下的 `srm-{模块}-{租户}`（以租户代号作为仓库后缀）。
 - 例：奥克斯寻源二开 `operation-srm-aux/srm-source-aux`。
 - 同构示例：`operation-srm-hytera/srm-source-hytera`、`operation-srm-ddmc/srm-source-ddmc`、`operation-srm-luxshareic/srm-source-lsrt`。
-- **注意**：个别租户后缀与 group 后缀不一致，必须以 `search_projects` 返回的 `path_with_namespace` 为准，不要凭租户名硬拼。
+- **注意**：个别租户后缀与 group 后缀不一致，必须以 `gitlab_search_projects` 返回的 `path_with_namespace` 为准，不要凭租户名硬拼。
 - 二开是"有的租户有、有的租户无"：已知租户时，必须先探测该租户是否存在对应二开服务；存在则实际执行逻辑可能被二开覆盖/增强，必须一并排查。
 
 ## 3. 必须排除的噪声 namespace（命中即忽略，除非用户明确点名）
@@ -32,7 +32,7 @@
 | 二开库 `operation-srm-{租户}/srm-{模块}-{租户}` | `release` | 二开服务统一以 `release` 分支为准 |
 
 - 版本号比较必须数值比较（非字符串）：`1-100-0-hotfix` > `1-99-0-hotfix`。
-- 用 `list_branches(project, search="hotfix")` 取 `recommended_ref`（已按"最新 hotfix > release > 默认分支"算好）。
+- 用 `gitlab_list_branches(project_id, per_page)` 取分支（已按"最新 hotfix > release > 默认分支"排序返回，推荐用 `recommended_ref`）。
 - 查二开库 `release` 分支时**不要带 `search`**（过滤会误判 release 不存在）。
 - `truncated: true` 说明分支被截断，需调大 `max_branches` 或改用 `search`。
 - 若 `recommended_ref` 为空或与预期不符，**先询问用户当前正式版本号**，不要默认回退到 `master`/`develop`。

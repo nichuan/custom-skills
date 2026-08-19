@@ -1,6 +1,6 @@
 # 盘古（订单履约域）表关联关系与业务规则
 
-本文件沉淀**数据库拿不到的业务知识**：表间关联、状态流转、上下游联动规则。字段级结构一律走 zhenyun-pangun-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns`）。
+本文件沉淀**数据库拿不到的业务知识**：表间关联、状态流转、上下游联动规则。字段级结构一律走 zhenyun-pangu-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns`）。
 
 ---
 

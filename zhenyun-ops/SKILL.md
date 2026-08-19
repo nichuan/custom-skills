@@ -61,9 +61,9 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill）。�
 
 ---
 
-## 四、zhenyun-pangun-mcp 工具路由（子 Skill 需要时可调用）
+## 四、zhenyun-pangu-mcp 工具路由（子 Skill 需要时可调用）
 
-`zhenyun-pangun-mcp` 提供日志、数据库、猪齿鱼协作、代码搜索四类工具。各子 Skill 在对应场景下应调用以下工具，**所有参数严禁瞎猜瞎传**（准确参数取值规则见各子 Skill 的「MCP 工具与参数声明」章节）：
+`zhenyun-pangu-mcp` 提供日志、数据库、猪齿鱼协作、代码搜索四类工具。各子 Skill 在对应场景下应调用以下工具，**所有参数严禁瞎猜瞎传**（准确参数取值规则见各子 Skill 的「MCP 工具与参数声明」章节）：
 
 | 场景 | 工具 | 由哪个子 Skill 调用 |
 | --- | --- | --- |
@@ -71,7 +71,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill）。�
 | 查阿里云 SLS 日志（仅 cn 国内盘古 prod，按 traceId/关键字） | `obs_sls_query` | java-troubleshoot |
 | 查数据库（Archery 执行 SQL、看表结构、看库/实例列表） | `archery_query` / `archery_describe_table` / `archery_list_columns` / `archery_list_databases` / `archery_list_instances` / `archery_query_tenant` | spuc-sql-generator / ssrc-sql-generator |
 | 猪齿鱼协作（查任务、查 issue、下载附件、看状态流） | `choerodon_search_tasks_by_person` / `choerodon_list_issue` / `choerodon_query_issue` / `choerodon_list_attachments` / `choerodon_download_attachment` / `choerodon_get_status_map` / `choerodon_search_users` | **`choerodon-task`（主用，只读查询）**；java-troubleshoot（仅排障时定位需求/缺陷上下文） |
-| 代码搜索（GitLab 仓库关键字检索） | `search_repo` | java-troubleshoot（定位源码） |
+| 代码搜索（本地跨仓关键字 + GitLab 仓库/分支/文件） | `search_repo`；`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree` | java-troubleshoot（定位源码） |
 | 需求/缺陷跟踪任务 id（按任务号查详情） | `choerodon_query_issue` | java-troubleshoot（排障时关联需求/缺陷上下文） |
 
 > 本路由 Skill 不直接调用上述工具，只负责判断「该用哪类工具、由哪个子 Skill 调用」。工具的准确参数取值规则由各子 Skill 自行声明与执行。

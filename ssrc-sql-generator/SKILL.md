@@ -1,6 +1,6 @@
 ---
 name: ssrc-sql-generator
-description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生成业务查询 SQL、调整现有 SQL、查询表结构及关联关系。通过 zhenyun-pangun-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先检索模板库复用（schema 已验证模板免 MCP 校验），生成后询问用户沉淀结果，模板库越用越强。专门针对租户的询价单（招标单）、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行。
+description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生成业务查询 SQL、调整现有 SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先检索模板库复用（schema 已验证模板免 MCP 校验），生成后询问用户沉淀结果，模板库越用越强。专门针对租户的询价单（招标单）、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行。
 ---
 
 # SRM 采购寻源 SQL 生成助手
@@ -56,7 +56,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - 输出用 `<...>` 占位符，附「替换为真实值的方法」。
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
-统一经 `zhenyun-pangun-mcp` 的 Archery 访问（覆盖 cn/aws 双站点）。
+统一经 `zhenyun-pangu-mcp` 的 Archery 访问（覆盖 cn/aws 双站点）。
 
 | 用户说 | site / instance | 真实实例 |
 |--------|-----------------|----------|
@@ -117,12 +117,12 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 > **找表 → catalog；确认字段 → Archery；确认真实值 → Archery query。**
 > catalog 命中「业务大概率对应 ssrc_xxx」≠「ssrc_xxx.field 一定存在」；字段存在性必须由 Archery 证明。
 
-### table-catalog（zhenyun-pangun-mcp / 独立目录）
+### table-catalog（zhenyun-pangu-mcp / 独立目录）
 - `search_tables("<业务描述>", domain?)`：语义检索候选表（域前缀 `ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据）。不知表名时第一步调用。
 - `get_table_relations("<表名>")`：一跳/二跳关联与 join 字段，写 JOIN 前确认路径。
 - `add_table_relation(...)` / `record_table_usage(...)` / `upsert_table_knowledge(...)`：验证后沉淀关联、记录用量、修正描述。
 
-### Archery（zhenyun-pangun-mcp，只读）
+### Archery（zhenyun-pangu-mcp，只读）
 - `archery_query(sql, site, instance, db)`：执行只读 SQL，逐步获取租户/主键/状态真实值。
 - `archery_list_columns(table, site, instance, db)`：返回字段名列表，生成 UPDATE/WHERE 前核对拼写。
 - `archery_describe_table(table, site, instance, db)`：返回 SHOW CREATE TABLE（结构+注释+索引），不确定字段/需完整结构时调用。
@@ -185,7 +185,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 | 询价单 vs 招标单区分（secondary_source_category）、评分上下文 RFX/BID、状态同步、附件/人员 ID/征询单/寻源结果删除规则、拓展字段特例 | `references/relations.md` | 不确定单据类型、状态同步、附件/人员/关联修复规则时 |
 | 表名-主键-关联键速查、常见租户、易错枚举、`iam_user`/`attribute_*` 拓展字段特例 | `references/table_meta.md` | 快速确认主键/高频枚举/人员字段时 |
 
-> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangun-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
+> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
 
 ---
 

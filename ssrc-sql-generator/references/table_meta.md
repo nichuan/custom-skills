@@ -1,7 +1,7 @@
 # 核心表元数据
 
 本文件是 **业务语义 / 速查层**：仅沉淀数据库拿不到、或高频复用容易写错的业务语义（主键、关联、状态/枚举速查、常见租户）。
-**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 zhenyun-pangun-mcp 的 Archery 工具实时获取**（详见 `SKILL.md`）：
+**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 zhenyun-pangu-mcp 的 Archery 工具实时获取**（详见 `SKILL.md`）：
 
 - `archery_describe_table(table, site, instance, db)` —— 返回 SHOW CREATE TABLE（完整结构 + 注释 + 索引）
 - `archery_list_columns(table, site, instance, db)` —— 返回字段名列表（核对字段拼写是否真实存在）

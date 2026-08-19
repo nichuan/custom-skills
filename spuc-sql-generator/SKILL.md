@@ -1,6 +1,6 @@
 ---
 name: spuc-sql-generator
-description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务、SLOD 发货工作台、老送货单、SIEC 状态机、委外）的 SQL 生成助手，支持业务查询 SQL 生成、数据修复 SQL 生成、表结构及关联关系查询。通过 zhenyun-pangun-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先按盘古专属分类/关键词检索模板复用，生成后询问用户沉淀结果。专门针对采购订单、收货工作台事务、发货工作台（送货/计划/标签）、老送货单、导出外部/结算/商城状态修复等核心业务场景。与 ssrc-sql-generator（采购寻源：询价/招标/报价/评分）互补，寻源类需求请勿使用本技能。
+description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务、SLOD 发货工作台、老送货单、SIEC 状态机、委外）的 SQL 生成助手，支持业务查询 SQL 生成、数据修复 SQL 生成、表结构及关联关系查询。通过 zhenyun-pangu-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先按盘古专属分类/关键词检索模板复用，生成后询问用户沉淀结果。专门针对采购订单、收货工作台事务、发货工作台（送货/计划/标签）、老送货单、导出外部/结算/商城状态修复等核心业务场景。与 ssrc-sql-generator（采购寻源：询价/招标/报价/评分）互补，寻源类需求请勿使用本技能。
 ---
 
 # SRM 盘古订单履约 SQL 生成助手
@@ -12,14 +12,14 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 ## 重要提示（必读）
 
 1. **多租户隔离**：几乎所有业务表都含 `tenant_id` 字段。**生成的 SQL 必须包含 `tenant_id` 条件**（除非明确说明是跨租户巡检/监控查询），否则会误改/误查其他租户的数据。
-2. **生产环境安全**：所有 SQL 默认针对 **生产数据库**（Archery 默认实例 `prod`=`SAAS-SRM-PROD`、库 `srm`，统一通过 `zhenyun-pangun-mcp` 调用）。执行任何写入前必须先 `SELECT` 确认影响范围，优先使用占位符（如 `<tenant_id>`、`<po_header_id>`）而非真实值。
+2. **生产环境安全**：所有 SQL 默认针对 **生产数据库**（Archery 默认实例 `prod`=`SAAS-SRM-PROD`、库 `srm`，统一通过 `zhenyun-pangu-mcp` 调用）。执行任何写入前必须先 `SELECT` 确认影响范围，优先使用占位符（如 `<tenant_id>`、`<po_header_id>`）而非真实值。
 3. **跨库注意**：发货工作台表在 **`srm_logistics_delivery`** 库（`slod_*`），其余（订单/收货/老送货/主数据）在 **`srm`** 库。跨库 JOIN 时表名必须带库名前缀（如 `srm_logistics_delivery.slod_asn_line`、`srm.sinv_rcv_trx_line`）。
-4. **结构事实走 MCP**：表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 `zhenyun-pangun-mcp` 的 `archery_describe_table` / `archery_list_columns` 实时获取；本地文件只沉淀数据库拿不到或高频易错的**业务语义**（见「参考文件指引」）。
+4. **结构事实走 MCP**：表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 `zhenyun-pangu-mcp` 的 `archery_describe_table` / `archery_list_columns` 实时获取；本地文件只沉淀数据库拿不到或高频易错的**业务语义**（见「参考文件指引」）。
 5. **禁止编造**：不确定的表名、字段名、状态值、枚举值，必须调 MCP 验证或查询真实数据，**绝不凭记忆臆造**。
 
 ## 环境 / 实例选择（必读，极易出错）
 
-**统一通过 `zhenyun-pangun-mcp` 的 Archery 工具访问数据库**（覆盖 cn/aws 双站点，这是唯一数据库实时能力入口）。Archery 默认实例是 **PROD**（`prod`=`SAAS-SRM-PROD`）。**用户只要提到非生产环境，必须显式传 `site`+`instance`**，否则会误查生产数据。按用户口吻映射：
+**统一通过 `zhenyun-pangu-mcp` 的 Archery 工具访问数据库**（覆盖 cn/aws 双站点，这是唯一数据库实时能力入口）。Archery 默认实例是 **PROD**（`prod`=`SAAS-SRM-PROD`）。**用户只要提到非生产环境，必须显式传 `site`+`instance`**，否则会误查生产数据。按用户口吻映射：
 
 | 用户说 | 传 `site` / `instance` | 真实实例 |
 |--------|------------------------|----------|
@@ -34,7 +34,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 - 例：用户说「查下 dev 的采购订单」→ `archery_query(site="cn", instance="dev", db="srm", sql="<SQL>")`。
 - 拿不准实例/库时先调 `archery_list_instances(site)` / `archery_list_databases(site, instance)` 确认，不要瞎猜；拿不准用户意图时**主动问清环境**，不要默认猜 PROD。
 
-## 工具能力（zhenyun-pangun-mcp，Archery）
+## 工具能力（zhenyun-pangu-mcp，Archery）
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
@@ -62,9 +62,9 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 > 结构信息一律用上述工具实时获取；不要引用本地表结构文档。
 > 模板库存于 **DB（sql-template MCP / Supabase）**，检索与沉淀一律走 MCP。
 
-## 工具能力（zhenyun-pangun-mcp，Archery）
+## 工具能力（zhenyun-pangu-mcp，Archery）
 
-> 数据库查询**统一用 Archery**（`zhenyun-pangun-mcp` 的数据库能力，覆盖 cn/aws 双站点）。所有工具参数取真实值，**严禁瞎猜**（完整声明见文末附录）。
+> 数据库查询**统一用 Archery**（`zhenyun-pangu-mcp` 的数据库能力，覆盖 cn/aws 双站点）。所有工具参数取真实值，**严禁瞎猜**（完整声明见文末附录）。
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
@@ -147,7 +147,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 5. **生成最终 SQL**：所有前置 QUERY 成功、ASSERT 全部通过后，才将真实值代入 `ACTION` 生成 UPDATE/DELETE/INSERT（仍遵循「SQL 输出格式规范」与盘古规则：`sodr_*` 乐观锁、留痕字段、ES 联动）。
 6. **输出结构化报告**：包含 ① 执行轨迹（每个 STEP 的查询与真实中间结果）② 最终 SQL（带真实值或明确标注的占位符供人工复核）③ 执行后校验 SELECT。
 7. **参考 example_case**：模板携带 `example_case` 时，对照示例中的思考链路执行，消除猜测。
-8. **降级**：`zhenyun-pangun-mcp` 的 Archery 不可用导致 QUERY 无法执行时，**不得**假装执行通过；改为输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
+8. **降级**：`zhenyun-pangu-mcp` 的 Archery 不可用导致 QUERY 无法执行时，**不得**假装执行通过；改为输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
 
 ## 分级校验策略（正确性与效率兼顾）
 
@@ -181,7 +181,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 | 老送货单 vs 发货工作台送货单（两套表）、订单状态机组合、乐观锁、pe_supplier、ES 联动、清理规则、留痕、同步/幂等表、API 建议 | `references/relations.md` | 不确定表间关系、状态组合、上下游联动/清理规则时 |
 | 表名-主键-关联键速查、库归属、import_type 等枚举速查、易错拼写（tax_include_amount 等）、主数据速查 | `references/table_meta.md` | 快速确认表/主键/关联键、高频枚举值时 |
 
-> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangun-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
+> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
 
 ## 参考文件指引
 
@@ -283,7 +283,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 - **执行前备份**：不得输出 `CREATE TABLE bak_xxx AS SELECT ...`。
 - **回滚方案**：不得输出回滚段；生产修复以「先 SELECT 核查 → 人工确认 → 可控提交」为准。
 
-## 附录：zhenyun-pangun-mcp Archery 工具参数声明（严禁瞎猜瞎传）
+## 附录：zhenyun-pangu-mcp Archery 工具参数声明（严禁瞎猜瞎传）
 
 调用 `archery_*` 任意工具前，**必须**先确认下列参数取真实值。拿不准 `site`/`instance`/`db_name` 时优先调用「列举类」工具（`archery_list_instances` / `archery_list_databases`）或询问用户。
 
@@ -310,7 +310,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 总结
 
-本助手通过 **zhenyun-pangun-mcp 的 Archery 实时获取表结构** + **本地仅沉淀业务语义** + **DB 模板库（盘古专属分类）复用沉淀**，覆盖订单履约全链路：
+本助手通过 **zhenyun-pangu-mcp 的 Archery 实时获取表结构** + **本地仅沉淀业务语义** + **DB 模板库（盘古专属分类）复用沉淀**，覆盖订单履约全链路：
 
 - 结构事实 → `archery_describe_table` / `archery_list_columns` / `archery_query`
 - 业务语义 → `relations.md` / `table_meta.md`

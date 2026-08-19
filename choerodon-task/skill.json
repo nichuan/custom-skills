@@ -23,7 +23,7 @@
   },
   "mcp_servers": [
     {
-      "name": "zhenyun-pangun-mcp",
+      "name": "zhenyun-pangu-mcp",
       "tools": [
         "choerodon_query_issue",
         "choerodon_search_tasks_by_person",

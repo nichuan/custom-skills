@@ -1,6 +1,6 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangun-mcp 查日志/查数据库/搜源码/查猪齿鱼，按需通过 table-catalog 补充数据字典与 join 关系、gitlab-code 读取完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangu-mcp 查日志/查数据库/搜源码/查猪齿鱼，按需通过 table-catalog 补充数据字典与 join 关系、gitlab_* 读取 GitLab 仓库完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
@@ -107,7 +107,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 > 工具**真实参数 Schema 以 MCP 为唯一事实源**，严禁在本 Skill 猜测/重复定义。下面只写"何时用、怎么选、安全约束"。
 
-### 日志（zhenyun-pangun-mcp：obs_log_query / obs_log_trace / obs_sls_query）
+### 日志（zhenyun-pangu-mcp：obs_log_query / obs_log_trace / obs_sls_query）
 
 - **平台/数据源选择由 MCP 自动完成**，Skill 不接触 Project/Logstore/namespace/AccessKey（详见 `knowledge/environment/log-routing.md`）。
 - 路由原则速记：cn 盘古 prod → SLS；cn 非生产 + 全部 AWS → Loki；默认 cn、默认非 aws。
@@ -115,19 +115,19 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
 - 首次 `limit` 给 100~200；query 必须带标签过滤（如 `{namespace="..."}`），否则范围过大易超时。
 
-### 代码（search_repo + gitlab-code.get_file）
+### 代码（search_repo + gitlab_*）
 
-- 关键字检索统一用 `search_repo(keyword)`；锁定仓库与分支后用 `gitlab-code.get_file` 读完整文件（读完整文件是 gitlab-code 独占能力）。
+- 关键字检索统一用 `search_repo(keyword)`（本地跨仓）；需要精确到 GitLab 仓库/分支/文件的，用 `gitlab_*` 系列：`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree`。锁定仓库与分支后用 `gitlab_get_file(project_id, path, ref)` 读完整文件（读完整文件是 GitLab 能力）。
 - 搜索范围必须收敛（详见 `knowledge/architecture/srm-repository-topology.md`）：
   - 标准库只在 `operation-srm/srm-{模块}`；二开库 `operation-srm-{租户}/srm-{模块}-{租户}`；`op-deliver-*` 等快照仓库忽略。
-  - 分支：标准库用最新 `x-y-z-hotfix`（`list_branches` 取 `recommended_ref`），二开库用 `release`。
+  - 分支：标准库用最新 `x-y-z-hotfix`（`gitlab_list_branches` 取 `recommended_ref`），二开库用 `release`。
   - 仓库名/分支名以 MCP 实时返回为准，**不硬编码**。
 - 报告中必须标注完整 `path_with_namespace@branch:file:line` 并标明标准/二开来源。
 - 标准 vs 二开判定、适配器 JS、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/virtual-table.md`。
 
-### 数据库（zhenyun-pangun-mcp：Archery 系列）
+### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
-> 整合版 `zhenyun-pangun-mcp` 已取代老的独立查询 MCP（`sql-ops` 查库 / `log-ops` 查日志），后者已不推荐使用。所有日志/数据库/代码检索均通过该整合版工具，不要再引用 `sql-ops` / `log-ops`。
+> 整合版 `zhenyun-pangu-mcp` 已取代老的独立查询 MCP（`sql-ops` 查库 / `log-ops` 查日志），后者已不推荐使用。所有日志/数据库/代码检索均通过该整合版工具，不要再引用 `sql-ops` / `log-ops`。
 
 - **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。
 - **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
@@ -188,7 +188,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 返回 | 含义 | 处理 |
 |------|------|------|
 | 401 | 凭据缺失/过期 | 提示配置 MCP `.env`/`env`，不让用户在对话粘贴 Token |
-| 403 | 权限不足 | 提示申请对应项目/资源权限；不可见时用 `search_projects` 确认，不断言不存在 |
+| 403 | 权限不足 | 提示申请对应项目/资源权限；不可见时用 `gitlab_search_projects` 确认，不断言不存在 |
 | 404 | 资源/ID 问题 | 先用列举类工具确认资源是否存在，再决定 |
 | timeout | 范围过大 | 缩小时间范围、补齐标签/租户条件、改走索引字段 |
 | empty | 查询条件 vs 确实无数据 | 判断是条件过严还是真无数据；用户指定时间不擅自扩大 |
@@ -254,7 +254,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 需要调查的内容 | 引用 |
 |----------------|------|
 | 日志平台路由 / Loki vs SLS / region-env 获取 | `knowledge/environment/log-routing.md` |
-| 盘古环境与 Archery 实例别名 | `knowledge/environment/pangun.md` |
+| 盘古环境与 Archery 实例别名 | `knowledge/environment/pangu.md` |
 | 天工环境与实例 | `knowledge/environment/tiangong.md` |
 | SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` |
 | 标准 vs 二开判定口径 | `knowledge/architecture/standard-customization.md` |

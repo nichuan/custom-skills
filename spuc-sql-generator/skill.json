@@ -1,7 +1,7 @@
 {
   "name": "spuc-sql-generator",
   "version": "1.0.0",
-  "description": "SRM 盘古订单履约域 SQL 生成助手：覆盖采购订单（SODR）、收货工作台事务（SINV_RCV）、发货工作台（SLOD 送货/计划/标签）、老送货单（SINV_ASN）、状态机（SIEC）、委外等核心场景。通过 zhenyun-pangun-mcp 的 Archery 工具实时获取表结构与真实值，通过 sql-template MCP（盘古专属分类）检索/沉淀模板。与 ssrc-sql-generator（采购寻源）互补。",
+  "description": "SRM 盘古订单履约域 SQL 生成助手：覆盖采购订单（SODR）、收货工作台事务（SINV_RCV）、发货工作台（SLOD 送货/计划/标签）、老送货单（SINV_ASN）、状态机（SIEC）、委外等核心场景。通过 zhenyun-pangu-mcp 的 Archery 工具实时获取表结构与真实值，通过 sql-template MCP（盘古专属分类）检索/沉淀模板。与 ssrc-sql-generator（采购寻源）互补。",
   "author": "SRM Team",
   "tags": [
     "sql",
@@ -24,11 +24,11 @@
     "收货事务查询/导出状态修复/清理 SQL 生成",
     "发货工作台（送货/计划/标签）查询与修复 SQL 生成",
     "老送货单查询与占用数量修复 SQL 生成",
-    "表结构查询与字段校验（zhenyun-pangun-mcp Archery 工具）",
+    "表结构查询与字段校验（zhenyun-pangu-mcp Archery 工具）",
     "SQL 模板检索与沉淀（sql-template MCP，盘古专属分类）"
   ],
   "requirements": {
-    "mcp": ["zhenyun-pangun-mcp", "sql-template"],
+    "mcp": ["zhenyun-pangu-mcp", "sql-template"],
     "database": "MySQL（默认库 srm，发货工作台域在 srm_logistics_delivery；实例默认 prod=SAAS-SRM-PROD，实例名由别名自动解析，真实名以 archery_list_instances 返回为准）"
   }
 }

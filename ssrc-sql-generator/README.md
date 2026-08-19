@@ -2,14 +2,14 @@
 
 ## 概述
 
-本 Skill 是专门为 SRM（Supplier Relationship Management）采购寻源系统设计的 SQL 生成助手。采用 **「本地仅沉淀业务语义、结构事实走 MCP」** 的分层设计：表的字段/结构通过 **zhenyun-pangun-mcp 的 Archery 工具** 实时获取，本地只保留数据库拿不到或高频易错的业务知识，并通过 **模板库 + 分级校验** 兼顾正确性与处理效率。
+本 Skill 是专门为 SRM（Supplier Relationship Management）采购寻源系统设计的 SQL 生成助手。采用 **「本地仅沉淀业务语义、结构事实走 MCP」** 的分层设计：表的字段/结构通过 **zhenyun-pangu-mcp 的 Archery 工具** 实时获取，本地只保留数据库拿不到或高频易错的业务知识，并通过 **模板库 + 分级校验** 兼顾正确性与处理效率。
 
 > **重要**：本 Skill 同时覆盖询价单（RFX 开头）和新招标单（BID 开头）两种寻源场景，两者共用同一套 `ssrc_rfx_*` 数据库表。区分字段是 `ssrc_rfx_header.secondary_source_category`（新招标单 = `'NEW_BID'`），评标/结果等关联表中两者**共用同一 `source_from = 'RFX'` 上下文**（新招标不再使用 `'BID'`，`'BID'` 仅指几乎不用的老招标），仅前端术语叫法不同（如"待定标"="待核价"、"评标"="评分"等）。
 
 ## 核心特性
 
 ### 1. 结构事实走 MCP（替代本地表结构文件）
-- 表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 zhenyun-pangun-mcp 的 Archery 工具实时获取：
+- 表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 zhenyun-pangu-mcp 的 Archery 工具实时获取：
   - `archery_describe_table(table, site, instance, db)` 取完整结构（SHOW CREATE TABLE）
   - `archery_list_columns(table, site, instance, db)` 返回字段名列表（核对字段拼写）
   - `archery_query(sql, site, instance, db)` 取真实值（租户ID、单据主键、状态值等）
@@ -40,7 +40,7 @@ ssrc-sql-generator/
     └── relations.md                      # 表关联关系与业务规则
 ```
 
-> 表结构由 zhenyun-pangun-mcp 的 Archery 工具实时提供；SQL 模板由 sql-template MCP（Supabase）维护，均不在 Skill 目录中复制。
+> 表结构由 zhenyun-pangu-mcp 的 Archery 工具实时提供；SQL 模板由 sql-template MCP（Supabase）维护，均不在 Skill 目录中复制。
 
 ## 快速开始
 
@@ -198,7 +198,7 @@ ORDER BY r.create_time DESC;
 
 ### v1.5.0
 - **精简**：删除本地单表结构文件，不再在仓库中暴露表结构与字段信息
-- **结构事实走 MCP**：表字段/类型/注释/拓展字段/索引统一通过 zhenyun-pangun-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns` / `archery_query`）实时获取
+- **结构事实走 MCP**：表字段/类型/注释/拓展字段/索引统一通过 zhenyun-pangu-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns` / `archery_query`）实时获取
 - **业务语义分层**：将数据库拿不到或高频易错的知识沉淀到 `table_meta.md`（含常见租户、易错枚举、拓展字段特例）
 - **分级校验策略**：已验证模板、table_meta/relations 明确列出的表字段免 MCP 校验提效；表名/字段名不明确时必校验
 - **模板维护入口**：模板统一迁移到 sql-template MCP，支持检索、验证标记和使用统计
@@ -206,7 +206,7 @@ ORDER BY r.create_time DESC;
 - 同步更新 SKILL.md / README.md / skill.json
 
 ### v1.4.0
-- 接入 zhenyun-pangun-mcp 的 Archery 工具（archery_query / archery_list_columns / archery_describe_table）
+- 接入 zhenyun-pangu-mcp 的 Archery 工具（archery_query / archery_list_columns / archery_describe_table）
 - 强化逐步取值、异常回退占位符等规则
 
 ### v1.3 (2026-07-09)
