@@ -1,7 +1,7 @@
 {
   "name": "ssrc-sql-generator",
-  "version": "1.6.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 zhenyun-pangun-mcp 的 Archery 工具对接真实数据库：表结构/字段由 archery_describe_table / archery_list_columns 实时获取，逐步执行只读查询获取真实值（租户->单据->业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用「本地仅沉淀业务语义、结构事实走 MCP」分层 + 分级校验（已验证模板免校验、不明确必校验），兼顾正确性与效率；并接入 DB 模板库（sql-template MCP，Supabase）实现「生成前检索复用、生成后询问沉淀」的闭环，模板库随使用增长越用越强。专门针对询价单(含招标单)、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。",
+  "version": "1.7.0",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 zhenyun-pangun-mcp 的 Archery 工具对接真实数据库：表结构/字段由 archery_describe_table / archery_list_columns 实时获取，逐步执行只读查询获取真实值（租户->单据->业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用「本地仅沉淀业务语义、结构事实走 MCP」分层 + 分级校验（schema 已验证模板免校验、不明确必校验），兼顾正确性与效率；并接入 DB 模板库（sql-template MCP，Supabase）实现「生成前检索复用、生成后询问沉淀」的闭环。核心铁律：MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行；查询默认 prod，修改类必须确认环境+租户+影响范围。专门针对询价单(含招标单)、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -34,7 +34,8 @@
         "archery_list_columns",
         "archery_describe_table",
         "archery_list_databases",
-        "archery_list_instances"
+        "archery_list_instances",
+        "archery_query_tenant"
       ],
       "description": "对接 Archery 平台，执行只读查询与表/字段结构校验；实例名由别名（prod/test/dev）自动解析，库名以 archery_list_databases 实际返回为准"
     },

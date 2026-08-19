@@ -10,9 +10,9 @@
 
 ### 1. 结构事实走 MCP（替代本地表结构文件）
 - 表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 zhenyun-pangun-mcp 的 Archery 工具实时获取：
-  - `archery_describe_table(site, instance, db, table)` 取完整字段
-  - `archery_list_columns(site, instance, db, table)` 校验字段存在性
-  - `execute_sql('<SQL>')` 取真实值（租户ID、单据主键、状态值等）
+  - `archery_describe_table(table, site, instance, db)` 取完整结构（SHOW CREATE TABLE）
+  - `archery_list_columns(table, site, instance, db)` 返回字段名列表（核对字段拼写）
+  - `archery_query(sql, site, instance, db)` 取真实值（租户ID、单据主键、状态值等）
 - 仓库不再包含暴露表结构的本地单表文档，更精简、更安全。
 
 ### 2. 业务语义分层（本地只沉淀拿不到的知识）
@@ -58,11 +58,11 @@ ssrc-sql-generator/
 ### 工作流程
 
 1. **识别涉及的表**：从用户需求中提取表名，对照 `table_meta.md` 确认表与关联键。
-2. **实时获取结构（MCP）**：对不明确的表/字段调 `describe_table` / `validate_table_columns` 确认。
+2. **实时获取结构（MCP）**：对不明确的表/字段调 `archery_describe_table` / `archery_list_columns` 确认。
 3. **补充关联关系**：参考 `relations.md` 确认关联键与业务规则。
 4. **检索复用模板**：调用 sql-template MCP 的 `search_sql_template`，按业务关键词、单据类型和涉及表检索；不要读取本地模板文件。
 5. **分级校验**：按 `SKILL.md` 分级校验策略，已验证内容免校验、不明确必校验。
-6. **逐步取真实值并执行**：用 `execute_sql` 先租户→再单据→再业务明细，确认影响范围后生成 SQL。
+6. **逐步取真实值并执行**：用 `archery_query` 先租户→再单据→再业务明细，确认影响范围后生成 SQL。
 
 ## 核心文件说明
 
@@ -103,7 +103,7 @@ SQL 模板库由 MCP 统一维护：
 2. 模板内容保留业务场景说明、涉及表、占位符和验证状态；不要在 Skill 目录新增模板文件。
 
 ### 标记「已验证」
-首次生成并经 `describe_table` / `validate_table_columns` 校验通过后，调用 `update_sql_template` 将模板标记为 `verified=true` 并记录验证时间，后续同类任务即可免校验提效。若结构可能已变更，重新校验并取消验证标记。
+首次生成并经 `archery_describe_table` / `archery_list_columns` 校验通过后，调用 `update_sql_template` 将模板标记为 `verified=true` 并记录验证时间，后续同类任务即可免校验提效。若结构可能已变更，重新校验并取消验证标记。
 
 ## 使用示例
 
@@ -113,7 +113,7 @@ SQL 模板库由 MCP 统一维护：
 
 **Skill 处理**：
 1. 从 `table_meta.md` 识别涉及表：`hpfm_tenant`、`ssrc_rfx_header`
-2. 用 MCP `execute_sql` 取 `tenant_id`：`SELECT tenant_id FROM hpfm_tenant WHERE tenant_num='SRM-AUX'`
+2. 用 MCP `archery_query` 取 `tenant_id`：`SELECT tenant_id FROM hpfm_tenant WHERE tenant_num='SRM-AUX'`（也可优先用 `archery_query_tenant` 反查）
 3. 从 `relations.md` 确认关联：`hpfm_tenant.tenant_id` ↔ `ssrc_rfx_header.tenant_id`
 4. 调用 `search_sql_template` 匹配时间过滤模板
 5. 生成 SQL：
@@ -140,7 +140,7 @@ ORDER BY r.create_time DESC;
 
 **Skill 处理**：
 1. 从 `table_meta.md` 识别涉及表：`ssrc_rfx_header`、`ssrc_rfx_quotation_header`、`ssrc_rfx_line_supplier`
-2. 用 `describe_table` 确认字段（如有不明确）
+2. 用 `archery_describe_table` 确认字段（如有不明确）
 3. 从 `relations.md` 确认关联键
 4. 生成关联查询 SQL
 
@@ -164,15 +164,15 @@ ORDER BY r.create_time DESC;
 - ⚠️ **写入类 SQL 输出规范**（详见 `SKILL.md`「SQL 输出格式规范」）：每条 UPDATE/DELETE 之前必须保留一段用一致 WHERE 条件的「原始数据核查 SELECT」，供提交前人工确认；**禁止输出**「执行前备份」(`CREATE TABLE bak_...`) 与「回滚方案」段。
 
 ### 结构获取规则（替代原"上下文加载规则"）
-- 结构事实统一走 MCP：`describe_table` / `validate_table_columns` / `execute_sql`
+- 结构事实统一走 MCP：`archery_describe_table` / `archery_list_columns` / `archery_query`
 - 不维护本地单表结构文件，避免上下文臃肿与表信息暴露
 - 字段名/表名不明确时必校验，已验证模板中的内容可免校验
 
 ### 准确性保障
 - 生成 SQL 前必须验证：
-  - 表名拼写（对照 `table_meta.md` 或 `describe_table`）
+  - 表名拼写（对照 `table_meta.md` 或 `archery_describe_table`）
   - 关联键（对照 `relations.md`）
-  - 字段存在性（`validate_table_columns` 或 `describe_table`）
+  - 字段存在性（`archery_list_columns` 或 `archery_describe_table`）
   - ⚠️ **source_from 是否正确**：评标/结果表中 `'RFX'` 同时覆盖询价单与新招标（新招标不再用 `'BID'`），`'BID'` 仅指几乎不用的老招标；征询单用 `'RFI'`/`'RFP'`。另：`ssrc_rfx_header.source_from` 是单据来源，区分单据类型用 `secondary_source_category`
 - 对于复杂逻辑，建议分步生成并验证
 

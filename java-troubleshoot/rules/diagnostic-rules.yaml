@@ -1,0 +1,175 @@
+# Diagnostic Rules（诊断规则独立层）
+#
+# 结构约束（严禁"信号→直接断定原因"）：
+#   signals        → 观察到的故障信号（来自日志/代码/数据库 Evidence）
+#   hypothesis     → 由信号推导的若干个待验证假设（非结论）
+#   evidence       → 验证假设所需的证据来源
+#   conclusion_requires → 下结论前必须满足的证据条件
+#
+# 排障 Agent 在 InvestigationContext 中匹配 signals，提出 hypothesis，
+# 然后按 evidence 去获取事实，满足 conclusion_requires 后才可定论。
+
+- id: npe
+  signals:
+    - NullPointerException
+    - 日志含 "NullPointer"
+  hypothesis:
+    - 某个对象未被初始化/注入即被使用
+    - 关联数据缺失导致字段为 null
+    - 二开/配置表返回了意外的空值
+  evidence:
+    - stack trace（定位 null 出现的具体类/方法/行）
+    - source code（确认对象初始化路径）
+    - relevant data（确认上游是否真的返回了数据）
+  conclusion_requires:
+    - 识别确切的 null 路径（哪个对象、在什么分支变为 null）
+
+- id: timeout
+  signals:
+    - 日志含 timeout / TimeoutException
+    - 某服务耗时 > 3s
+    - 调用链中存在等待超时
+  hypothesis:
+    - 下游服务响应慢/不可用
+    - 连接池耗尽导致获取连接等待超时
+    - 大查询/锁等待拖慢响应
+  evidence:
+    - 调用链（trace）中各服务耗时
+    - 下游服务日志
+    - 连接池状态（如 HikariPool 日志）
+  conclusion_requires:
+    - 定位具体哪个环节超时，区分"下游慢"还是"自身资源不足"
+
+- id: bean_creation
+  signals:
+    - BeanCreationException
+    - NoSuchBeanDefinitionException
+  hypothesis:
+    - Spring 配置/自动扫描路径问题
+    - 依赖缺失或版本不兼容
+    - 标准升级后 bean 定义变更
+  evidence:
+    - source code（Spring 配置、自动扫描路径）
+    - 启动日志
+    - 标准升级前后差异（若用户提到升级）
+  conclusion_requires:
+    - 确认缺失/冲突的 bean 名称与原因
+
+- id: sql_exception
+  signals:
+    - SQLException
+    - JdbcSQLException
+    - HikariPool 相关异常
+  hypothesis:
+    - SQL 语法/字段错误
+    - 数据库连接/连接池问题
+    - 表/字段不存在或映射错误（含虚拟表误判）
+  evidence:
+    - 异常完整堆栈
+    - source code（Mapper XML 中的实际 SQL）
+    - 数据库 describe（确认真实表/字段）
+  conclusion_requires:
+    - 定位具体 SQL 与失败原因，确认物理表/虚拟表归属
+
+- id: connection_pool_exhausted
+  signals:
+    - "Connection is not available"
+    - "wait timeout"
+    - HikariPool 连接等待超时
+  hypothesis:
+    - 连接池配置过小
+    - 连接未及时释放（泄漏）
+    - 慢查询占用连接
+  evidence:
+    - 连接池配置（代码/配置）
+    - 慢查询日志
+    - 活跃连接分布
+  conclusion_requires:
+    - 确认是配置问题还是泄漏/慢查询导致
+
+- id: permission_denied
+  signals:
+    - "403"
+    - Forbidden
+    - AccessDeniedException
+  hypothesis:
+    - 用户/服务缺少对应权限码
+    - 权限注解配置错误
+    - 租户/数据权限隔离导致
+  evidence:
+    - 源码权限注解（@PreAuthorize 等）
+    - 权限配置数据
+    - 当前用户/服务角色
+  conclusion_requires:
+    - 确认缺失的具体权限码或配置项
+
+- id: data_inconsistency
+  signals:
+    - 服务A返回成功，但服务B状态未更新
+    - 多表状态对不上
+  hypothesis:
+    - 分布式事务/补偿失败
+    - 异步消息未消费/消费失败
+    - 二开脚本覆盖了标准写入逻辑
+  evidence:
+    - 多个关联表的当前状态（数据库）
+    - 消息/事务日志
+    - 二开脚本逻辑（适配器）
+  conclusion_requires:
+    - 定位状态断裂的具体环节与因果
+
+- id: config_issue
+  signals:
+    - 用户描述指向配置问题
+    - 日志/源码印证值集/消息清单等配置缺失
+  hypothesis:
+    - 配置项缺失或未生效
+    - 平台级/租户级配置表取值错误
+    - 二开配置覆盖了预期行为
+  evidence:
+    - 配置表数据（虚拟表 or 配置表）
+    - source code（配置消费点）
+    - 用户描述与实际情况对照
+  conclusion_requires:
+    - 确认具体缺失/错误的配置项及其取值
+
+- id: upgrade_regression
+  signals:
+    - 用户提到版本变更/标准升级
+    - 日志/代码印证行为差异
+  hypothesis:
+    - 标准产品变更影响了现有逻辑
+    - 二开未适配新版本
+    - 配置随升级失效
+  evidence:
+    - 升级前后源码差异（标准库分支对比）
+    - 二开是否适配新版本
+    - 配置/数据兼容性
+  conclusion_requires:
+    - 确认变更点与当前故障的因果关系
+
+- id: operation_issue
+  signals:
+    - 用户描述指向操作/流程问题
+    - 日志/源码印证为预期行为
+  hypothesis:
+    - 用户操作不符合系统设计
+    - 流程节点未按预期执行
+  evidence:
+    - 操作日志/审计
+    - source code（业务流程）
+  conclusion_requires:
+    - 明确是操作问题还是系统缺陷
+
+- id: unknown
+  signals:
+    - 以上规则均不匹配
+  hypothesis:
+    - 需进入 AI 深度分析，基于全部 Evidence 归纳根因
+  evidence:
+    - 调用链摘要
+    - 完整错误日志
+    - 相关业务数据
+    - 相关源码
+  conclusion_requires:
+    - 至少一条直接证据或两条独立证据支撑结论

@@ -19,7 +19,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 环境 / 实例选择（必读，极易出错）
 
-**统一通过 `zhenyun-pangun-mcp` 的 Archery 工具访问数据库**（覆盖 cn/aws 双站点，替代原 `sql-ops`）。Archery 默认实例是 **PROD**（`prod`=`SAAS-SRM-PROD`）。**用户只要提到非生产环境，必须显式传 `site`+`instance`**，否则会误查生产数据。按用户口吻映射：
+**统一通过 `zhenyun-pangun-mcp` 的 Archery 工具访问数据库**（覆盖 cn/aws 双站点，这是唯一数据库实时能力入口）。Archery 默认实例是 **PROD**（`prod`=`SAAS-SRM-PROD`）。**用户只要提到非生产环境，必须显式传 `site`+`instance`**，否则会误查生产数据。按用户口吻映射：
 
 | 用户说 | 传 `site` / `instance` | 真实实例 |
 |--------|------------------------|----------|
@@ -64,7 +64,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 工具能力（zhenyun-pangun-mcp，Archery）
 
-> 数据库查询**统一用 Archery**（覆盖 cn/aws 双站点，替代原 `sql-ops`）。所有工具参数取真实值，**严禁瞎猜**（完整声明见文末附录）。
+> 数据库查询**统一用 Archery**（`zhenyun-pangun-mcp` 的数据库能力，覆盖 cn/aws 双站点）。所有工具参数取真实值，**严禁瞎猜**（完整声明见文末附录）。
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
@@ -151,7 +151,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 分级校验策略（正确性与效率兼顾）
 
-> **🚦 先探测后查询（替代 sql-ops 门禁）**：`archery_query` **没有**声明式 `trusted_tables` 门禁，因此改用「先确认再查询」纪律防止编造表/字段——即表/字段必须先经 `table-catalog.search_tables` 检索命中、或 `archery_describe_table`/`archery_list_columns` 确认存在，才能用于 `archery_query`。**「检索到 / describe 过」即视为已确认**，可直接查询；catalog/模板/describe 任意一处确认即可，不必重复 describe。
+> **🚦 先探测后查询**：`archery_query` 通过「先确认再查询」纪律防止编造表/字段——即表/字段必须先经 `table-catalog.search_tables` 检索命中、或 `archery_describe_table`/`archery_list_columns` 确认存在，才能用于 `archery_query`。**「检索到 / describe 过」即视为已确认**，可直接查询；catalog/模板/describe 任意一处确认即可，不必重复 describe。
 
 ### ✅ 已确认（可直接用于 archery_query，无需再 describe）
 - 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段 —— 其 `core_tables` 直接作为可信来源；
@@ -172,64 +172,16 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 ### 🛡️ 异常回退
 - MCP 调用失败/无结果时：改用占位符并标注「未验证」，**严禁编造**。
 
-## 术语映射表与状态规则
+## 业务知识引用索引（Knowledge 层）
 
-> 以下为盘古域独有的、极易混淆的概念。**生成 SQL 前务必对照核对**。
+> 以下为盘古域独有的、极易混淆的概念（状态组合、表关系、上下游联动、枚举、清理规则等），属于**稳定业务事实**，已抽离到 `references/` 知识文件，**生成 SQL 前按需查阅**，勿在本 SKILL 内重复内联：
 
-### 1. 老送货单 vs 发货工作台送货单（两套表，最易混）
-- **老送货单**：`srm.sinv_asn_*`（sinv_asn_header / sinv_asn_line / sinv_asn_header_es / sinv_asn_line_es / sinv_label_*）。
-- **发货工作台送货单**：`srm_logistics_delivery.slod_asn_*`（slod_asn_header / slod_asn_line / slod_plan_* 计划 / slod_label_* 标签）。
-- 租户是否开启发货工作台决定走哪套表；不确定时先查 `slod_node_config` 是否有该租户配置或向用户确认。
+| 需要了解的业务事实 | 查阅文件 | 典型场景 |
+|---|---|---|
+| 老送货单 vs 发货工作台送货单（两套表）、订单状态机组合、乐观锁、pe_supplier、ES 联动、清理规则、留痕、同步/幂等表、API 建议 | `references/relations.md` | 不确定表间关系、状态组合、上下游联动/清理规则时 |
+| 表名-主键-关联键速查、库归属、import_type 等枚举速查、易错拼写（tax_include_amount 等）、主数据速查 | `references/table_meta.md` | 快速确认表/主键/关联键、高频枚举值时 |
 
-### 2. 订单状态字段组合（sodr_po_header）
-- 状态由多字段组合表达：`status_code` + `approved_flag` + `erp_approval_flag` + `released_flag` + `confirmed_flag` + `closed_flag` + `cancelled_flag`。
-- 典型组合：
-  - 新建：全 0 + `status_code='PENDING'`（并清 `change_sync_status`）
-  - 审批通过：approved=1, erp_approval=1, released=0, confirmed=0, `status_code='APPROVED'`
-  - 已发布：+released=1（`released_date=now()`，清 `po_upgrade_re_confirm_flag`），`status_code='PUBLISHED'`
-  - 已确认：+confirmed=1（`status_code` 仍为 `'PUBLISHED'`，展示层按 confirmed_flag 翻译为 CONFIRMED）
-- `closed_flag` / `cancelled_flag` 取值：`0`=否、`1`=是、`2`=处理中、`3`=待确认（如 `cancelled_flag=3` 为取消待确认）。**关闭与取消互斥，不能同时为 1**。
-- 修复整单取消时**头金额需归零**（`amount=0, tax_include_amount=0`）；修复行取消时发运行 `can_create_asn_flag=0` 并重算头金额（排除取消行）。
-- 修复为已确认/已取消/已关闭后，**必须关注下游 `sinv_rcv_trx_line` 待收货数据的 `complete_flag` 同步**（确认→打开 complete_flag=0；取消/关闭→complete_flag=1）。
-- 头/行/发运行状态的**展示翻译**逻辑见模板「订单头行状态翻译」，LOV 为 `SODR.PO_STATUS`。
-
-### 3. 乐观锁规则（sodr 系列专属）
-- **所有 `sodr_*` 表的 UPDATE 必须带 `object_version_number = object_version_number + 1`**，否则前端保存会版本冲突。
-- `sinv_*` / `slod_*` 表一般无此要求（以 `archery_describe_table` 实际字段为准）。
-
-### 4. 供应商修复规则（pe_supplier 组合字段）
-- 平台供应商表 `sslm_supplier_basic`（键 `supplier_company_id`），本地供应商表 `sslm_external_supplier`（键 `supplier_id`，其 `link_id` 即平台的 `supplier_company_id`）。
-- **`pe_supplier` = `supplier_company_id`-`supplier_id`（平台id-本地id）拼接**；`settle_pe_supplier` = `settle_supplier_id`-`settle_erp_supplier_id` 拼接；两者都为空时不处理。
-- 订单头结算供应商标准逻辑与公司一致：修复公司时同步检查 `settle_company_id/settle_company_name`。
-- 供应商字段命名差异：收货事务/老送货用 `supplier_num`，发货工作台用 `supplier_code`，订单头用 `supplier_code`——写 SQL 前校验。
-
-### 5. 收货导出记录（sinv_rcv_change_record）import_type 枚举
-- `SETTLE`=推结算、`SINV_TO_SLOD`=推发货、`SINV_TO_SODR`=推订单、`SINV_TO_PR`=推申请、`RCV_EXPORT`=推外部、`SINV_TO_MALL`=推商城、`SINV_TO_OUTSOURCE`=推委外、`ANT_AUDIT`=反审核。
-- `source_document_table` 区分头/行维度：`sinv_rcv_trx_header` / `sinv_rcv_trx_line`。
-- 修复要点：把状态改回 `FAIL` 可触发重推；改推订单状态**必须极其谨慎**；对接多外部系统时 WHERE 需带 `external_system_code`；关注「导出外部成功才导结算」的租户配置联动。
-
-### 6. ES 表（外部系统映射）联动规则
-- `*_es` 表保存与外部系统（ERP等）的单据映射（如 `sodr_po_header_es`、`slod_asn_header_es`、`sinv_rcv_trx_line_es`）。
-- **同步状态「成功 → 失败」时必须删除对应 ES 表数据**（否则外部映射残留导致重复/冲突）；「失败 → 成功」时若无 ES 数据需按插入模板补 ES（先修头行表再插 ES，ES 取值来自头行表）。
-- 委外等清理场景：**先删 ES 表、再删业务表**。
-
-### 7. 数据清理规则（上下游协同）
-- 收货事务清理需覆盖：`sinv_rcv_trx_order_link` → `sinv_rcv_trx_header/line` → `*_es` → `*_ext` → `sinv_rcv_trx_score` → `sinv_rcv_record_strategy_mapping`；若开启发货工作台，还含 `slod_idempotent_record`（record_type='10'）与 `slod_trx_dly_detail`。
-- 发货工作台清理需覆盖：`slod_delivery_init_info_link` → `slod_po_dly_record` → `slod_idempotent_record`(record_type='20') → ASN/PLAN/LABEL 三套头行 + `*_es` + `slod_delivery_line_ext/header_ext`(按 source_type) + `slod_dly_line_export_record` + `slod_po_dly_strategy_change_record`。
-- 订单删除共 6 张表：`sodr_po_header/line/line_location` + 三张 `*_es`；**删除前必须确认前置单据数量释放与预算释放**。
-- 原则：1）只针对指定租户；2）针对指定单据必须上下游协同清理；3）清理生成建议用 `concat('delete ...')` 反查生成再人工执行。
-
-### 8. 修复留痕规则
-- 数据修复类 UPDATE 建议在留痕字段追加工单号：`attribute_longtext10 = concat(IFNULL(attribute_longtext10,','),'数据修复/<工单号>')`（部分物流表用 `attribute_longtext60`，用前校验）。
-- 统一带 `last_update_date = now()`。
-
-### 9. 同步/幂等记录表
-- 订单侧同步记录：`sodr_po_status_sync_record`（`sync_type`：`SRM_EXP_ERP` 新建同步、`DELIVERY_EXP_ERP` 交期同步、`ORDER_DELIVERY_WORK` 订单同步发货工作台）；无记录时按插入模板补 FAIL/SUCCESS 记录触发或标记。
-- 消费幂等：`sodr_consumer_idempotent`（订单/发货消息消费）；发货幂等：`slod_idempotent_record`（record_type：'10' 收货、'20' 订单初始化）。
-- 收货同步类调度任务：`SINV_TO_SETTLE_BATCH_SYNC` / `SINV_TO_SLOD_BATCH_SYNC` / `SINV_TO_SODR_BATCH_SYNC`，可复制临时任务加参 `{"importStatus":"IMPORTING"}` 重推，配置表 `spuc_sinv_sitf_import_split_line` 需含租户。
-
-### 10. 何时建议走 API/调度而非 SQL
-- 事务导入/反审核/事务重推/审批回调/订单初始化/策略更新等场景，**平台有标准数据修复接口或调度**，优先建议接口而非直接 UPDATE（尤其涉及推送订单状态、已导出外部成功的单据）。SQL 修复仅用于接口无法覆盖或明确要求的场景。
+> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangun-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
 
 ## 参考文件指引
 
@@ -255,6 +207,13 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
   - `execution_flow`：**数据修复类模板必填**。按「执行过程驱动模式」的伪代码语法，把本次实际执行过的前置查询、断言、修复动作整理为 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION），供后续复用时分步执行；
   - `example_case`：**数据修复类模板必填**。写入本次真实执行轨迹的脱敏版：输入参数 → 各 STEP 中间结果（如「Step 1 结果: tenant_id = 46997」）→ 最终 SQL，作为 Few-Shot 示例；
   - `verified`：表/字段已 MCP 校验通过则置 `true` 并填 `verified_at`。
+  - **问题解决方案扩展字段（推荐填写，提升检索与复用可信度）**：
+    - `status`：模板状态。数据修复类默认 `draft`；经 MCP 校验通过可标 `verified`；多次成功复用后升 `trusted`；确认废弃标 `deprecated`。
+    - `risk_level`：风险等级，按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
+    - `business_domain`：`盘古订单履约`；`system`：`盘古`。
+    - `problem_description` / `symptom` / `root_cause`：本次要解决的问题 / 现象 / 根因（供按问题语义检索命中）。
+    - `verify_sql` / `rollback_sql`：修复后校验 SQL / 回滚 SQL（如适用）。
+    - `execution_policy`：写操作执行策略（如 `需人工确认` / `高风险禁止自动执行`）。
 - 存量高频模板可用 `update_sql_template(id, execution_flow=..., example_case=...)` 渐进式补充执行过程（优先 Top 高频数据修复场景）。
 - 复用模板生成后调用 `record_template_usage(id)`。
 
@@ -281,22 +240,9 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 4. **更新本 SKILL**：在术语映射表或参考文件指引中补充新概念。
 5. **禁止**：不要为每张表创建本地结构文件——结构事实统一走 MCP。
 
-## 核心业务概念（背景知识）
+## 核心业务概念（背景知识 → Knowledge 层）
 
-### 1. 订单履约主流程
-寻源结果/申请/合同 → 生成采购订单（sodr）→ 审批 → 发布 → 供应商确认（可含电子签章）→（开启发货工作台则）订单初始化发货 → 送货/计划/标签（slod）→ 收货事务（sinv_rcv）→ 推结算/推外部/推商城/推委外。
-
-### 2. 关键实体关系
-- **订单**：`sodr_po_header` 1:N `sodr_po_line` 1:N `sodr_po_line_location`（发运行，数量占用/收发货净数在此）
-- **发货工作台**：订单发运行 → `slod_delivery_init_info_link`（初始化链接）→ `slod_asn_*` / `slod_plan_*` / `slod_label_*`
-- **收货事务**：`sinv_rcv_trx_order_link`（来源链接）→ `sinv_rcv_trx_header` 1:N `sinv_rcv_trx_line`；导出记录 `sinv_rcv_change_record`
-- **老送货单**：`sinv_asn_header` 1:N `sinv_asn_line`，占用订单发运行 `occupied_quantity`
-- **签章**：`sodr_po_header_sign`（electric_sign_status：EFFECTED/CANCELLATION）
-
-### 3. 常见操作类型
-- 查询类：单据状态/占用数量/导出状态/策略配置/操作记录/异常监控
-- 修复类：状态回退与推进、供应商与主数据字段修复、金额修复、同步状态修复、编号修复
-- 清理类：初始化数据删除、单据级联清理（必须上下游协同）
+> 订单履约主流程、关键实体关系（订单/发货/收货/老送货单/签章）、常见操作类型等**稳定业务事实**已沉淀到 `references/relations.md`（主链路关联 + 实体关系）与 `references/table_meta.md`（核心表速查），此处不再内联，需要时查阅对应文件。
 
 ## 数据库约束与安全规则
 
