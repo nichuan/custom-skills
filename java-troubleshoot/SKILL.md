@@ -1,20 +1,23 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 log-ops MCP 分析日志/调用链，并通过 gitlab-code MCP 定位源码，按需通过 sql-ops MCP 查询数据。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangun-mcp 查日志/查数据库/搜源码/查猪齿鱼，按需通过 table-catalog 补充数据字典与 join 关系、gitlab-code 读取完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
 
 ## MCP 依赖
 
-本技能依赖四个 MCP：
+本技能**统一使用 `zhenyun-pangun-mcp`** 完成日志查询、数据库查询、代码搜索、猪齿鱼协作等核心能力。只有 `zhenyun-pangun-mcp` 不覆盖的能力才回落到专用 MCP。
 
-| MCP | 用途 | 工具 |
+| MCP | 角色 | 工具 |
 |-----|------|------|
-| `log-ops` | SLS 日志查询、调用链分析、规则诊断 | `query_logs`、`analyze_trace`、`diagnose_trace`、`troubleshoot_logs` |
-| `sql-ops` | 数据库结构确认与只读查询 | `describe_table`、`validate_table_columns`、`execute_sql` |
-| `gitlab-code` | GitLab 项目、分支、源码和目录搜索 | `search_projects`、`list_branches`、`search_code`、`get_file`、`list_tree` |
-| `table-catalog` | 数据字典目录：表语义检索、join 关系 | `search_tables`、`get_table_detail`、`get_table_relations`、`record_table_usage`、`add_table_relation` |
+| `zhenyun-pangun-mcp` | **提供**：日志(Loki/CLS)、Archery 数据库、猪齿鱼协作、代码搜索 | `obs_log_query`、`obs_log_datasources`、`obs_sls_query`、`archery_query`、`archery_describe_table`、`archery_list_columns`、`archery_list_databases`、`archery_list_instances`、`archery_query_tenant`、`choerodon_*` 系列、`search_repo`、`getTaskId` |
+| `table-catalog` | **补充**：数据字典语义检索、join 关系（pangun 不含此能力） | `search_tables`、`get_table_detail`、`get_table_relations`、`record_table_usage`、`add_table_relation` |
+| `gitlab-code` | **补充**：读取完整文件内容 / 目录树（pangun 的 `search_repo` 只返回命中片段，不含读文件能力） | `get_file`、`list_tree`、`search_projects`、`list_branches`、`search_code` |
+
+> 日志、数据库、代码搜索、猪齿鱼**优先调用 `zhenyun-pangun-mcp`**。`zhenyun-pangun-mcp` 的所有参数必须按下方「MCP 工具与参数声明」章节取真实值，**严禁瞎猜瞎传**（数据源名、实例名、环境名尤其不能乱填）。
+>
+> `zhenyun-pangun-mcp` 已覆盖日志（含三平台）、数据库（含 cn/aws 双站点）的查询类能力；`table-catalog` 的数据字典检索、`gitlab-code` 的 `get_file` 读文件是 pangun 没有的能力，按需回落使用。
 
 推荐将上述 MCP 以 stdio 注册到同一个 MCP 客户端。所有凭据只放在对应 MCP 服务端的 `.env`/MCP `env` 中，不写入 Skill、提示词、命令行参数或报告。
 
@@ -44,13 +47,16 @@ description: Java 微服务故障排查助手。仅在用户描述了异常、�
 
 支持：天工 `paas-dev` / `paas-test` / `saas-dev` / `saas-test` / `sandbox` / `prod`；盘古 `dev` / `test` / `prod`。
 
-Project、Logstore、namespace、Region 和 Endpoint 的映射唯一维护在 `log-ops-mcp`，技能不得要求用户填写这些技术参数。
+日志平台/数据源的映射唯一维护在 `zhenyun-pangun-mcp`（Loki 双平台 aws/cn + 阿里云 SLS），技能不得要求用户填写这些技术参数。
 
 ### 日志 MCP 配置
 
-SLS 凭据只配置在 `log-ops-mcp` 的 MCP `env` 或 `.env` 中，**禁止写入技能文件、提示词、命令行参数或诊断报告**。日志 MCP 会根据系统/环境自动选择 Project、Logstore、namespace 和对应的凭据。
+日志凭据只配置在 `zhenyun-pangun-mcp` 的 MCP `env` 或 `.env` 中，**禁止写入技能文件、提示词、命令行参数或诊断报告**。日志工具（`obs_log_query` / `obs_sls_query`）会根据系统/环境自动选择数据源与对应的凭据。
 
-支持的凭据变量：`SLS_TYGO_NONPROD_ACCESS_KEY_ID` / `SLS_TYGO_NONPROD_ACCESS_KEY_SECRET`、`SLS_TYGO_PROD_ACCESS_KEY_ID` / `SLS_TYGO_PROD_ACCESS_KEY_SECRET`、`SLS_PANGU_NONPROD_ACCESS_KEY_ID` / `SLS_PANGU_NONPROD_ACCESS_KEY_SECRET`、`SLS_PANGU_PROD_ACCESS_KEY_ID` / `SLS_PANGU_PROD_ACCESS_KEY_SECRET`。
+**日志平台路由（核心，极易错）**：
+- **cn 国内公有云（默认，绝大多数场景）**：盘古 `prod` 走阿里云 SLS（`obs_sls_query`，system=`盘古`）；盘古 `dev`/`test` 等非生产走 Loki（`obs_log_query(region="cn")`）。
+- **AWS 海外公有云（jp-saas-1，少数情况）**：仅当用户明确说明是 AWS 海外环境时才用，无论 prod/非生产全部走 Loki（`obs_log_query(region="aws")`）。
+- 一句话：除「cn 国内盘古 prod」走 SLS 外，其余（cn 非生产 + 全部 AWS）都走 Loki。**默认按 cn 处理，不要默认 aws。**
 
 ---
 
@@ -114,17 +120,57 @@ SLS 凭据只配置在 `log-ops-mcp` 的 MCP `env` 或 `.env` 中，**禁止写�
 
 ---
 
-### 第二步：查询日志与调用链分析（log-ops MCP）
+### 第二步：查询日志与调用链分析（统一用 zhenyun-pangun-mcp）
 
-日志处理唯一调用 `log-ops-mcp`，技能目录不再包含 SLS 查询、调用链分析或规则诊断脚本，也不接触 Project、Logstore、namespace 或 AccessKey。需要修改日志处理逻辑时，只维护 `log-ops-mcp`。
+日志处理**统一调用 `zhenyun-pangun-mcp`**（`obs_log_query` / `obs_sls_query`）。技能不接触 Project、Logstore、namespace 或 AccessKey，平台/数据源选择由 pangun 自动完成。
 
-常规排障优先调用 `troubleshoot_logs(system, environment, trace_id, keyword, level, time_range, limit, auto_expand)`；需要分步处理时依次调用 `query_logs`、`analyze_trace`、`diagnose_trace`。有 traceId 时 MCP 自动执行 ERROR/WARN + 全链路双阶段查询，并强制带 namespace 过滤。未指定时间且 2 小时无结果时保持 `auto_expand=true` 自动尝试 24/72 小时；用户指定时间范围时传 `auto_expand=false`。
+按阶段 1~3 选定的「系统 + 环境 + 线索」决定调用哪个日志工具：
+
+- **cn 国内盘古 `prod`**：用 `obs_sls_query(environment="prod", trace_id?, keyword?, level?, system="盘古")`。
+  - 有 traceId 优先传 `trace_id`；否则传 `keyword`。
+- **cn 国内盘古 `dev`/`test`（非生产）**：用 `obs_log_query(region="cn", env, query)`。
+  - ⚠️ **"test 环境"在 MCP 代码层面对应 `env="nonprod"` + `namespace="saas-test-new"`**（不是字面的 "test"；`LOKI_DATASOURCES` 的 cn 只有 `prod`/`nonprod`/`ops`）。
+  - 有 traceId 优先用 `obs_log_trace(trace_id, region="cn", env="nonprod")` 一键追全链路（**已内置多格式匹配，自动覆盖 `[xxx]`/`traceId=xxx`/`traceId: xxx`/`trace_id=xxx` 等写法，不要手写字段前缀**）；若需手写 `obs_log_query`，直接按 traceId 子串匹配最稳：`query='{namespace="saas-test-new"} |= "xxx"'`，**不要写死 `traceId=` 前缀**（日志正文实际是 `[xxx]` 方括号包裹，写死会查空）。
+- **AWS 海外（全部环境，Loki，少数情况）**：仅当用户明确说明是 AWS 海外环境时才用 `obs_log_query(region="aws", env, query)`，env 经 `obs_log_datasources("aws")` 确认（`prod`/`nonprod`/`ops`）。
+- ⚠️ **盘古非生产（dev/test）一律走 Loki，不要调 `obs_sls_query`**；只有 cn 盘古 prod 才走 SLS。
+- **不确定 region/env 时**：**默认按 cn 处理**（先 `obs_log_datasources("cn")`）；只有用户明确说是 AWS 海外才查 `obs_log_datasources("aws")`。再据返回的真实 env 键去查（cn/aws 均为 `prod`/`nonprod`/`ops`）。**严禁瞎猜 env，也不要默认 aws。**
+
+**参数铁律（严禁瞎猜）**：
+- `obs_sls_query` 的 `system` 必须是 `盘古` 或 `天工`（别名 `pg`/`pangu`/`tg`/`tiangong` 会归一化）；`environment` 仅用于 cn 盘古 `prod`（虽然 `sls_config` 底层含 dev/test 键，但路由规则下非生产一律走 Loki，**不要对 dev/test 调 `obs_sls_query`**）。**不要混用天工 `paas-*` 命名**。
+- `obs_log_query` / `obs_log_trace` 的 `env` 必须来自 `obs_log_datasources(region)` 返回的真实键；`query` 用 **LogQL**（见下方速查）。
+- **Loki 标签名 ≠ SLS 字段名**：Loki 用的是 `namespace` / `service_name` / `pod` / `container` / `app`（写在 `{...}` 流选择器中）；SLS 用的是 `_namespace_` / `_container_name_`（下划线前缀）。两者不要混用。
+- 时间窗口显式给（`start`/`end` 或相对时间 `-1h`）；首次 `limit` 给 100~200。
+- 完整参数声明见文末「MCP 工具与参数声明」。
+
+### LogQL 语法速查（Loki / `obs_log_query` / `obs_log_trace` 用）
+
+> 手册是给人在 Grafana **页面**手工选 namespace/app、配面板的；MCP 是直接调 Loki HTTP API，`query` 即 LogQL 字符串，**不存在"页面选框"概念，必须在 query 里显式写标签过滤**。
+
+- 流选择器：`{namespace="saas-test-new"}`（必须至少带一个标签，否则跨全量数据流、慢且易超时）。
+- 行过滤（接在流选择器后）：
+  - `|= "x"` 包含关键字 x
+  - `!= "x"` 排除关键字 x
+  - `|~ "a|b"` 正则匹配 a 或 b
+  - `!~ "a|b"` 正则不匹配
+- 示例（traceId 直接按子串，不写死字段前缀）：`{namespace="saas-test-new"} |= "abc" |~ "(?i)error|warn"`（日志正文里 traceId 多为 `[abc]` 方括号包裹，写 `traceId=abc` 会查空）
+- 多格式正则（与 `obs_log_trace` 内置一致）：`{namespace="saas-test-new"} |~ "(\\[abc\\]|(?i:trace[_]?id)[:=]\\s*abc(?=\\W|$))"`（覆盖 `[abc]`/`traceId=abc`/`trace_id: abc` 等，并加了词边界防误匹配 `abcx`）
+
+### 常用 Loki 查询模板（直接套用，先 `obs_log_datasources` 确认 env）
+
+1. 按应用全量：`{namespace="saas-test-new", app="srm-order"}`
+2. 查 ERROR：`{namespace="saas-test-new"} |= "ERROR"`
+3. 异常关键字：`{namespace="saas-test-new"} |~ "Exception|NullPointer|Timeout"`
+4. 整条链路（有 traceId）：`obs_log_trace(trace_id="xxx", region="cn", env="nonprod")`
+5. 接口访问日志：`{namespace="saas-test-new", app="srm-gateway"} |= "/ssrc/"`
+6. 指定服务+关键字：`{namespace="saas-test-new", service_name="srm-source"} |= "listRfHeaders"`
+
+> 调用链分析、规则诊断：若 `zhenyun-pangun-mcp` 暂无对应分析工具，可结合日志原文由本技能「第五步 AI 深度分析」完成。
 
 ---
 
 ### 第三步：调用链分析
 
-拿到 `query_logs` 返回值后调用 `analyze_trace(logs_json)` 进行分析；常规场景直接使用上一步的 `troubleshoot_logs`。
+拿到 `obs_log_query` / `obs_sls_query` 返回的日志后，提取调用链信息（参与服务、ERROR/WARN 日志、业务 ID、异常类型），按下方规则做诊断。若 `zhenyun-pangun-mcp` 提供了 trace 分析类工具则优先使用，否则由本技能大模型直接分析日志原文。
 
 分析结果包括：
 - 参与的服务列表（按调用顺序）
@@ -362,6 +408,14 @@ LIMIT 100;
 | 3（较老） | Git 二开仓库 `operation-srm-{租户}/srm-{模块}-{租户}` | `search_projects` 探测，有则查 `release` 分支 |
 | 4 | 无二开 | 以上都查不到 → 走标准逻辑 |
 
+#### 代码搜索使用 `zhenyun-pangun-mcp` 的 `search_repo`
+
+代码关键字检索**统一用 `zhenyun-pangun-mcp` 的 `search_repo(keyword, mode?)`**（`mode` 可选 `code`/`commit`/`issue`/`wiki`，默认 `code`）。参数与约束：
+
+- `keyword` 必填，是要搜的关键字（类名、方法名、错误码等）。
+- 这是**全局搜索**，会返回命中仓库、分支与片段；**但它不返回完整文件**，锁定 `path_with_namespace` 与分支后，必须用 `gitlab-code` 的 `get_file` 读取具体文件内容（读完整文件是 `gitlab-code` 的独占能力，pangun 不提供）。
+- 优先遵循上文「代码库拓扑」与「分支选择规则」，不要漫无目的全局搜；用 `search_repo` 锁定仓库后，仍按上文第 5~9 步的「项目级搜索 / 读文件 / 追关联」流程收敛。
+
 #### GitLab 权限处理
 
 - `401`：提示 Token 缺失、过期或无效，不要求用户在对话中粘贴 Token；让用户配置 `gitlab-code-mcp/.env` 或 MCP `env`。
@@ -382,37 +436,55 @@ LIMIT 100;
 
 ---
 
-### 第七步：数据库交叉验证（sql-ops MCP）
+### 第七步：数据库交叉验证（统一用 zhenyun-pangun-mcp 的 Archery）
 
-当问题可能涉及数据状态时，**必须**调用 `sql-ops-mcp.execute_sql`，不得调用已废弃的 `archery-query`。
+当问题可能涉及数据状态时，**必须**调用 `zhenyun-pangun-mcp` 的 Archery 工具：用 `archery_query` 执行只读 SQL，`archery_describe_table` / `archery_list_columns` 确认表结构/字段。
+
+**按排障环境选择实例（极易出错，必读）：**
+
+Archery 默认实例是 **PROD**。`site`/`instance` 必须与你「阶段 2 选定的环境」一致，**显式传参**，否则会误查生产数据、得出错误结论：
+
+| 阶段2选定环境 | 传 `site` / `instance` | 说明 |
+|--------------|------------------------|------|
+| 盘古 `prod` / 不提环境 | `site="cn"`, `instance="prod"` | 盘古生产 |
+| 盘古 `prod` 生产只读 | `instance="prod-ro"` | 盘古生产只读 |
+| 盘古 `test` | `instance="test"` | 盘古测试 |
+| 盘古 `dev` | `instance="dev"` | 盘古开发 |
+| 天工 `paas-*`/`saas-*`/`sandbox` | `site="cn"`, `instance` 按天工 Archery 实例别名 | 天工 PgSQL（勿用盘古实例） |
+| AWS 海外站点 | `site="aws"`, `instance="aws"` | aws 站点盘古库 |
+
+- `site` **只能是 `cn` 或 `aws`**；`instance` **必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直接传真实实例名**（如 `SAAS-SRM-PROD数据库`，真实名由别名自动转换）。
+- 拿不准实例/库时先调 `archery_list_instances(site)` / `archery_list_databases(site, instance)` 确认，不要瞎猜。
+- 例：阶段2选了「盘古 dev」→ `archery_query(site="cn", instance="dev", db="srm", sql="SELECT ... LIMIT 100")`。
+- 拿不准环境时，**回到阶段 2 向用户确认**，不要默认猜 PROD。
 
 **找表规则（强制，禁止猜表名）：**
 
-1. 不确定表名时，先调 `table-catalog.search_tables(业务描述, domain?)` 获取候选表（域前缀：`spfm` 采购执行履约 / `ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据 / `sodr` 订单 / `smdmg` 主数据全局 / `slod` 物流发货(`srm_logistics_delivery` 库) / `siec` 状态机）。结果带 `db_name` 字段：**命中 `slod_*` 时属 `srm_logistics_delivery` 库，订单侧常需跨库联查，JOIN 必须带库前缀**。仅 `SINV`(收货事务) 等未入库表仍用 `describe_table` 直接校验，并建议用 `upsert_table_knowledge` 补录
-1b. **物理库找不到目标表时，先按配置表（虚拟表）处理，不要断言"表不存在"**：用该"表名"作为 `table_code` 去查 `spfm_rel_table_definition`（确认是否为虚拟表 + 看 tenant 维度），再到 `spfm_rel_table_record` 查数据（必带 `tenant_id`）；若疑似租户定制，先 `describe_table("spfm_rel_table_record_srm_{租户}")`（如 `srm_sojo`）探测租户分表。详见上文「配置表（虚拟表）」小节
-2. 涉及多表时用 `get_table_relations(表名)` 获取 join 路径；目录无记录时按命名约定推断，验证成功后用 `add_table_relation` 沉淀
-3. 字段以 `sql-ops` 的 `describe_table`/`validate_table_columns` 实时结果为准（目录中字段摘要仅供参考）
-4. 再用 `execute_sql` 查询真实数据
+1. 不确定表名时，先调 `table-catalog.search_tables(业务描述, domain?)` 获取候选表（域前缀：`spfm` 采购执行履约 / `ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据 / `sodr` 订单 / `smdmg` 主数据全局 / `slod` 物流发货(`srm_logistics_delivery` 库) / `siec` 状态机）。结果带 `db_name` 字段：**命中 `slod_*` 时属 `srm_logistics_delivery` 库，订单侧常需跨库联查，JOIN 必须带库前缀**。仅 `SINV`(收货事务) 等未入库表仍用 `archery_describe_table` 直接校验，并建议用 `upsert_table_knowledge` 补录
+1b. **物理库找不到目标表时，先按配置表（虚拟表）处理，不要断言"表不存在"**：用该"表名"作为 `table_code` 去查 `spfm_rel_table_definition`（确认是否为虚拟表 + 看 tenant 维度），再到 `spfm_rel_table_record` 查数据（必带 `tenant_id`）；若疑似租户定制，先 `archery_describe_table(site, instance, "srm", "spfm_rel_table_record_srm_{租户}")`（如 `srm_sojo`）探测租户分表。详见上文「配置表（虚拟表）」小节
+2. 涉及多表时用 `get_table_relations(表名)`（table-catalog）获取 join 路径；目录无记录时按命名约定推断，验证成功后用 `add_table_relation` 沉淀
+3. 字段以 `archery_describe_table` / `archery_list_columns` 实时结果为准（目录中字段摘要仅供参考），**不要凭记忆写字段**
+4. 再用 `archery_query` 查询真实数据
 5. 排障结束后调 `record_table_usage("表1,表2")` 沉淀本次实际用到的表；发现目录描述缺失/有误用 `upsert_table_knowledge` 修正
 
 ```text
-execute_sql(sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100", db_name="srm", limit_num=100)
+archery_query(site="cn", instance="dev", db="srm", sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100")
 ```
 
 #### 查询硬性约束（违反即不得执行）
 
 **1）租户 ID 必须作为查询条件**
 
-- 每条 SQL 的 **每一张业务表**都必须带租户过滤（通常是 `tenant_id`，以 `describe_table` 实际字段名为准）
+- 每条 SQL 的 **每一张业务表**都必须带租户过滤（通常是 `tenant_id`，以 `archery_describe_table` 实际字段名为准）
 - 多表 JOIN 时，**每张表都要各自带租户条件**，不能只在主表加一次
 - 租户 ID 未知时：**先停下来问用户**，或先用一条带明确单据号/编码的小范围查询反查出 `tenant_id`，**不得用"先全表捞出来看看"的方式绕过**
 - 反例（禁止）：`SELECT * FROM ssrc_inquiry WHERE inquiry_number = 'XXX'`
 - 正例：`SELECT ... FROM ssrc_inquiry WHERE tenant_id = 123 AND inquiry_number = 'XXX' LIMIT 100`
-- **例外（特殊表）**：`sada_adaptor_task_header` / `sada_adaptor_task_line` 等适配器脚本表**没有 `tenant_id`**，租户维度是 `apply_tenant_num`（租户编码字符串）。这类表用 `apply_tenant_num = '<编码>'` 作为租户过滤，并叠加 `running_service` / `header_id` 走索引；若某表确实无任何租户字段（以 `describe_table` 为准），用能区分业务范围的最窄条件（单据号/编码/时间），并标注"该表无租户列"。
+- **例外（特殊表）**：`sada_adaptor_task_header` / `sada_adaptor_task_line` 等适配器脚本表**没有 `tenant_id`**，租户维度是 `apply_tenant_num`（租户编码字符串）。这类表用 `apply_tenant_num = '<编码>'` 作为租户过滤，并叠加 `running_service` / `header_id` 走索引；若某表确实无任何租户字段（以 `archery_describe_table` 为准），用能区分业务范围的最窄条件（单据号/编码/时间），并标注"该表无租户列"。
 
 **2）必须借助现有索引，让 SQL 走高性能路径**
 
-- 执行前先看索引：用 `describe_table(table_name)` 拿到表的索引信息，**优先选择能命中索引（尤其是以 `tenant_id` 打头的联合索引）的字段组合作为 WHERE 条件**
+- 执行前先看索引：用 `archery_describe_table(site, instance, db, table)` 拿到表的索引信息，**优先选择能命中索引（尤其是以 `tenant_id` 打头的联合索引）的字段组合作为 WHERE 条件**
 - WHERE 条件顺序与索引最左前缀保持一致；能用等值就不用范围，能用索引列就不要用非索引列
 - **禁止**在索引列上套函数或做隐式类型转换（如 `DATE(create_time) = ...`、字符串列传数字），会导致索引失效；改用范围写法 `create_time >= ... AND create_time < ...`
 - 避免 `LIKE '%xxx%'` 前置通配；确需模糊匹配时必须叠加 `tenant_id` + 时间范围收窄
@@ -422,10 +494,10 @@ execute_sql(sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100", d
 
 - 严禁 `SELECT *` 全表扫描、无 WHERE 查询、无 `LIMIT` 查询
 - 只 SELECT 排障真正需要的列，不要 `SELECT *`
-- 必须带 `LIMIT`（排障场景建议 ≤ 100），并同时传 `limit_num`
+- 必须带 `LIMIT`（排障场景建议 ≤ 100，通过 `archery_query` 的 `limit` 参数控制）
 - 聚合统计（`COUNT`/`GROUP BY`）同样必须带 `tenant_id` + 时间范围
-- 严禁任何写操作（`UPDATE`/`DELETE`/`INSERT`/DDL），本技能只做只读验证
-- **禁止查询 `information_schema.tables` / `information_schema.columns` 等元数据表**（无权限，会直接失败）：需要确认某张表是否存在、是否存在租户分表时，一律用 `describe_table` / `validate_table_columns` 探测，不要用 information_schema 枚举
+- 严禁任何写操作（`UPDATE`/`DELETE`/`INSERT`/DDL），`archery_query` 仅做只读验证（即使绕过 MCP 直接执行也不得写）
+- **禁止查询 `information_schema.tables` / `information_schema.columns` 等元数据表**（无权限，会直接失败）：需要确认某张表是否存在、是否存在租户分表时，一律用 `archery_describe_table` / `archery_list_columns` 探测，不要用 information_schema 枚举
 
 **4）超时与失败处理**
 
@@ -434,10 +506,10 @@ execute_sql(sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100", d
 
 **数据库类型说明：**
 
-| 系统 | 数据库类型 | 常用 Archery 实例 |
-|------|----------|------------------|
-| 盘古 | MySQL | `SAAS-SRM-PROD数据库` / `SAAS-SRM-TEST数据库` |
-| 天工 | PostgreSQL | 天工相关 PgSQL 实例 |
+| 系统 | 数据库类型 | 常用 `instance` 别名 |
+|------|----------|----------------------|
+| 盘古 | MySQL | `prod` / `prod-ro` / `test` / `dev`（真实实例名由别名自动转换） |
+| 天工 | PostgreSQL | 天工相关 PgSQL 实例别名 |
 
 **典型验证场景：**
 
@@ -450,6 +522,18 @@ execute_sql(sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100", d
 | 邀约/审批被拦截 | 查询历史记录表，确认是否已存在非终态记录 |
 
 数据库验证结果必须纳入最终证据链，不能只靠日志和代码逻辑推测。
+
+#### Archery 工具速查（统一数据库入口）
+
+数据库查询**统一用 `zhenyun-pangun-mcp` 的 Archery 系列工具**（覆盖 cn/aws 双站点，替代原 `sql-ops` 的 cn/aws 两个实例）。**参数严禁瞎猜**，完整声明见文末「MCP 工具与参数声明」：
+
+- `archery_list_instances(site?)`：先确认当前有哪些可用数据库实例（**拿不准实例名时必调**）。
+- `archery_list_databases(site, instance)`：确认某实例下有哪些库（如 `srm`/`srm_logistics_delivery`）。
+- `archery_describe_table(site, instance, db, table)` / `archery_list_columns(site, instance, db, table)`：看表结构/字段（不凭记忆写字段）。
+- `archery_query(sql, site="cn", instance=None, db=None, limit=100)`：执行只读 SQL（`db` 默认 `srm`）。
+- `archery_query_tenant(tenant="", site="cn", instance=None, db=None)`：按租户编码/名称辅助定位租户（`tenant` 为空列出前 100 个；盘古专属能力，查 `hpfm_tenant`）。
+- **`site` 只能是 `cn` 或 `aws`；`instance` 必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直接传真实实例名**（如 `SAAS-SRM-PROD数据库`）。真实实例名由别名自动转换。
+- 相同 SQL 约束（租户 ID、索引、LIMIT、只读）同样适用，不得做写操作。
 
 ---
 
@@ -482,13 +566,17 @@ execute_sql(sql="SELECT ... FROM ... WHERE tenant_id = ... AND ... LIMIT 100", d
 
 ## 关键日志字段说明
 
-| 字段 | 说明 | 用法示例 |
+> ⚠️ 下表是 **SLS（阿里云，仅 cn 盘古 prod 用 `obs_sls_query`）** 的字段，带下划线前缀；**Loki（非生产 + 全部 AWS，用 `obs_log_query`/`obs_log_trace`）用的是 `namespace`/`service_name`/`pod`/`container` 等无前缀标签**（见上方 LogQL 速查）。二者不要混用。
+
+| 字段（SLS 专用） | 说明 | 用法示例 |
 |------|------|---------|
 | traceId | 全链路追踪ID | `traceId: abc123` |
 | _container_name_ | 服务名（Pod容器名） | `_container_name_: tiangong-workflow` |
 | _namespace_ | 环境标识（必须指定） | `_namespace_: tygo-paas-dev` |
 | level | 日志级别 | `level: ERROR` |
 | content | 日志正文 | `content: Exception` |
+
+> 注意：上表是 **SLS** 字段（如 `traceId: abc123` 冒号写法）。**Loki（非生产/AWS）里 traceId 不写字段前缀，直接按子串匹配**（如 `|= "abc123"`，日志正文多为 `[abc123]` 方括号包裹），不要套用 SLS 的 `traceId: xxx` 写法。
 
 ---
 
@@ -571,17 +659,100 @@ to_time = int(now.timestamp())
 
 ---
 
+## 附录：zhenyun-pangun-mcp 工具与参数声明（严禁瞎猜瞎传）
+
+调用 `zhenyun-pangun-mcp` 的任意工具前，**必须**先确认下列参数取真实值，不得臆造数据源名、实例名、环境名。拿不准时优先调用「列举类」工具（`obs_log_datasources` / `archery_list_instances` / `archery_list_databases`）或询问用户。
+
+### 1. 日志类
+
+#### `obs_log_datasources(region)`
+- `region`：`cn`（默认）| `aws`。用于**先确认该 region 下有哪些数据源(env)**，再传给 `obs_log_query`。
+
+#### `obs_log_query(region, env, query, limit?, start?, end?, direction?)`
+- `region`：`cn`（默认）| `aws`。**默认 cn（国内公有云，绝大多数场景）；仅当用户明确说明是 AWS 海外环境（jp-saas-1）时才传 `aws`**。
+- `env`：**必须来自 `obs_log_datasources(region)` 返回的真实键**。
+  - cn：`prod` / `nonprod` / `ops`（注意：**「test 环境」对应 `env="nonprod"`**，不是字面 "test"）
+  - aws：`prod` / `nonprod` / `ops`
+- `query`：LogQL 查询串，如 `{namespace="saas-test-new", app="srm-order"} |= "xxx"`（traceId 直接按子串，不写死 `traceId=` 前缀）。
+- `limit`：默认 100。`start`/`end`：ISO 时间戳或相对时间（`-1h`）。`direction`：`backward`（默认）| `forward`。
+- ⚠️ 不要瞎传 `env`；cn 未配置时直接调用会失败，先 `obs_log_datasources` 确认。
+- 若 `query` 未带 `namespace`/`service_name`/`pod` 任一标签，返回体含 `warning`（范围过大），应补全标签后重试。
+
+#### `obs_log_trace(trace_id, region?, env?, limit?, start?, end?, direction?)`
+- 按 traceId 一键追全链路（Loki，**单查询优先、最多 2 次 HTTP**，按时间排序还原调用链）。已做性能优化根治超时：
+  - **进程内 session/cookie 缓存**：同一进程多次调用只登录一次，不重复 POST /login；
+  - **不再单独发 ERROR/WARN 查询**：ERROR/WARN 行本就包含在结果里，`meta.error_count` 已给出数量；
+  - 带 namespace 查为 0 时自动降级为不限 namespace 重查一次（适配 namespace 推导偏差）。
+- `trace_id`：必填。`region`：默认 `cn`。`env`：默认 `nonprod`（对应 test 环境=namespace `saas-test-new`）。
+- `direction`：`BACKWARD`（默认，从最近往回）| `FORWARD`（从最早开始）。
+- 优先用本工具替代手写 `obs_log_query` 追链路；返回含 `error_count`/`total` 及按时间排序的 `results`。
+
+#### `obs_sls_query(environment, trace_id?, keyword?, level?, system?)`
+- `system`：必须是 `盘古` 或 `天工`（别名 `pg`/`pangu`/`tg`/`tiangong` 会归一化）；**其他值会被纠正并提示**。
+- `environment`：**必须匹配 `sls_config` 的真实键**（盘古：`dev`/`test`/`prod`；天工以配置为准）。**不要瞎传** `prod`/`paas-prod` 等未在配置中的值。
+- `trace_id` / `keyword`：二者至少其一；有 traceId 优先 `trace_id`。
+- `level`：可选 `ERROR`/`WARN`/`INFO` 等，缺省查全部。
+- ⚠️ 环境参数统一用盘古/天工的 `dev`/`test`/`prod`，不要混用天工 `paas-*` 命名。
+
+### 2. 数据库类（Archery）
+
+#### `archery_list_instances(site?)`
+- `site`：`cn` | `aws`。返回可用实例（含别名与真实名映射）。**拿不准实例名时必调。**
+
+#### `archery_list_databases(site, instance)`
+- `site`：`cn` | `aws`。`instance`：**必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），不要用真实实例名。
+
+#### `archery_describe_table(site, instance, db, table)` / `archery_list_columns(...)`
+- 同上 `site`/`instance` 规则；库名/表名以 `archery_list_databases` 返回为准。
+
+#### `archery_query(sql, site="cn", instance=None, db=None, limit=100)`
+- `site`：`cn` | `aws`。`instance`：别名（同上）。
+- `db`：常用 `srm`、`srm_logistics_delivery` 等（以 `archery_list_databases` 返回为准，默认 `srm`）。
+- `sql`：只读查询；同样遵守本技能第七步「查询硬性约束」（租户 ID、索引、LIMIT、禁止写操作）。
+- `limit`：返回行数上限（1~5000，默认 100）。
+
+#### `archery_query_tenant(tenant="", site="cn", instance=None, db=None)`
+- 辅助按租户编码/名称定位租户；`site`/`instance`/`db` 规则同上。
+- `tenant`：空时列出前 100 个租户；传入后按 `tenant_num = '值'` 或 `tenant_name LIKE '%值%'` 匹配。
+
+> **实例别名映射（避免瞎传真实名）**：`prod`→`SAAS-SRM-PROD数据库`、`prod-ro`→`SAAS-SRM-PROD只读数据库`、`test`→`SAAS-SRM-TEST数据库`、`dev`→`SAAS-SRM-DEV数据库`、`aws`→aws 站点库。`site` 只接受 `cn`/`aws`。
+
+### 3. 猪齿鱼协作类（`choerodon_*`）
+
+> 仅在故障关联到需求/缺陷/迭代、需补充业务上下文时调用；`issue_id` / `task_id` **必须是猪齿鱼返回的真实 id**，不要自己编。
+
+- `choerodon_search_tasks_by_person(user_name, execute?, page?, size?, project_id?, organization_id?)`：`user_name` 必填（猪齿鱼用户名）。
+- `choerodon_list_issue(project_id, issue_type?, page?, size?, ...)`：列 issue；`project_id` 须真实。
+- `choerodon_query_issue(issue_id)`：`issue_id` 为加密 id（来自列表返回）。
+- `choerodon_list_attachments(issue_id)` / `choerodon_download_attachment(attachment_id, target_dir)`：`issue_id`/`attachment_id` 须真实。
+- `choerodon_get_status_map(project_id, issue_type)`：取状态流转配置。
+- `choerodon_search_users(keyword, ...)`：按关键字搜用户，拿到真实 `user_name`/`id` 再用于上面的工具。
+
+### 4. 代码搜索类
+
+- `search_repo(keyword, mode?)`：`keyword` 必填；`mode`：`code`(默认)/`commit`/`issue`/`wiki`。**代码关键字检索使用本工具**；锁定仓库与分支后回 `gitlab-code.get_file` 读取完整文件（读完整文件是 gitlab-code 的独占能力，pangun 不提供）。
+- `getTaskId`：获取当前需求/缺陷跟踪的任务 id（用于关联猪齿鱼）。
+
+---
+
 ## 注意事项
 
-- 凭据只由 `log-ops-mcp` 从环境变量读取；任何输出中不得展示 AccessKey，必要时统一写为 `****`
-- 查询时**务必带** `_namespace_` 过滤，避免跨环境数据污染
-- 若日志返回 `x-log-progress: Incomplete`，缩小时间范围重试
+- 凭据只由 `zhenyun-pangun-mcp` 从环境变量读取；任何输出中不得展示 AccessKey，必要时统一写为 `****`
+- 查询 Loki 时 **`query` 必须带 `namespace`（或 `service_name`/`pod`）标签过滤**（如 `{namespace="saas-test-new"}`），否则扫描全量数据流、慢且易超时（`obs_log_query` 会返回 `warning` 提示）。
+- 若日志返回 `x-log-progress: Incomplete` 或 Loki 分页 incomplete，缩小时间范围重试
 - 分析结论要基于日志证据，不要凭空猜测
 - 遇到生产问题，修复建议要保守（先止损，再根治）
-- 日志查询、调用链分析和规则诊断统一走 `log-ops-mcp`；数据库查询统一走 `sql-ops-mcp`
+
+#### Grafana 面板现象（给用户解释用，不影响 MCP 行为）
+
+手册提到的 Grafana 页面面板现象，与 MCP API 调用无关，仅当你向用户解释"为什么页面看到的和工具查到的不一样"时参考：
+- **日志量面板有"绿色/黄色"两套**：绿色=固定模板计算（从 `2026-08-11 16:00` 起才有数据），黄色=实时计算。查更早时段绿色无数据属正常，不是 MCP 问题。
+- **页面"加关键词过滤后黄色日志量变少"**：黄色是实时计算，加了关键词自然只统计命中行；绿色固定模板不受关键词影响。这是预期行为。
+- 这些均属页面展示层，MCP 直接走 Loki/Grafana API 查询，不受面板模板限制。
+- 日志查询（Loki/SLS）、数据库查询（Archery）、代码搜索（search_repo）、猪齿鱼协作**统一走 `zhenyun-pangun-mcp`**；仅数据字典检索走 `table-catalog`、读取完整文件走 `gitlab-code.get_file`
 - **代码检索必须收敛范围**：标准代码只在 `operation-srm`（Group ID 49）下的 `srm-{模块}`；租户二开在 `operation-srm-{租户}/srm-{模块}-{租户}`；`op-deliver-*` 等交付快照仓库一律忽略
 - **`search_code` 必须带 `project` 和 `ref`**；无特别说明时先用 `list_branches(project, search="hotfix")` 取 `recommended_ref`——**标准库用最新 `x-y-z-hotfix`**（如 `1-69-0-hotfix`），**二开库用 `release`**；报告中必须写明实际使用的分支
 - **已知租户时必须先探测是否存在二开服务**，存在则以二开实现为准，并在报告中注明标准/二开来源
 - **最新二开方式 = 适配器 JS 脚本（存库）**，优先于老 Git 二开库排查：查 `sada_adaptor_task_header`（`apply_tenant_num` + `running_service` + `enabled_flag=1`）→ `sada_adaptor_task_line`（`header_id`）取 `script_content`；解码为 `Base64(UTF-16BE)`；这两张表**无 `tenant_id`，租户字段是 `apply_tenant_num`**
-- **配置表 = 虚拟表（非物理表）**：物理库找不到目标表时先按配置表处理——用该表名当 `table_code` 查 `spfm_rel_table_definition`（结构定义）→ `spfm_rel_table_record`（数据，必带 `tenant_id`，`tenant_id=0` 平台级 / 非 0 租户级）；租户定制可能在 `spfm_rel_table_record_srm_{租户}` 分表（如 `srm_sojo`），先 `describe_table` 探测；数据用 `value1~75`/`longValue1~50`/`index0~50` slot 承载，读值前看 `mapping_json` 确认列映射
+- **配置表 = 虚拟表（非物理表）**：物理库找不到目标表时先按配置表处理——用该表名当 `table_code` 查 `spfm_rel_table_definition`（结构定义）→ `spfm_rel_table_record`（数据，必带 `tenant_id`，`tenant_id=0` 平台级 / 非 0 租户级）；租户定制可能在 `spfm_rel_table_record_srm_{租户}` 分表（如 `srm_sojo`），先 `archery_describe_table(site, instance, "srm", "spfm_rel_table_record_srm_{租户}")` 探测；数据用 `value1~75`/`longValue1~50`/`index0~50` slot 承载，读值前看 `mapping_json` 确认列映射
 - **SQL 必须带租户 ID**（多表 JOIN 时每张表都要带），必须走索引、带 `LIMIT`、避免 `SELECT *` 与全表扫描；租户 ID 未知时先问用户或小范围反查，不得无条件查询；适配器脚本表（无 tenant_id）用 `apply_tenant_num` 过滤

@@ -1,10 +1,10 @@
 # 盘古（订单履约域）核心表元数据
 
 本文件是 **业务语义 / 速查层**：仅沉淀数据库拿不到、或高频复用容易写错的业务语义（主键、关联、状态/枚举速查、库归属）。
-**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 sql-ops MCP 实时获取**（详见 `SKILL.md`）：
+**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 zhenyun-pangun-mcp 的 Archery 工具实时获取**（详见 `SKILL.md`）：
 
-- `describe_table('<表名>')` —— 返回完整字段清单与表注释
-- `validate_table_columns('<表名>', ['字段A','字段B'])` —— 校验字段是否存在
+- `archery_describe_table(site, instance, db, table)` —— 返回完整字段清单与表注释
+- `archery_list_columns(site, instance, db, table)` —— 校验字段是否存在
 
 ## 库归属（重要）
 
@@ -88,10 +88,10 @@
 > ⚠️ **老送货单（sinv_asn_\*）与发货工作台送货单（slod_asn_\*）是两套独立表体系**，先确认租户是否开启发货工作台再选表。
 
 ### 委外（SINV_OUTSOURCE）
-- **sinv_outsource_\* 系列**: 委外单据表（结构用 describe_table 实时获取）；清理时**先删 ES 表、再删业务表**
+- **sinv_outsource_\* 系列**: 委外单据表（结构用 archery_describe_table 实时获取）；清理时**先删 ES 表、再删业务表**
 
 ### 状态机（SIEC）
-- **siec_\* 系列**: 单据状态机流转记录（结构用 describe_table 实时获取）；排查状态卡住时结合状态机流转记录与业务表状态字段核对
+- **siec_\* 系列**: 单据状态机流转记录（结构用 archery_describe_table 实时获取）；排查状态卡住时结合状态机流转记录与业务表状态字段核对
 
 ---
 

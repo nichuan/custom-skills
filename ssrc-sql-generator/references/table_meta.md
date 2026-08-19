@@ -1,10 +1,10 @@
 # 核心表元数据
 
 本文件是 **业务语义 / 速查层**：仅沉淀数据库拿不到、或高频复用容易写错的业务语义（主键、关联、状态/枚举速查、常见租户）。
-**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 sql-ops MCP 实时获取**（详见 `SKILL.md`）：
+**表的原始结构（字段名、类型、注释、拓展字段、索引）一律通过 zhenyun-pangun-mcp 的 Archery 工具实时获取**（详见 `SKILL.md`）：
 
-- `describe_table('<表名>')` —— 返回完整字段清单与表注释
-- `validate_table_columns('<表名>', ['字段A','字段B'])` —— 校验字段是否存在
+- `archery_describe_table(site, instance, db, table)` —— 返回完整字段清单与表注释
+- `archery_list_columns(site, instance, db, table)` —— 校验字段是否存在
 
 ## 元数据格式
 - **表名**: 主键、核心字段1、核心字段2、关联键(外键)
@@ -99,9 +99,9 @@
 - **team（评标专家/指标分组）**：`BUSINESS`(商务) / `TECHNOLOGY`(技术) / `BUSINESS_TECHNOLOGY`(商务+技术)
 - **rfx_role（ssrc_rfx_member 成员角色）**：`RFX_BY`(寻源负责人) / `CHECKED_BY`(审批人) / `PRETRIAL_BY`(预审人) / `OPENED_BY`(开标人)
 - **ssrc_rf_header.source_from（征询单来源）**：`RFI`(信息征询) / `RFP`(方案征询) / `RFQ`(价格征询)
-- 其余状态枚举（rfx_status / quotation_status / feedback_status / 寻源结果状态等）优先通过 `describe_table` 获取数据库注释；需要复用的状态模板通过 sql-template MCP 检索。
+- 其余状态枚举（rfx_status / quotation_status / feedback_status / 寻源结果状态等）优先通过 `archery_describe_table` 获取数据库注释；需要复用的状态模板通过 sql-template MCP 检索。
 
 ## 拓展字段补充（iam_user 特例）
 
 - 标准 SRM 业务表拓展字段为 `attribute_decimal/datetime/varchar/longtext` 各 `1~10`（见 `SKILL.md` 拓展字段规则）。
-- **`iam_user` 例外**：其拓展字段为 `attribute1 ~ attribute15`（均为 `varchar(150)`），处理 iam_user 时以 `describe_table` 实际返回为准，不要套用 1~10 规则。
+- **`iam_user` 例外**：其拓展字段为 `attribute1 ~ attribute15`（均为 `varchar(150)`），处理 iam_user 时以 `archery_describe_table` 实际返回为准，不要套用 1~10 规则。

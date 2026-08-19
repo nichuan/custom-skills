@@ -1,6 +1,6 @@
 # 盘古（订单履约域）表关联关系与业务规则
 
-本文件沉淀**数据库拿不到的业务知识**：表间关联、状态流转、上下游联动规则。字段级结构一律走 sql-ops MCP。
+本文件沉淀**数据库拿不到的业务知识**：表间关联、状态流转、上下游联动规则。字段级结构一律走 zhenyun-pangun-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns`）。
 
 ---
 
@@ -125,6 +125,6 @@
 ## 八、留痕与安全（写入类通用）
 
 1. 数据修复 UPDATE 统一带：`last_update_date = now()`；`sodr_*` 另带 `object_version_number+1`。
-2. 建议留痕：`attribute_longtext10 = concat(IFNULL(attribute_longtext10,','),'数据修复/<工单号>')`（部分物流表用 `attribute_longtext60`，使用前 `validate_table_columns` 校验）。
+2. 建议留痕：`attribute_longtext10 = concat(IFNULL(attribute_longtext10,','),'数据修复/<工单号>')`（部分物流表用 `attribute_longtext60`，使用前用 `archery_list_columns` 校验字段是否存在）。
 3. UPDATE/DELETE 必须以 `tenant_id + 主键` 定位；执行前保留同 WHERE 的 SELECT 核查段。
 4. 事务导入/反审核/重推/订单初始化等场景**优先建议平台数据修复接口或调度**，SQL 直改为兜底手段。

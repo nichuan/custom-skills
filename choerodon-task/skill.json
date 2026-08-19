@@ -1,0 +1,52 @@
+{
+  "name": "choerodon-task",
+  "version": "1.0.0",
+  "description": "猪齿鱼（Choerodon）协作任务只读查询助手：按任务号查具体 issue、按经办人/真实姓名查任务、按关键词/状态列 issue、看状态流转与附件。查询后若需进一步处理（排障定位根因、生成/修复 SQL、更新状态），本 Skill 仅做查询与上下文梳理，并视情况路由到 java-troubleshoot / spuc-sql-generator / ssrc-sql-generator。仅做只读查询，不改写猪齿鱼数据、不擅自改业务库。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "choerodon",
+    "猪齿鱼",
+    "issue",
+    "task",
+    "agile",
+    "查询"
+  ],
+  "features": {
+    "query_by_issue_id": "按具体任务号（加密 id）查 issue 详情",
+    "query_by_assignee": "按经办人/真实姓名查任务（先搜成员再按 id 过滤）",
+    "query_by_filter": "按关键词/状态/经办人组合列 issue",
+    "status_map": "取状态名→加密 id 映射，理解状态流转",
+    "attachments": "列附件并取签名下载地址",
+    "read_only": "仅只读查询，不写猪齿鱼、不改业务库",
+    "route_on_action": "需处理任务时路由到 java-troubleshoot / spuc-sql-generator / ssrc-sql-generator"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangun-mcp",
+      "tools": [
+        "choerodon_query_issue",
+        "choerodon_search_tasks_by_person",
+        "choerodon_list_issue",
+        "choerodon_search_users",
+        "choerodon_get_status_map",
+        "choerodon_list_attachments",
+        "choerodon_download_attachment"
+      ],
+      "description": "猪齿鱼协作平台：任务/issue 查询、成员搜索、状态映射、附件下载；Token 由 .env 凭据登录获取，带缓存与失效重登"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "collaboration",
+    "project-management",
+    "query"
+  ],
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "none",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "last_updated": "2026-08-18"
+  }
+}
