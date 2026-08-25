@@ -74,7 +74,7 @@
 2. 确保标注主键和外键关联
 3. 仅列出**高频使用的3-5个核心字段**
 4. 关联、状态语义等数据库拿不到的业务知识沉淀在此文件（而非本地单表结构文档）
-5. 复杂/数据修复场景的**完整 SQL 示例**通过 sql-template MCP 的 `save_sql_template` 沉淀（见 `SKILL.md` 模板维护章节）
+5. 复杂/数据修复场景的**完整 SQL 示例**通过 zhenyun-pangu-mcp 的 `save_sql_template` 沉淀（见 `SKILL.md` 模板维护章节）
 
 ### 表命名规范
 - **hpfm_** 前缀：平台基础数据表
@@ -99,7 +99,7 @@
 - **team（评标专家/指标分组）**：`BUSINESS`(商务) / `TECHNOLOGY`(技术) / `BUSINESS_TECHNOLOGY`(商务+技术)
 - **rfx_role（ssrc_rfx_member 成员角色）**：`RFX_BY`(寻源负责人) / `CHECKED_BY`(审批人) / `PRETRIAL_BY`(预审人) / `OPENED_BY`(开标人)
 - **ssrc_rf_header.source_from（征询单来源）**：`RFI`(信息征询) / `RFP`(方案征询) / `RFQ`(价格征询)
-- 其余状态枚举（rfx_status / quotation_status / feedback_status / 寻源结果状态等）优先通过 `archery_describe_table` 获取数据库注释；需要复用的状态模板通过 sql-template MCP 检索。
+- 其余状态枚举（rfx_status / quotation_status / feedback_status / 寻源结果状态等）优先通过 `archery_describe_table` 获取数据库注释；需要复用的状态模板通过 zhenyun-pangu-mcp `search_sql_templates` 检索。
 
 ## 拓展字段补充（iam_user 特例）
 

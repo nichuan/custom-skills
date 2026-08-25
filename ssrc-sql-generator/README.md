@@ -18,10 +18,10 @@
 ### 2. 业务语义分层（本地只沉淀拿不到的知识）
 - `table_meta.md`：表名-主键-关联键速查 + 常见租户 + 易错枚举（数据库拿不到或高频易错）。
 - `relations.md`：表关联与业务规则（纯业务知识）。
-- 模板库已迁移至 **DB（sql-template MCP / Supabase）**：检索复用与沉淀走 MCP，不再本地维护（详见下方「模板库 + 分级校验」）。
+- 模板库已迁移至 **DB（zhenyun-pangu-mcp 认知层 / Supabase）**：检索复用与沉淀走 MCP，不再本地维护（详见下方「模板库 + 分级校验」）。
 
 ### 3. 模板库 + 分级校验（正确性与效率兼顾）
-- 模板库存于 **Supabase（sql-template MCP）**，提供 `search_sql_template`（生成前检索复用）与 `save_sql_template`（生成后沉淀）闭环。
+- 模板库存于 **Supabase（zhenyun-pangu-mcp 认知层）**，提供 `search_sql_templates`（生成前检索复用）与 `save_sql_template`（生成后沉淀）闭环。
 - 模板随使用增长，越用越强；「✅ 已验证」模板（`verified=true`）的表字段免 MCP 校验以提效（详见 `SKILL.md` 分级校验策略）。
 
 ### 4. 维护成本低、可持续沉淀
@@ -40,7 +40,7 @@ ssrc-sql-generator/
     └── relations.md                      # 表关联关系与业务规则
 ```
 
-> 表结构由 zhenyun-pangu-mcp 的 Archery 工具实时提供；SQL 模板由 sql-template MCP（Supabase）维护，均不在 Skill 目录中复制。
+> 表结构由 zhenyun-pangu-mcp 的 Archery 工具实时提供；SQL 模板由 zhenyun-pangu-mcp 认知层（Supabase）维护，均不在 Skill 目录中复制。
 
 ## 快速开始
 
@@ -60,7 +60,7 @@ ssrc-sql-generator/
 1. **识别涉及的表**：从用户需求中提取表名，对照 `table_meta.md` 确认表与关联键。
 2. **实时获取结构（MCP）**：对不明确的表/字段调 `archery_describe_table` / `archery_list_columns` 确认。
 3. **补充关联关系**：参考 `relations.md` 确认关联键与业务规则。
-4. **检索复用模板**：调用 sql-template MCP 的 `search_sql_template`，按业务关键词、单据类型和涉及表检索；不要读取本地模板文件。
+4. **检索复用模板**：调用 zhenyun-pangu-mcp 的 `search_sql_templates`，按业务关键词、单据类型和涉及表检索；不要读取本地模板文件。
 5. **分级校验**：按 `SKILL.md` 分级校验策略，已验证内容免校验、不明确必校验。
 6. **逐步取真实值并执行**：用 `archery_query` 先租户→再单据→再业务明细，确认影响范围后生成 SQL。
 
@@ -86,9 +86,9 @@ Skill 入口文件，定义：
 - 关联键与 SQL 关联示例
 - 状态同步、人员 ID 指向、延时消息等业务规则
 
-### sql-template MCP
+### 模板库（zhenyun-pangu-mcp 认知层）
 SQL 模板库由 MCP 统一维护：
-- 生成前调用 `search_sql_template` 检索可复用模板，优先使用 `verified=true` 的模板
+- 生成前调用 `search_sql_templates` 检索可复用模板，优先使用 `verified=true` 的模板
 - 复杂场景完成后，经用户确认调用 `save_sql_template` 沉淀
 - 复用模板后调用 `record_template_usage` 记录使用次数
 
@@ -115,7 +115,7 @@ SQL 模板库由 MCP 统一维护：
 1. 从 `table_meta.md` 识别涉及表：`hpfm_tenant`、`ssrc_rfx_header`
 2. 用 MCP `archery_query` 取 `tenant_id`：`SELECT tenant_id FROM hpfm_tenant WHERE tenant_num='SRM-AUX'`（也可优先用 `archery_query_tenant` 反查）
 3. 从 `relations.md` 确认关联：`hpfm_tenant.tenant_id` ↔ `ssrc_rfx_header.tenant_id`
-4. 调用 `search_sql_template` 匹配时间过滤模板
+4. 调用 `search_sql_templates` 匹配时间过滤模板
 5. 生成 SQL：
 
 ```sql
@@ -157,7 +157,7 @@ ORDER BY r.create_time DESC;
 ### SQL 生成规则
 - 必须先确认表关联键的正确性（参考 `relations.md`）
 - 使用明确的表别名避免字段歧义
-- 时间范围过滤优先复用 sql-template MCP 中已验证的模板
+- 时间范围过滤优先复用 zhenyun-pangu-mcp 模板库中已验证的模板
 - 聚合统计时明确 GROUP BY 字段和聚合函数
 - 生成的 SQL 必须包含关键注释说明
 - ⚠️ 新招标单（BID）查询与询价单完全共用：评标/结果表 `source_from` 仍为 `'RFX'`（不要写成 `'BID'`），单据类型区分用 `ssrc_rfx_header.secondary_source_category = 'NEW_BID'`
@@ -183,7 +183,7 @@ ORDER BY r.create_time DESC;
 - 模板随业务演进补充 `verified=true` 验证状态
 
 ### 优化建议
-- 若某类 SQL 频繁出错，修正或新增 sql-template MCP 模板，并标注验证状态
+- 若某类 SQL 频繁出错，修正或新增 zhenyun-pangu-mcp 模板库模板，并标注验证状态
 - 若用户常问某些关联，补充到 `relations.md`
 - 保持本地文件精简：结构事实一律走 MCP
 
@@ -201,7 +201,7 @@ ORDER BY r.create_time DESC;
 - **结构事实走 MCP**：表字段/类型/注释/拓展字段/索引统一通过 zhenyun-pangu-mcp 的 Archery 工具（`archery_describe_table` / `archery_list_columns` / `archery_query`）实时获取
 - **业务语义分层**：将数据库拿不到或高频易错的知识沉淀到 `table_meta.md`（含常见租户、易错枚举、拓展字段特例）
 - **分级校验策略**：已验证模板、table_meta/relations 明确列出的表字段免 MCP 校验提效；表名/字段名不明确时必校验
-- **模板维护入口**：模板统一迁移到 sql-template MCP，支持检索、验证标记和使用统计
+- **模板维护入口**：模板统一迁移到 zhenyun-pangu-mcp 认知层，支持检索、验证标记和使用统计
 - **清理死链**：移除历史表结构、模板文件和示例文件引用
 - 同步更新 SKILL.md / README.md / skill.json
 

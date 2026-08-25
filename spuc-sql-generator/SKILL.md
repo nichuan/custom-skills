@@ -1,6 +1,6 @@
 ---
 name: spuc-sql-generator
-description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务、SLOD 发货工作台、老送货单、SIEC 状态机、委外）的 SQL 生成助手，支持业务查询 SQL 生成、数据修复 SQL 生成、表结构及关联关系查询。通过 zhenyun-pangu-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先按盘古专属分类/关键词检索模板复用，生成后询问用户沉淀结果。专门针对采购订单、收货工作台事务、发货工作台（送货/计划/标签）、老送货单、导出外部/结算/商城状态修复等核心业务场景。与 ssrc-sql-generator（采购寻源：询价/招标/报价/评分）互补，寻源类需求请勿使用本技能。
+description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务、SLOD 发货工作台、老送货单、SIEC 状态机、委外）的 SQL 生成助手，支持业务查询 SQL 生成、数据修复 SQL 生成、表结构及关联关系查询。通过 zhenyun-pangu-mcp 对接真实数据库与认知层：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）+ 分级校验」：生成前先 search_sql_templates 按盘古专属分类/关键词检索模板复用，生成后询问用户沉淀结果。专门针对采购订单、收货工作台事务、发货工作台（送货/计划/标签）、老送货单、导出外部/结算/商城状态修复等核心业务场景。与 ssrc-sql-generator（采购寻源：询价/招标/报价/评分）互补，寻源类需求请勿使用本技能。
 ---
 
 # SRM 盘古订单履约 SQL 生成助手
@@ -42,7 +42,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 | `archery_list_columns(site, instance, db, "<表名>", ["字段A","字段B"]?)` | 校验/列出字段 | 生成 UPDATE/WHERE 前确认字段名拼写 |
 | `archery_describe_table(site, instance, db, "<表名>")` | 返回完整字段清单与表注释（含拓展字段） | 不确定字段、需要完整结构时 |
 
-## 工具能力（table-catalog MCP，数据字典目录）
+## 工具能力（zhenyun-pangu-mcp 认知层，数据字典目录）
 
 > **用途**：不知道表名时，用业务语义检索候选表、发现 join 关系，避免凭空猜表。目录只存表结构语义，不含业务数据。
 
@@ -60,7 +60,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 > - **`SINV`（收货事务）等表仍未入库**，涉及 SINV 时**直接调 `archery_describe_table(site, instance, db, "<表名>")`** 校验，并用 `upsert_table_knowledge` 补录；不要因目录查不到就放弃。
 
 > 结构信息一律用上述工具实时获取；不要引用本地表结构文档。
-> 模板库存于 **DB（sql-template MCP / Supabase）**，检索与沉淀一律走 MCP。
+> 模板库存于 **DB（zhenyun-pangu-mcp 认知层 / Supabase）**，检索与沉淀一律走 MCP。
 
 ## 工具能力（zhenyun-pangu-mcp，Archery）
 
@@ -78,11 +78,11 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 - `site` ∈ {`cn`, `aws`}；`instance` 用别名 `prod`/`prod-ro`/`aws`/`dev`/`test`。
 - 同样遵守本技能「数据库约束与安全规则」（多租户、索引、LIMIT、禁止写操作）。
 
-## 工具能力（sql-template MCP，模板库）
+## 工具能力（zhenyun-pangu-mcp 认知层，模板库）
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
-| `search_sql_template(keyword, doc_type, category, verified_only, limit)` | 检索可复用模板（结果含 `execution_flow` 执行过程伪代码与 `example_case` 示例） | 生成前先按盘古分类/关键词/表名定位已有模板 |
+| `search_sql_templates(keyword, category, system, verified_only, limit)` | 检索可复用模板（结果含 `execution_flow` 执行过程伪代码与 `example_case` 示例） | 生成前先按盘古分类/关键词/表名定位已有模板 |
 | `save_sql_template(title, category, scenario, sql_text, execution_flow, example_case, ...)` | 沉淀本次生成的 SQL 为模板（数据修复类必须附执行过程伪代码与脱敏示例） | 复杂场景完成后询问用户并保存 |
 | `get_sql_template(id)` / `list_sql_templates(...)` | 按 id 获取 / 总览模板库 | 查看某模板或全量浏览 |
 | `update_sql_template(id, ...)` | 更新模板（如补「✅ 已验证」） | 复核后标记验证 |
@@ -91,10 +91,10 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 ### 盘古模板检索/沉淀约定（与 ssrc 区分，保证检索准确）
 
 - **category（业务分类）** 使用盘古专属取值：`订单SPUC` / `物流收货SINV` / `物流发货SLOD` / `盘古通用查询` / `数据修复-盘古`；
-- **doc_type（单据类型）** 使用：`采购订单` / `收货事务` / `发货单` / `送货单` / `状态机`；
+- **system** 统一填 `盘古`，与 ssrc 寻源模板（`天工`）区分；
 - **title 前缀** 统一使用 `【盘古-xx】`（如 `【盘古-订单】订单状态修复-已发布`）；
 - **keywords** 必含 `盘古` 或 `spuc`，再补业务词（如「订单状态,已确认,发运行」）；
-- 检索时优先带 `category` 或 `doc_type` 过滤，避免与 ssrc 寻源模板（询价单RFX/征询单RF 等分类）混淆。
+- 检索时优先带 `category`/`system` 过滤，避免与 ssrc 寻源模板（询价单RFX/征询单RF 等分类）混淆。
 
 > 模板库不可用（MCP 未连接/报错）时**降级**：不检索模板直接生成、完成后提示「无法沉淀」，不阻塞主流程。
 
@@ -102,13 +102,13 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 生成任何 SQL 前，按以下顺序执行，**严禁跳步**：
 
-1. **先检索模板库**：调用 `search_sql_template`，按盘古分类（`category=订单SPUC/物流收货SINV/物流发货SLOD/...`）+ 业务关键词检索已有模板；优先复用 `verified=true`（✅ 已验证）模板。MCP 不可用则跳过本步继续。
+1. **先检索模板库**：调用 `search_sql_templates`，按盘古分类（`category=订单SPUC/物流收货SINV/物流发货SLOD/...`）+ 业务关键词检索已有模板；优先复用 `verified=true`（✅ 已验证）模板。MCP 不可用则跳过本步继续。
    **⚡ 若命中的模板包含 `execution_flow`（执行过程伪代码），必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `archery_query` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
 2. **确认业务上下文**：按「术语映射表」判断单据体系（订单 sodr / 收货事务 sinv_rcv / 发货工作台 slod / 老送货单 sinv_asn），**特别注意老送货单与发货工作台送货单是两套表**；上下文不足时才向用户澄清。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'`（或按 tenant_name 模糊）获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `46997`/`151025` 等仅供参考）；可借助 `archery_query_tenant(tenant="<租户编码>", site="cn", instance=None, db=None)` 辅助反查。
 4. **确认涉及表与字段（分级校验 + 校验门禁）**：
-   - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 SPUC/SODR/主数据/物流发货等多个域时），**必须先用 `table-catalog.search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径。
-   - **🚦 可信来源即视为「已确认」**：`search_tables` 返回的候选表、`get_table_relations` 返回的关联表、以及 `search_sql_template` 命中的 `verified=true` 模板的 `core_tables`，都是可信来源，可直接用于 `archery_query`（跨库表写成 `db.table`，如 `srm_logistics_delivery.slod_asn_header`）。
+   - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 SPUC/SODR/主数据/物流发货等多个域时），**必须先用 `search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径。
+   - **🚦 可信来源即视为「已确认」**：`search_tables` 返回的候选表、`get_table_relations` 返回的关联表、以及 `search_sql_templates` 命中的 `verified=true` 模板的 `core_tables`，都是可信来源，可直接用于 `archery_query`（跨库表写成 `db.table`，如 `srm_logistics_delivery.slod_asn_header`）。
    - **`archery_describe_table` 探测兜底**：只有 catalog 未收录、模板也没有的偏表/新表（如部分 `SINV` 表）才调 `archery_describe_table(site, instance, db, "<表名>")` 校验字段存在；确认后通过 `upsert_table_knowledge` 补录。
    - 字段层面同理：catalog 的 `entry_columns`、模板字段、`get_table_relations` 的 `join_on` 字段可直接信任；不确定或编造的字段才用 `archery_list_columns(site, instance, db, "<表名>", ["字段A","字段B"])` 确认。
    - SQL 生成完成后调用 `record_table_usage("<表1,表2>")` 沉淀。
@@ -151,18 +151,18 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 分级校验策略（正确性与效率兼顾）
 
-> **🚦 先探测后查询**：`archery_query` 通过「先确认再查询」纪律防止编造表/字段——即表/字段必须先经 `table-catalog.search_tables` 检索命中、或 `archery_describe_table`/`archery_list_columns` 确认存在，才能用于 `archery_query`。**「检索到 / describe 过」即视为已确认**，可直接查询；catalog/模板/describe 任意一处确认即可，不必重复 describe。
+> **🚦 先探测后查询**：`archery_query` 通过「先确认再查询」纪律防止编造表/字段——即表/字段必须先经 `search_tables` 检索命中、或 `archery_describe_table`/`archery_list_columns` 确认存在，才能用于 `archery_query`。**「检索到 / describe 过」即视为已确认**，可直接查询；catalog/模板/describe 任意一处确认即可，不必重复 describe。
 
 ### ✅ 已确认（可直接用于 archery_query，无需再 describe）
-- 来自 **sql-template MCP 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段 —— 其 `core_tables` 直接作为可信来源；
-- 来自 **`table-catalog.search_tables` 检索命中**的候选表（注意结果中的 `db_name`，跨库表写成 `db.table`）；以及 `get_table_relations` 返回的关联表与 `join_on` 字段；
+- 来自 **zhenyun-pangu-mcp 认知层 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段 —— 其 `core_tables` 直接作为可信来源；
+- 来自 **`search_tables` 检索命中**的候选表（注意结果中的 `db_name`，跨库表写成 `db.table`）；以及 `get_table_relations` 返回的关联表与 `join_on` 字段；
 - 在 **`references/table_meta.md`** 中明确列出的表名、主键、关联键（如 `po_header_id`、`rcv_trx_line_id`、`asn_line_id`、`tenant_id`）—— 与 catalog/模板结论一致时直接信任，若与 catalog/模板冲突以 catalog/模板为准，并修正本文件；
 - 在 **`references/relations.md`** 中明确给出的关联与规则；
 - `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表高频字段（已确认可信，可直接使用）。
 
 ### ⚠️ 必须确认后再用（先 archery_describe_table / archery_list_columns 探测）
 - **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`：仅当目标表经 `archery_describe_table`/`archery_list_columns` 确认存在该字段时才使用（部分物流表用到 `attribute_longtext60`）；这些字段**不要仅凭命名规则假设存在**，使用前需校验。
-- 表名不明确、不在上述可信来源中出现的：**先用 `table-catalog.search_tables` 检索候选表**；命中后即可直接用于 `archery_query`（无需再 describe）；目录未收录（如部分 SINV 表）才直接 `archery_describe_table`。
+- 表名不明确、不在上述可信来源中出现的：**先用 `search_tables` 检索候选表**；命中后即可直接用于 `archery_query`（无需再 describe）；目录未收录（如部分 SINV 表）才直接 `archery_describe_table`。
 - 用户口头描述或自定义的字段（如「那个含税金额」需确认是 `tax_included_amount` 还是 `tax_include_amount`——**订单头是 `tax_include_amount`、收货事务行是 `tax_included_amount`，极易写错**）；
 - 对拼写、存在性有任何怀疑的；生成 UPDATE/WHERE 前对关键字段调 `archery_list_columns` 确认。
 
@@ -181,7 +181,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 | 老送货单 vs 发货工作台送货单（两套表）、订单状态机组合、乐观锁、pe_supplier、ES 联动、清理规则、留痕、同步/幂等表、API 建议 | `references/relations.md` | 不确定表间关系、状态组合、上下游联动/清理规则时 |
 | 表名-主键-关联键速查、库归属、import_type 等枚举速查、易错拼写（tax_include_amount 等）、主数据速查 | `references/table_meta.md` | 快速确认表/主键/关联键、高频枚举值时 |
 
-> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
+> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `zhenyun-pangu-mcp` 的 `search_sql_templates` 检索模板。
 
 ## 参考文件指引
 
@@ -190,20 +190,19 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 | `references/relations.md` | 表关联关系 + 业务规则（纯业务知识，数据库拿不到） | 不确定表间关系、关联键、上下游联动规则时 |
 | `references/table_meta.md` | 业务语义/速查层：表名-主键-关联键速查、易错枚举、主数据速查 | 快速确认表/主键/关联键、高频枚举值时 |
 
-> 字段级结构一律 `archery_describe_table` / `archery_list_columns` 实时获取；SQL 模板一律走 sql-template MCP（盘古专属分类）。
+> 字段级结构一律 `archery_describe_table` / `archery_list_columns` 实时获取；SQL 模板一律走 zhenyun-pangu-mcp 认知层（盘古专属分类）。
 
 ## 模板维护与检索（DB 模板库闭环）
 
 ### 检索模板（生成前）
-- 收到新任务时，**先调用 `search_sql_template`**，按盘古分类（`category`）/单据类型（`doc_type`）/关键词（含「盘古」）检索。
+- 收到新任务时，**先调用 `search_sql_templates`**，按盘古分类（`category`）/系统（`system=盘古`）/关键词（含「盘古」）检索。
 - 优先复用 `verified_only=true` 模板；MCP 不可用时降级为「不检索直接生成」。
 
 ### 沉淀模板（生成后）
 - 完成一次**复杂场景或数据修复**后，**主动询问用户是否沉淀**，确认后按「盘古模板约定」调用 `save_sql_template`：
   - `title`：`【盘古-xx】...` 前缀；
   - `category`：`订单SPUC` / `物流收货SINV` / `物流发货SLOD` / `盘古通用查询` / `数据修复-盘古`；
-  - `doc_type`：`采购订单` / `收货事务` / `发货单` / `送货单` / `状态机`；
-  - `keywords`：必含 `盘古`；`core_tables` / `placeholders` 照实填写；
+  - `system`：`盘古`；`keywords` 必含 `盘古`；`core_tables` 照实填写；
   - `execution_flow`：**数据修复类模板必填**。按「执行过程驱动模式」的伪代码语法，把本次实际执行过的前置查询、断言、修复动作整理为 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION），供后续复用时分步执行；
   - `example_case`：**数据修复类模板必填**。写入本次真实执行轨迹的脱敏版：输入参数 → 各 STEP 中间结果（如「Step 1 结果: tenant_id = 46997」）→ 最终 SQL，作为 Few-Shot 示例；
   - `verified`：表/字段已 MCP 校验通过则置 `true` 并填 `verified_at`。
@@ -228,7 +227,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 3. **说明依赖**：告知用户缺少的真实值（如具体 `po_header_id`、租户编码）。
 4. **降级查询**：先查 `hpfm_tenant` 再缩小范围定位，避免一次大查询失败即放弃。
 
-当 **sql-template MCP** 不可用时：
+当 **zhenyun-pangu-mcp 认知层** 不可用时：
 5. **检索降级**：不检索模板直接按铁律生成，不阻断主流程。
 6. **沉淀降级**：完成后提示「模板库当前不可用，本次结果未沉淀」。
 
@@ -314,6 +313,6 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 - 结构事实 → `archery_describe_table` / `archery_list_columns` / `archery_query`
 - 业务语义 → `relations.md` / `table_meta.md`
-- 复用提效 → `search_sql_template`（按盘古分类检索）+ `save_sql_template`（按盘古约定沉淀）
+- 复用提效 → `search_sql_templates`（按盘古分类检索）+ `save_sql_template`（按盘古约定沉淀）
 - 执行安全 → 模板含 `execution_flow` 时强制「执行过程驱动模式」：逐 STEP 执行 QUERY、校验 ASSERT、提取真实变量后才生成修复 SQL，杜绝猜测主键/状态
 - 所有铁律（多租户、乐观锁、pe_supplier 组合、关闭/取消互斥、ES 联动、上下游协同、跨库前缀、留痕、禁止编造）**始终生效**。

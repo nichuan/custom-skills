@@ -14,7 +14,7 @@
 
 3. **不知道表名的查询**
    输入：查供应商资质证书信息
-   期望：先 `table-catalog.search_tables` 找表，再 Archery 确认字段，catalog 不替代字段存在证明。
+   期望：先 `zhenyun-pangu-mcp search_tables` 找表，再 Archery 确认字段，catalog 不替代字段存在证明。
 
 4. **跨表 JOIN**
    输入：询价单 + 报价明细联查

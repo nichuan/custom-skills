@@ -1,7 +1,7 @@
 {
   "name": "ssrc-sql-generator",
   "version": "1.7.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 的 Archery 工具对接真实数据库：表结构/字段由 archery_describe_table / archery_list_columns 实时获取，逐步执行只读查询获取真实值（租户->单据->业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用「本地仅沉淀业务语义、结构事实走 MCP」分层 + 分级校验（schema 已验证模板免校验、不明确必校验），兼顾正确性与效率；并接入 DB 模板库（sql-template MCP，Supabase）实现「生成前检索复用、生成后询问沉淀」的闭环。核心铁律：MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行；查询默认 prod，修改类必须确认环境+租户+影响范围。专门针对询价单(含招标单)、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。",
+  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 的 Archery 工具对接真实数据库：表结构/字段由 archery_describe_table / archery_list_columns 实时获取，逐步执行只读查询获取真实值（租户->单据->业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用「本地仅沉淀业务语义、结构事实走 MCP」分层 + 分级校验（schema 已验证模板免校验、不明确必校验），兼顾正确性与效率；并接入 DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）实现「生成前 search_sql_templates 检索复用、生成后 save_sql_template 沉淀」的闭环。核心铁律：MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行；查询默认 prod，修改类必须确认环境+租户+影响范围。专门针对询价单(含招标单)、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -19,7 +19,7 @@
   "features": {
     "table_structure": "表结构/字段由 zhenyun-pangu-mcp 的 archery_describe_table / archery_list_columns 实时获取，本地不维护、不暴露表结构",
     "table_relations": "表之间的关联关系与业务规则（relations.md）",
-    "sql_templates": "模板库已迁移至 DB（sql-template MCP / Supabase）：含场景检索、✅已验证标记、使用统计；生成前 search_sql_template 检索复用，生成后 save_sql_template 沉淀",
+    "sql_templates": "模板库已迁移至 DB（zhenyun-pangu-mcp 认知层 / Supabase）：含场景检索、✅已验证标记、使用统计；生成前 search_sql_templates 检索复用，生成后 save_sql_template 沉淀",
     "sql_examples": "复杂/数据修复场景完整 SQL 示例同样沉淀在 DB 模板库（数据修复分类），与通用模板统一管理、可检索",
     "graded_validation": "分级校验：已验证模板/语义层明确项免 MCP 校验提效，表名/字段名不明确必校验",
     "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射",
@@ -35,22 +35,23 @@
         "archery_describe_table",
         "archery_list_databases",
         "archery_list_instances",
-        "archery_query_tenant"
-      ],
-      "description": "对接 Archery 平台，执行只读查询与表/字段结构校验；实例名由别名（prod/test/dev）自动解析，库名以 archery_list_databases 实际返回为准"
-    },
-    {
-      "name": "sql-template",
-      "tools": [
-        "search_sql_template",
+        "archery_query_tenant",
+        "search_sql_templates",
         "save_sql_template",
         "get_sql_template",
         "list_sql_templates",
         "update_sql_template",
         "delete_sql_template",
-        "record_template_usage"
+        "record_template_usage",
+        "search_knowledge",
+        "get_knowledge",
+        "search_tables",
+        "get_table",
+        "get_table_relations",
+        "diagnose_context",
+        "search_pangu"
       ],
-      "description": "SQL 模板库（Supabase/Postgres）：保存沉淀与检索复用，与 zhenyun-pangu-mcp 解耦"
+      "description": "Pangu 统一 MCP：Archery 只读查询与表/字段结构校验（实例名由别名自动解析）+ 认知层（SQL 模板检索/沉淀 search_sql_templates、业务知识 search_knowledge、表目录 search_tables/get_table_relations、组合诊断 diagnose_context）。模板/知识/表能力已从 sql-template/table-catalog/knowledge 三个独立 MCP 整合进来"
     }
   ],
   "entry_point": "SKILL.md",

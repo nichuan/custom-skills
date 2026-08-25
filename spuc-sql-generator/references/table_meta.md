@@ -113,7 +113,7 @@
 1. 新表按上述格式添加，标注主键、关联键与**库归属**
 2. 仅列出高频使用的 3-5 个核心字段
 3. 状态/枚举等数据库拿不到的业务知识沉淀在此文件
-4. 完整 SQL 示例通过 sql-template MCP 的 `save_sql_template` 沉淀（category 用盘古专属分类，见 `SKILL.md`）
+4. 完整 SQL 示例通过 zhenyun-pangu-mcp 的 `save_sql_template` 沉淀（category 用盘古专属分类，见 `SKILL.md`）
 
 ### 表命名规范
 - **sodr_**: 采购订单域

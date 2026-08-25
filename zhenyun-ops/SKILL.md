@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill）。【仅当】用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且【无法直接命中某个具体子 Skill 时】（包括：意图不明确、一句话里混了多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、或拿不准子 Skill 是否存在），才加载本 Skill 进行路由。本 Skill 本身不执行具体业务，只负责根据用户意图精准路由并调用 use_skill 加载对应子 Skill：猪齿鱼任务查询（按任务号/按经办人/按关键词状态、看状态流转与附件）→ choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障/配置升级问题 → java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复 → ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复 → spuc-sql-generator。【若用户请求能直接明确命中 choerodon-task / java-troubleshoot / ssrc-sql-generator / spuc-sql-generator 之一，则不要加载本 Skill，直接使用对应子 Skill。】本 Skill 仅作为路由兜底，不抢占子 Skill 的直接触发。
+description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三层架构 Level 1 Router/Orchestrator）。【仅当】用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且【无法直接命中某个具体子 Skill 时】（包括：意图不明确、一句话里混了多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、或拿不准子 Skill 是否存在），才加载本 Skill 进行路由。本 Skill 本身不执行具体业务，只负责根据用户意图精准路由并调用 use_skill 加载对应子 Skill：猪齿鱼任务查询 → choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障/配置升级问题 → java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复 → ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复 → spuc-sql-generator。三层架构：zhenyun-ops（Router，管行为/路由）→ 专业 Skill（管领域流程/判断）→ zhenyun-pangu-mcp（管事实/知识/执行）。【若用户请求能直接明确命中某子 Skill，则不要加载本 Skill，直接使用对应子 Skill。】本 Skill 仅作为路由兜底，不抢占子 Skill 的直接触发。
 ---
 
 # 甄云 SRM 全局智能路由中心（zhenyun-ops）
@@ -63,10 +63,13 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill）。�
 
 ## 四、zhenyun-pangu-mcp 工具路由（子 Skill 需要时可调用）
 
-`zhenyun-pangu-mcp` 提供日志、数据库、猪齿鱼协作、代码搜索四类工具。各子 Skill 在对应场景下应调用以下工具，**所有参数严禁瞎猜瞎传**（准确参数取值规则见各子 Skill 的「MCP 工具与参数声明」章节）：
+`zhenyun-pangu-mcp` 是统一能力入口，分为**认知层（知识/模板/表/关系）+ Runtime（日志/数据）+ Project（代码）+ 猪齿鱼**四类。各子 Skill 在对应场景下应调用以下工具，**所有参数严禁瞎猜瞎传**（准确参数取值规则见各子 Skill 的「MCP 工具与参数声明」章节）：
 
 | 场景 | 工具 | 由哪个子 Skill 调用 |
 | --- | --- | --- |
+| 业务知识/排查经验检索（企业事实、系统架构、环境、SRM 机制） | `search_knowledge` / `get_knowledge` / `diagnose_context` / `search_pangu` | 全部 Skill（排障/生成 SQL 前的认知层查询） |
+| 可复用 SQL/修复模板检索与沉淀 | `search_sql_templates` / `get_sql_template` / `save_sql_template` / `list_sql_templates` / `update_sql_template` / `delete_sql_template` / `record_template_usage` | ssrc-sql-generator / spuc-sql-generator |
+| 表目录 / 关联关系 / 表元数据 | `search_tables` / `get_table` / `get_table_relations` / `add_table_relation` / `record_table_usage` / `upsert_table_knowledge` | java-troubleshoot / ssrc-sql-generator / spuc-sql-generator |
 | 查 Loki 日志（k8s 容器日志、TraceId、关键字；cn 国内非生产 dev/test + AWS 海外全环境） | `obs_log_query` / `obs_log_datasources` | java-troubleshoot |
 | 查阿里云 SLS 日志（仅 cn 国内盘古 prod，按 traceId/关键字） | `obs_sls_query` | java-troubleshoot |
 | 查数据库（Archery 执行 SQL、看表结构、看库/实例列表） | `archery_query` / `archery_describe_table` / `archery_list_columns` / `archery_list_databases` / `archery_list_instances` / `archery_query_tenant` | spuc-sql-generator / ssrc-sql-generator |
@@ -78,7 +81,42 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill）。�
 
 ---
 
-## 五、注意事项
+## 五、Skill → MCP 能力矩阵（三层架构的约束表）
+
+> 每个 Skill 只应调用「能力矩阵」允许的能力。新增 Skill 时按此矩阵判断它该依赖哪些 MCP 能力，避免 Skill 无节制引用工具。
+
+| Skill | Knowledge(认知) | Table(表/关系) | Template(模板) | Data(Archery) | Log(日志) | GitLab/代码 | 猪齿鱼 |
+|-------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `zhenyun-ops`（路由） | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `java-troubleshoot` | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| `ssrc-sql-generator` | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| `spuc-sql-generator` | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| `choerodon-task` | ✓ | — | — | — | — | ✓ | ✓ |
+
+- ✓ = 该 Skill 可调用对应能力；— = 通常不需要（特殊场景例外但需克制）。
+- **认知层（Knowledge）是全 Skill 通用底座**：排障/生成 SQL 前，先 `search_knowledge` 看是否有既有的企业事实、系统机制、排查经验。
+
+---
+
+## 六、多技能协作规则
+
+用户需求可能横跨多个业务域，此时**由本路由 Skill 协调多个子 Skill 协同**，而非让单个 Skill 包办一切：
+
+| 典型混合场景 | 协作方式 |
+|---|---|
+| 「接口报错 + 要查库确认数据」 | `java-troubleshoot`（定位根因）→ `ssrc/spuc-sql-generator`（数据修复） |
+| 「任务提到某个需求 + 要排障」 | `choerodon-task`（补需求上下文）→ `java-troubleshoot`（排障） |
+| 「寻源异常 + 可能是配置问题」 | `ssrc-sql-generator`（查表/数据）→ `java-troubleshoot`（若涉及服务行为） |
+
+协作原则：
+1. **先定位根因，再执行修复**：混合"排障 + 改数据"时，先用 `java-troubleshoot` 弄清根因，再按需用 SQL 技能生成修复 SQL。
+2. **按需串行切换**：用 `use_skill` 加载第一个子 Skill 拿到阶段性结论后，再加载下一个子 Skill 继续，不并行堆叠。
+3. **共享认知层**：任何子 Skill 排障/生成 SQL 前，都可先 `search_knowledge` 复用企业事实，避免重复劳动。
+4. **最终由路由 Skill 汇总**：多 Skill 完成后，统一整理为用户可读的结论。
+
+---
+
+## 七、注意事项
 
 - **保持轻量**：本 Skill 只做路由，不承载具体业务逻辑；具体业务逻辑必须放在各子 Skill 中，避免重复与冲突。
 - **不要在本 Skill 内复制子 Skill 的规则**（如排障流程、多租户 SQL 铁律），这些都在对应子 Skill 的 `SKILL.md` 里，加载后自动生效。

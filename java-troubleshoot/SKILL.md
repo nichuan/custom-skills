@@ -1,6 +1,6 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangu-mcp 查日志/查数据库/搜源码/查猪齿鱼，按需通过 table-catalog 补充数据字典与 join 关系、gitlab_* 读取 GitLab 仓库完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangu-mcp 查日志/查数据库/搜源码/查猪齿鱼/查认知层（数据字典 search_tables、join 关系 get_table_relations、排查知识 search_knowledge），gitlab_* 读取 GitLab 仓库完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
@@ -127,21 +127,20 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
-> 整合版 `zhenyun-pangu-mcp` 已取代老的独立查询 MCP（`sql-ops` 查库 / `log-ops` 查日志），后者已不推荐使用。所有日志/数据库/代码检索均通过该整合版工具，不要再引用 `sql-ops` / `log-ops`。
-
 - **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。
 - **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
 - **明确 WHERE + LIMIT**（≤100）：禁止 `SELECT *`、无 WHERE、无 LIMIT、全表扫描。
 - **索引意识**：优先命中以 `tenant_id` 打头的联合索引；不在索引列套函数/隐式转换；避免前置 `%` 模糊；大表叠加时间范围。
 - **环境对齐**：site/instance 必须与 InvestigationContext 的环境一致，显式传参（默认实例是 PROD，误查生产会得错误结论）。拿不准先 `archery_list_instances` / `archery_list_databases`。
 - **物理表找不到时**：先按配置表（虚拟表）处理（见 `knowledge/srm/virtual-table.md`），用"表名"当 `table_code` 查 `spfm_rel_table_definition`，**不得直接断言"表不存在"**。
-- **table-catalog 辅助**：不确定表名 → `search_tables(业务描述)`；多表 join → `get_table_relations`；字段以 `archery_describe_table` 实时为准；结束调 `record_table_usage` 沉淀。
+- **zhenyun-pangu-mcp 认知层辅助**：不确定表名 → `search_tables(业务描述)`；多表 join → `get_table_relations`；字段以 `archery_describe_table` 实时为准；结束调 `record_table_usage` 沉淀。
 - 禁止查 `information_schema.tables/columns`（无权限会失败），用 `archery_describe_table`/`archery_list_columns` 探测。
 
 ### 猪齿鱼（choerodon_*）
 
 - 仅当故障关联需求/缺陷/迭代、需补业务上下文时调用。
 - `issue_id`/`task_id` 必须是猪齿鱼返回的真实 id，不要自己编。
+- 注意获取猪齿鱼任务详情，里面可能会有提供traceId、业务单号，业务场景等信息。
 
 ### 诊断规则（rules/diagnostic-rules.yaml）
 
@@ -154,7 +153,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 ## 追问机制（只问阻塞下一步的信息）
 
 - **已从用户输入获得的信息，绝不重复询问。** 例：用户给 traceId+服务，直接查 trace，不要问"请选择系统/环境/问题类型"。
-- 仅在**当前假设无法确定、且缺少的信息会阻塞下一步证据获取**时才追问。
+- 仅在**当前假设无法确定、且缺少的信息会阻塞下一步证据获取**时才追问，比如：既没有traceId，有没有提供单号、发生问题的现象等信息。
 - 不要一次性抛出所有问题；每次只问真正缺的那一项，让用户选择而非手填技术参数（namespace/Project/Logstore 等由 MCP 自动映射）。
 - 用户一句话含多信息时，自动提取到 InvestigationContext，只问缺的。
 
@@ -251,15 +250,17 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ## 知识引用索引
 
-| 需要调查的内容 | 引用 |
-|----------------|------|
-| 日志平台路由 / Loki vs SLS / region-env 获取 | `knowledge/environment/log-routing.md` |
-| 盘古环境与 Archery 实例别名 | `knowledge/environment/pangu.md` |
-| 天工环境与实例 | `knowledge/environment/tiangong.md` |
-| SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` |
-| 标准 vs 二开判定口径 | `knowledge/architecture/standard-customization.md` |
-| 适配器 JS 脚本（存库二开） | `knowledge/srm/adapter-js.md` |
-| 配置表（虚拟表）机制 | `knowledge/srm/virtual-table.md` |
-| 故障信号 → 假设 → 证据 | `rules/diagnostic-rules.yaml` |
+> 下列企业事实/系统机制知识已**同步入库** `knowledge_docs`（可通过 zhenyun-pangu-mcp 的 `search_knowledge` 全局检索复用）。本地 `knowledge/` 目录保留作为本 Skill 排障的**精确操作手册**（含可直接复制的 SQL 范式与判定约束），两者内容一致，排障时以本地精确手册为准，亦可 `search_knowledge` 兜底检索。
+
+| 需要调查的内容 | 本地手册 | 知识库检索（search_knowledge） |
+|----------------|----------|------------------------------|
+| 日志平台路由 / Loki vs SLS / region-env 获取 | `knowledge/environment/log-routing.md` | `search_knowledge("日志平台路由", system="天工")` |
+| 盘古环境与 Archery 实例别名 | `knowledge/environment/pangu.md` | `search_knowledge("盘古环境 实例别名")` |
+| 天工环境与实例 | `knowledge/environment/tiangong.md` | `search_knowledge("天工环境")` |
+| SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` | `search_knowledge("代码库拓扑 二开")` |
+| 标准 vs 二开判定口径 | `knowledge/architecture/standard-customization.md` | `search_knowledge("标准二开判定")` |
+| 适配器 JS 脚本（存库二开） | `knowledge/srm/adapter-js.md` | `search_knowledge("适配器 JS 脚本")` |
+| 配置表（虚拟表）机制 | `knowledge/srm/virtual-table.md` | `search_knowledge("虚拟表 配置表")` |
+| 故障信号 → 假设 → 证据 | `rules/diagnostic-rules.yaml` | —（规则，留在 Skill） |
 
 > 本 Skill 不修改 MCP 本身，不修改业务代码。仅定义 Agent 排障行为与边界。

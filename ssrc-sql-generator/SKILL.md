@@ -1,6 +1,6 @@
 ---
 name: ssrc-sql-generator
-description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生成业务查询 SQL、调整现有 SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 的 Archery 对接真实数据库：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（sql-template MCP，Supabase）+ 分级校验」：生成前先检索模板库复用（schema 已验证模板免 MCP 校验），生成后询问用户沉淀结果，模板库越用越强。专门针对租户的询价单（招标单）、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行。
+description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生成业务查询 SQL、调整现有 SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 对接真实数据库与认知层：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）+ 分级校验」：生成前先 search_sql_templates 检索复用（schema 已验证模板免 MCP 校验），生成后询问用户沉淀结果，模板库越用越强。专门针对租户的询价单（招标单）、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行。
 ---
 
 # SRM 采购寻源 SQL 生成助手
@@ -30,7 +30,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 | 遇何情况做什么（行为规则） | 业务是什么（→ `references/*.md`） |
 | 生成可执行的查询 / 写 SQL | 工具怎么调用（→ MCP 实时 schema） |
 | 复用并沉淀模板 | 当前结构与数据是什么（→ Archery） |
-| 只读调查 + 生成写 SQL | 以前怎么解决过（→ sql-template） |
+| 只读调查 + 生成写 SQL | 以前怎么解决过（→ zhenyun-pangu-mcp search_sql_templates） |
 
 > Agent **不直接执行** INSERT/UPDATE/DELETE。MCP 数据库操作默认**只读**（仅 `archery_query` 取数据）。
 > 写 SQL（`ACTION`）一律**生成后交用户人工确认并执行**。
@@ -80,7 +80,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
   ↓
 ① 任务分类：查询 / SQL生成 / 数据修复
   ↓
-② 检索模板（search_sql_template）
+② 检索模板（search_sql_templates）
   │  命中且含 execution_flow → 进入 §5 执行过程驱动模式
   ↓
 ③ 确认业务上下文（§7 术语，仅不明确时澄清）
@@ -89,7 +89,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
   ↓
 ⑤ 确认租户（archery_query_tenant → 真实 tenant_id，禁止硬编码）
   ↓
-⑥ 找表：不知表名 → table-catalog.search_tables（§4）
+⑥ 找表：不知表名 → search_tables（§4）
   ↓
 ⑦ 确认字段：分级校验（§4 + §9 规则）
   ↓
@@ -110,17 +110,21 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 | 工具组 | 负责 | 不负责 |
 |--------|------|--------|
-| **table-catalog** | 找表 / 找 join 关系 / 业务语义 | 证明字段当前真实存在 |
+| **认知层（表/模板/知识）** | 找表 / 找 join 关系 / 检索模板 / 查知识 | 证明字段当前真实存在 |
 | **Archery** | 当前数据库结构事实（describe/list_columns）+ 当前真实数据（query） | — |
-| **sql-template** | 历史解决方案复用（检索/沉淀） | — |
 
-> **找表 → catalog；确认字段 → Archery；确认真实值 → Archery query。**
+> **找表 → search_tables；确认字段 → Archery；确认真实值 → Archery query；复现历史解法 → search_sql_templates。**
 > catalog 命中「业务大概率对应 ssrc_xxx」≠「ssrc_xxx.field 一定存在」；字段存在性必须由 Archery 证明。
 
-### table-catalog（zhenyun-pangu-mcp / 独立目录）
+### 表目录（zhenyun-pangu-mcp 认知层）
 - `search_tables("<业务描述>", domain?)`：语义检索候选表（域前缀 `ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据）。不知表名时第一步调用。
+- `get_table("<表名>")`：单表元数据详情（注释/描述/关键字段/入口字段）。
 - `get_table_relations("<表名>")`：一跳/二跳关联与 join 字段，写 JOIN 前确认路径。
-- `add_table_relation(...)` / `record_table_usage(...)` / `upsert_table_knowledge(...)`：验证后沉淀关联、记录用量、修正描述。
+
+### 模板库（zhenyun-pangu-mcp 认知层，Supabase）
+- `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)`：生成前检索复用（结果含 `execution_flow` 与 `example_case`）。
+- `save_sql_template(...)` / `get_sql_template(id)` / `list_sql_templates(...)` / `update_sql_template(id, ...)` / `delete_sql_template(id)` / `record_template_usage(id)`。
+- `diagnose_context(query, system, module)`：组合诊断，自动汇集 知识→模板→表→关系，排障首推。
 
 ### Archery（zhenyun-pangu-mcp，只读）
 - `archery_query(sql, site, instance, db)`：执行只读 SQL，逐步获取租户/主键/状态真实值。
@@ -129,11 +133,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - `archery_list_instances()` / `archery_list_databases(site, instance)` / `archery_query_tenant(...)`：确认实例/库/租户。
 - 工具真实签名由 MCP 运行时提供，本文件不维护参数附录。
 
-### sql-template（DB 模板库，Supabase）
-- `search_sql_template(keyword, doc_type, category, verified_only, limit)`：生成前检索复用（结果含 `execution_flow` 与 `example_case`）。
-- `save_sql_template(...)` / `get_sql_template(id)` / `list_sql_templates(...)` / `update_sql_template(id, ...)` / `delete_sql_template(id)` / `record_template_usage(id)`。
-
-> **MCP 异常降级**：catalog / Archery / sql-template 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注、完成后提示对应能力缺失。
+> **MCP 异常降级**：认知层 / Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注、完成后提示对应能力缺失。
 
 ---
 
@@ -185,7 +185,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 | 询价单 vs 招标单区分（secondary_source_category）、评分上下文 RFX/BID、状态同步、附件/人员 ID/征询单/寻源结果删除规则、拓展字段特例 | `references/relations.md` | 不确定单据类型、状态同步、附件/人员/关联修复规则时 |
 | 表名-主键-关联键速查、常见租户、易错枚举、`iam_user`/`attribute_*` 拓展字段特例 | `references/table_meta.md` | 快速确认主键/高频枚举/人员字段时 |
 
-> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `sql-template` MCP 检索模板。
+> ⚠️ **边界原则**：上述知识只回答「业务/表/状态**是什么**」（Knowledge）。「**现在**某条数据真实状态是什么」一律通过 `zhenyun-pangu-mcp` 的 `archery_query` 实时查询；「以前类似问题**怎么修**」通过 `zhenyun-pangu-mcp` 的 `search_sql_templates` 检索模板。
 
 ---
 
@@ -196,14 +196,14 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 | `references/relations.md` | 表关联 + 业务规则（纯知识，DB 拿不到） | 不确定关联键/状态同步规则时 |
 | `references/table_meta.md` | 表名-主键-关联键速查、常见租户、易错枚举、拓展字段特例 | 快速确认主键/高频枚举时 |
 
-> 字段级结构（字段名/类型/注释/索引）一律走 Archery 实时获取，不在此列文件内。模板库已迁移 DB（sql-template MCP）。
+> 字段级结构（字段名/类型/注释/索引）一律走 Archery 实时获取，不在此列文件内。模板库已迁移 DB（zhenyun-pangu-mcp 认知层）。
 
 ### 模板沉淀（生成后）
 完成复杂场景 / 数据修复后，**主动询问用户是否沉淀**，确认后 `save_sql_template`：
 - `title`/`category`/`scenario`/`sql_text`（保留 `<...>`/`{...}` 占位符原样）；
 - `execution_flow`：**数据修复类必填**，按 §5 伪代码整理本次实际执行过程；
 - `example_case`：**数据修复类必填**，写脱敏版**执行轨迹**（输入→各 STEP 中间结果→最终 SQL）；
-- `doc_type`/`keywords`/`core_tables`/`placeholders` 便于检索；
+- `keywords`/`core_tables` 便于检索；`system` 标注所属系统（天工/盘古）；
 - 校验通过的表/字段置 `schema_verified=true` 并填 `schema_verified_at` 与 `verified_source`（如 `archery_describe_table`），后续可免 MCP 校验；
 - **问题解决方案扩展字段（推荐填写，提升检索与复用可信度）**：
   - `status`：默认 `draft`；校验通过可标 `verified`；多次成功复用后升 `trusted`；废弃标 `deprecated`。
@@ -211,7 +211,8 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
   - `business_domain`：`采购寻源`；`system`：`天工`/`盘古`。
   - `problem_description` / `symptom` / `root_cause`：问题 / 现象 / 根因（供按问题语义检索命中）。
   - `verify_sql` / `rollback_sql`：修复后校验 SQL / 回滚 SQL（如适用）。
-  - `execution_policy`：写操作执行策略（如 `需人工确认`）。
+  - `execution_policy`：执行策略标准枚举 `READ_ONLY`/`REQUIRES_CONFIRMATION`/`SAFE_UPDATE`/`HIGH_RISK`/`FORBIDDEN_AUTOMATIC`（SELECT→自动、UPDATE→需确认、DELETE→禁止自动）。
+  - `parameters`：参数说明（JSON 字符串，如 `{"tenant_id": {"type": "bigint", "required": true}}`，存为 JSONB）。
 - `record_template_usage(id)` 复用后累加。
 > `save_sql_template` 内置相似去重；覆盖用 `update_sql_template`。
 
@@ -222,7 +223,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 | 异常 | 处理 |
 |------|------|
 | Archery 查询/结构工具失败/空 | 回退占位符 + 标注「未验证」，说明缺的真实值，请用户补充；可降级先查 `hpfm_tenant` 再缩小范围 |
-| sql-template 不可用 | 不检索直接生成、完成后提示「未沉淀」，不阻塞 |
+| 模板库不可用 | 不检索直接生成、完成后提示「未沉淀」，不阻塞 |
 | catalog 未收录表 | 直接用 `archery_describe_table` 探测 |
 
 **禁止**：编造表名/字段/状态值；为每张表创建本地结构文件（结构事实统一走 MCP）。
