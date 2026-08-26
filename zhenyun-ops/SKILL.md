@@ -79,6 +79,17 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 
 > 本路由 Skill 不直接调用上述工具，只负责判断「该用哪类工具、由哪个子 Skill 调用」。工具的准确参数取值规则由各子 Skill 自行声明与执行。
 
+### 认知层使用纪律（Knowledge / Template / Table）
+
+- **知识/机制是什么**：先 `search_knowledge`；命中后用 `get_knowledge(id)` 读取完整 Markdown。`query` 为空可按过滤条件列出知识；`knowledge_type` 支持 `business/system/technical/troubleshooting/data_model/configuration/experience/rule`，`status` 支持 `draft/verified/deprecated/archived`。
+- **以前怎么处理**：先 `search_sql_templates`，优先 `verified_only=true`；命中后 `get_sql_template(id)`。确认实际复用后才 `record_template_usage(id)`。
+- **不知道表名**：`search_tables(业务描述)` → `get_table(表名)` / `get_table_relations(表名)`。目录和关系只是候选知识，字段存在性、DDL 和当前数据必须由 Archery 证明。
+- **问题跨多个认知域**：用 `diagnose_context` 收集知识→模板→表→关系；它不查实时日志/数据库，也不执行 SQL。仅想快速发现线索时可用 `search_pangu`，拿到结果后仍要回到专项工具。
+- **沉淀知识**：只有用户确认内容后才 `save_knowledge`；`content_md` 用规范 Markdown，`core_tables`/`tags`/`related_template_ids` 用逗号分隔，默认 `status=draft`，稳定事实核验后再标 `verified`。
+- **沉淀模板**：只有用户确认后才 `save_sql_template`；`sql_text` 仅写入模板库，不执行，`parameters` 必须是 JSON 对象字符串。模板里的写 SQL 仍须交用户人工执行。
+- **维护目录/关系**：`add_table_relation` 仅在 Archery/SELECT 验证 join 后调用，`confidence` 传 0~1；`upsert_table_knowledge` 仅用于 Archery 已确认但目录缺失/过期的表。`update_sql_template` 是部分更新，`delete_sql_template` 是破坏性操作，均需明确确认。
+- **边界**：知识库写操作只修改 Supabase 认知层元数据，不修改业务库；`record_template_usage`/`record_table_usage` 只记录实际使用统计，禁止虚增。
+
 ---
 
 ## 五、Skill → MCP 能力矩阵（三层架构的约束表）

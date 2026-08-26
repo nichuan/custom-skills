@@ -72,21 +72,25 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 | `archery_list_databases(site, instance)` | 列出某实例下的库 | 确认 `srm` / `srm_logistics_delivery` 等库名 |
 | `archery_describe_table(site, instance, db, table)` | 返回完整字段清单 | 不确定字段、需完整结构（等同 `describe_table`） |
 | `archery_list_columns(site, instance, db, table)` | 列字段清单 | 生成 UPDATE/WHERE 前确认字段拼写 |
-| `archery_query(sql, site="cn", instance=None, db=None, limit=100)` | 执行只读 SQL | 逐步获取租户/主键/状态真实值 |
+| `archery_query(sql, site="cn", instance=None, db=None, limit=100)` | 执行只读 SQL（单条基础 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE） | 逐步获取租户/主键/状态真实值 |
 | `archery_query_tenant(tenant="", site="cn", instance=None, db=None)` | 按租户编码/名称定位租户 | 反查 `tenant_id` |
 
 - `site` ∈ {`cn`, `aws`}；`instance` 用别名 `prod`/`prod-ro`/`aws`/`dev`/`test`。
-- 同样遵守本技能「数据库约束与安全规则」（多租户、索引、LIMIT、禁止写操作）。
+- 同样遵守本技能「数据库约束与安全规则」（多租户、索引、LIMIT、禁止写操作）。MCP 只接受单条基础 `SELECT`、`EXPLAIN SELECT` 或 `SHOW CREATE TABLE`，不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、函数/子查询、窗口函数或集合运算。
 
 ## 工具能力（zhenyun-pangu-mcp 认知层，模板库）
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
-| `search_sql_templates(keyword, category, system, verified_only, limit)` | 检索可复用模板（结果含 `execution_flow` 执行过程伪代码与 `example_case` 示例） | 生成前先按盘古分类/关键词/表名定位已有模板 |
-| `save_sql_template(title, category, scenario, sql_text, execution_flow, example_case, ...)` | 沉淀本次生成的 SQL 为模板（数据修复类必须附执行过程伪代码与脱敏示例） | 复杂场景完成后询问用户并保存 |
+| `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)` | 检索可复用模板；当前 MCP 返回标题、场景、SQL、风险、状态、关键词、核心表和使用次数，不返回 `execution_flow` / `example_case` | 生成前先按盘古分类/关键词/表名定位已有模板 |
+| `save_sql_template(title, category, scenario, sql_text, ...)` | 沉淀本次生成的 SQL 为模板；`parameters` 传 JSON 对象字符串，模板只写入库不执行 | 复杂场景完成后询问用户并保存 |
 | `get_sql_template(id)` / `list_sql_templates(...)` | 按 id 获取 / 总览模板库 | 查看某模板或全量浏览 |
 | `update_sql_template(id, ...)` | 更新模板（如补「✅ 已验证」） | 复核后标记验证 |
 | `record_template_usage(id)` | 记录使用一次（使用次数 +1） | 复用模板生成后调用，优化排序 |
+
+> 当前 MCP 的模板工具实际签名以 `server.py` 为准。不要向 `save_sql_template` / `update_sql_template`
+> 传入未声明的 `execution_flow`、`example_case`、`schema_verified`、`problem_description` 等字段；
+> 数据修复的逐步执行轨迹由本 Skill 在当次任务中维护，并按下方铁律执行。
 
 ### 盘古模板检索/沉淀约定（与 ssrc 区分，保证检索准确）
 
@@ -103,7 +107,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 生成任何 SQL 前，按以下顺序执行，**严禁跳步**：
 
 1. **先检索模板库**：调用 `search_sql_templates`，按盘古分类（`category=订单SPUC/物流收货SINV/物流发货SLOD/...`）+ 业务关键词检索已有模板；优先复用 `verified=true`（✅ 已验证）模板。MCP 不可用则跳过本步继续。
-   **⚡ 若命中的模板包含 `execution_flow`（执行过程伪代码），必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `archery_query` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
+   **⚡ 命中修复模板或任务涉及写 SQL 时，必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `archery_query` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。当前 MCP 不返回 `execution_flow` 字段，不要假设模板含有该字段。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
 2. **确认业务上下文**：按「术语映射表」判断单据体系（订单 sodr / 收货事务 sinv_rcv / 发货工作台 slod / 老送货单 sinv_asn），**特别注意老送货单与发货工作台送货单是两套表**；上下文不足时才向用户澄清。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'`（或按 tenant_name 模糊）获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `46997`/`151025` 等仅供参考）；可借助 `archery_query_tenant(tenant="<租户编码>", site="cn", instance=None, db=None)` 辅助反查。
 4. **确认涉及表与字段（分级校验 + 校验门禁）**：
@@ -122,12 +126,14 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 8. **MCP 异常回退**：若 MCP 工具调用失败或无返回，改用占位符并明确标注「未经过数据库验证」，绝不编造字段或值。
 9. **完成后询问沉淀**：向用户展示结果后，**主动询问是否将本次 SQL 沉淀为模板**；确认则按「盘古模板约定」调用 `save_sql_template`，并按需 `record_template_usage`；拒绝则跳过。
 
-## 执行过程驱动模式（execution_flow，命中即强制）
+## 执行过程驱动模式（Skill 内部规则，命中修复任务即强制）
 
 > 目标：让大模型像资深 DBA 一样「按部就班、有据可查」，杜绝跳过前置校验、猜测主键/状态直接生成修复 SQL。
 
 ### 触发条件
-检索到的模板包含 `execution_flow` 字段时**强制进入本模式**；模板无 `execution_flow` 时仍按铁律逐步取真实值。
+命中修复模板或任务本身涉及写 SQL 时**强制进入本模式**。当前 MCP 模板接口不返回
+`execution_flow` / `example_case` 字段，因此不要假设模板带有它们，也不要将其作为工具参数；
+即使模板没有执行轨迹，也必须按本节规则逐步取真实值。
 
 ### 伪代码语法（模板约定）
 ```text
@@ -140,13 +146,13 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 ```
 
 ### 执行规则（逐条强制）
-1. **解析模板**：读取 `execution_flow`，识别全部 `[STEP]` 及其 `QUERY` / `ASSERT` / `CONDITION` / `ACTION`。
+1. **建立执行轨迹**：根据模板场景和当前任务整理全部 `[STEP]` 及其 `QUERY` / `ASSERT` / `CONDITION` / `ACTION`。
 2. **逐步执行 QUERY**：按 STEP 顺序逐个调用 `archery_query`（传 `site`/`instance`/`db`/`sql`），把真实结果（如 `tenant_id=46997`、`po_header_id=8899`）填入上下文变量 `{...}`，供后续 STEP 引用；跨库表注意带库名前缀。
 3. **校验 ASSERT**：每步执行后立即核对断言（如「必须返回 1 行」）；**不满足则立即向用户报告并停止，绝不盲目继续**（如查到 0 行/多行、状态组合不符合修复前提）。
 4. **CONDITION 短路**：条件命中（如「单据已在目标状态」「已被下游占用」）时直接返回结论，不生成修复 SQL。
 5. **生成最终 SQL**：所有前置 QUERY 成功、ASSERT 全部通过后，才将真实值代入 `ACTION` 生成 UPDATE/DELETE/INSERT（仍遵循「SQL 输出格式规范」与盘古规则：`sodr_*` 乐观锁、留痕字段、ES 联动）。
 6. **输出结构化报告**：包含 ① 执行轨迹（每个 STEP 的查询与真实中间结果）② 最终 SQL（带真实值或明确标注的占位符供人工复核）③ 执行后校验 SELECT。
-7. **参考 example_case**：模板携带 `example_case` 时，对照示例中的思考链路执行，消除猜测。
+7. **展示执行轨迹**：当前 MCP 不提供 `example_case`；在当次响应中展示脱敏的输入、各 STEP 中间结果和最终 SQL，不展示隐藏推理。
 8. **降级**：`zhenyun-pangu-mcp` 的 Archery 不可用导致 QUERY 无法执行时，**不得**假装执行通过；改为输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
 
 ## 分级校验策略（正确性与效率兼顾）
@@ -203,21 +209,16 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
   - `title`：`【盘古-xx】...` 前缀；
   - `category`：`订单SPUC` / `物流收货SINV` / `物流发货SLOD` / `盘古通用查询` / `数据修复-盘古`；
   - `system`：`盘古`；`keywords` 必含 `盘古`；`core_tables` 照实填写；
-  - `execution_flow`：**数据修复类模板必填**。按「执行过程驱动模式」的伪代码语法，把本次实际执行过的前置查询、断言、修复动作整理为 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION），供后续复用时分步执行；
-  - `example_case`：**数据修复类模板必填**。写入本次真实执行轨迹的脱敏版：输入参数 → 各 STEP 中间结果（如「Step 1 结果: tenant_id = 46997」）→ 最终 SQL，作为 Few-Shot 示例；
-  - `verified`：表/字段已 MCP 校验通过则置 `true` 并填 `verified_at`。
-  - **问题解决方案扩展字段（推荐填写，提升检索与复用可信度）**：
-    - `status`：模板状态。数据修复类默认 `draft`；经 MCP 校验通过可标 `verified`；多次成功复用后升 `trusted`；确认废弃标 `deprecated`。
-    - `risk_level`：风险等级，按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
-    - `business_domain`：`盘古订单履约`；`system`：`盘古`。
-    - `problem_description` / `symptom` / `root_cause`：本次要解决的问题 / 现象 / 根因（供按问题语义检索命中）。
-    - `verify_sql` / `rollback_sql`：修复后校验 SQL / 回滚 SQL（如适用）。
-    - `execution_policy`：写操作执行策略（如 `需人工确认` / `高风险禁止自动执行`）。
-- 存量高频模板可用 `update_sql_template(id, execution_flow=..., example_case=...)` 渐进式补充执行过程（优先 Top 高频数据修复场景）。
+  - 数据修复类在当次响应中必须保留 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION）执行轨迹；当前 MCP 模板接口不提供 `execution_flow` / `example_case` 字段，不要把它们作为参数传入；
+  - `verified`：表/字段已 MCP 校验通过则置 `true`；未校验保持 `false`。
+  - `status`：模板状态，默认 `draft`，可用 `draft/verified/trusted/deprecated`。
+  - `risk_level`：按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
+  - `business_domain`：`盘古订单履约`；`system`：`盘古`；`execution_policy`：写操作执行策略说明；`parameters`：参数 JSON 对象字符串。
+- 当前接口不支持用 `update_sql_template` 补充 `execution_flow` / `example_case`；请在当次结果中保留脱敏执行轨迹，或将必要参数说明写入 `scenario` / `parameters`。
 - 复用模板生成后调用 `record_template_usage(id)`。
 
 ### 去重
-- `save_sql_template` 内置相似去重；确需覆盖用 `update_sql_template`。
+- 写入前先 `search_sql_templates` 检查重复；当前接口不要假设 `skip_dup_check` 会自动去重。需要覆盖已有模板时用 `update_sql_template`，不要重复插入。
 
 ## 错误处理（MCP 异常）
 
@@ -314,5 +315,5 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 - 结构事实 → `archery_describe_table` / `archery_list_columns` / `archery_query`
 - 业务语义 → `relations.md` / `table_meta.md`
 - 复用提效 → `search_sql_templates`（按盘古分类检索）+ `save_sql_template`（按盘古约定沉淀）
-- 执行安全 → 模板含 `execution_flow` 时强制「执行过程驱动模式」：逐 STEP 执行 QUERY、校验 ASSERT、提取真实变量后才生成修复 SQL，杜绝猜测主键/状态
+- 执行安全 → 命中修复模板或任务涉及写 SQL 时强制「执行过程驱动模式」：逐 STEP 执行 QUERY、校验 ASSERT、提取真实变量后才生成修复 SQL，杜绝猜测主键/状态
 - 所有铁律（多租户、乐观锁、pe_supplier 组合、关闭/取消互斥、ES 联动、上下游协同、跨库前缀、留痕、禁止编造）**始终生效**。
