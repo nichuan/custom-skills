@@ -19,28 +19,13 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 ## 环境 / 实例选择（必读，极易出错）
 
-**统一通过 `zhenyun-pangu-mcp` 的 Archery 工具访问数据库**（覆盖 cn/aws 双站点，这是唯一数据库实时能力入口）。Archery 默认实例是 **PROD**（`prod`=`SAAS-SRM-PROD`）。**用户只要提到非生产环境，必须显式传 `site`+`instance`**，否则会误查生产数据。按用户口吻映射：
+**数据库访问统一由 `archery` Skill 管辖**（实例别名映射、各环境库清单、双站点 site/instance 规范、跨库规则）。本 Skill 只生成 SQL 内容，**不重复定义落库规则**，调用 Archery 工具前先 `use_skill("archery")` 加载。
 
-| 用户说 | 传 `site` / `instance` | 真实实例 |
-|--------|------------------------|----------|
-| 「生产」/ 不提环境 | `site="cn"`, `instance="prod"` | `SAAS-SRM-PROD数据库` |
-| 「生产只读」/「prod 只读」 | `instance="prod-ro"` | `SAAS-SRM-PROD只读数据库` |
-| 「测试」/「test」 | `instance="test"` | `SAAS-SRM-TEST数据库` |
-| 「开发」/「dev」 | `instance="dev"` | `SAAS-SRM-DEV数据库` |
-| 「aws」/ 海外站点 | `site="aws"`, `instance="aws"` | aws 站点盘古库 |
+本域需特别注意：**发货工作台域在 `srm_logistics_delivery` 库**（`slod_*` 表），订单侧常需跨库联查该库——跨库写法与 `db_name` 规则见 `archery` Skill。
 
-- `site` **只能是 `cn` 或 `aws`**；`instance` **必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直接传真实实例名**（真实名由别名自动转换）。
-- 库名默认 `srm`；发货工作台域在 `srm_logistics_delivery` 库，跨库查询显式传 `db_name`。
-- 例：用户说「查下 dev 的采购订单」→ `archery_query(site="cn", instance="dev", db="srm", sql="<SQL>")`。
-- 拿不准实例/库时先调 `archery_list_instances(site)` / `archery_list_databases(site, instance)` 确认，不要瞎猜；拿不准用户意图时**主动问清环境**，不要默认猜 PROD。
+## 工具能力（Archery 数据库访问）
 
-## 工具能力（zhenyun-pangu-mcp，Archery）
-
-| 工具 | 用途 | 典型场景 |
-|------|------|----------|
-| `archery_query(site, instance, db, "<SQL>")` | 执行只读 SQL 查询 | 获取租户 ID、单据主键、状态值、验证数据 |
-| `archery_list_columns(site, instance, db, "<表名>", ["字段A","字段B"]?)` | 校验/列出字段 | 生成 UPDATE/WHERE 前确认字段名拼写 |
-| `archery_describe_table(site, instance, db, "<表名>")` | 返回完整字段清单与表注释（含拓展字段） | 不确定字段、需要完整结构时 |
+> Archery 工具（query / describe_table / list_columns / list_instances / list_databases / query_tenant）的统一调用规范、实例别名映射、各环境库清单、双站点 site/instance 规则、安全降级，全部由 **`archery` Skill** 管辖。调用前先 `use_skill("archery")`。本 Skill 仅生成 SQL 内容，落库细节不重复定义。
 
 ## 工具能力（zhenyun-pangu-mcp 认知层，数据字典目录）
 
@@ -62,21 +47,10 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 > 结构信息一律用上述工具实时获取；不要引用本地表结构文档。
 > 模板库存于 **DB（zhenyun-pangu-mcp 认知层 / Supabase）**，检索与沉淀一律走 MCP。
 
-## 工具能力（zhenyun-pangu-mcp，Archery）
+## 工具能力（Archery 数据库访问）
 
-> 数据库查询**统一用 Archery**（`zhenyun-pangu-mcp` 的数据库能力，覆盖 cn/aws 双站点）。所有工具参数取真实值，**严禁瞎猜**（完整声明见文末附录）。
-
-| 工具 | 用途 | 典型场景 |
-|------|------|----------|
-| `archery_list_instances(site?)` | 列出可用数据库实例（含别名映射） | 拿不准实例名时先调，避免瞎传真实名 |
-| `archery_list_databases(site, instance)` | 列出某实例下的库 | 确认 `srm` / `srm_logistics_delivery` 等库名 |
-| `archery_describe_table(site, instance, db, table)` | 返回完整字段清单 | 不确定字段、需完整结构（等同 `describe_table`） |
-| `archery_list_columns(site, instance, db, table)` | 列字段清单 | 生成 UPDATE/WHERE 前确认字段拼写 |
-| `archery_query(sql, site="cn", instance=None, db=None, limit=100)` | 执行只读 SQL（单条基础 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE） | 逐步获取租户/主键/状态真实值 |
-| `archery_query_tenant(tenant="", site="cn", instance=None, db=None)` | 按租户编码/名称定位租户 | 反查 `tenant_id` |
-
-- `site` ∈ {`cn`, `aws`}；`instance` 用别名 `prod`/`prod-ro`/`aws`/`dev`/`test`。
-- 同样遵守本技能「数据库约束与安全规则」（多租户、索引、LIMIT、禁止写操作）。MCP 只接受单条基础 `SELECT`、`EXPLAIN SELECT` 或 `SHOW CREATE TABLE`，不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、函数/子查询、窗口函数或集合运算。
+> Archery 各工具（`archery_query` / `archery_list_instances` / `archery_list_databases` / `archery_describe_table` / `archery_list_columns` / `archery_query_tenant`）的调用规范、实例别名映射、库清单、双站点 site/instance 规则、安全降级，统一由 **`archery` Skill** 管辖。调用前先 `use_skill("archery")`。
+> 本 Skill 仅生成 SQL 内容，落库细节不重复定义；生成/执行时同样遵守多租户、索引、LIMIT、禁止写操作等约束。
 
 ## 工具能力（zhenyun-pangu-mcp 认知层，模板库）
 
@@ -283,30 +257,11 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 - **执行前备份**：不得输出 `CREATE TABLE bak_xxx AS SELECT ...`。
 - **回滚方案**：不得输出回滚段；生产修复以「先 SELECT 核查 → 人工确认 → 可控提交」为准。
 
-## 附录：zhenyun-pangu-mcp Archery 工具参数声明（严禁瞎猜瞎传）
+## 附录：Archery 工具参数声明（严禁瞎猜瞎传）
 
-调用 `archery_*` 任意工具前，**必须**先确认下列参数取真实值。拿不准 `site`/`instance`/`db_name` 时优先调用「列举类」工具（`archery_list_instances` / `archery_list_databases`）或询问用户。
+调用 `archery_*` 任意工具前，**必须**先确认参数取真实值。完整参数 Schema、实例别名映射、各环境库清单、双站点 site/instance 规范、跨库规则、安全降级，**统一由 `archery` Skill 管辖**——调用前先 `use_skill("archery")` 加载，本 Skill 不重复列参数附录。
 
-### `archery_list_instances(site?)`
-- `site`：`cn` | `aws`。返回可用实例（含别名与真实名映射）。**拿不准实例名时必调。**
-
-### `archery_list_databases(site, instance)`
-- `site`：`cn` | `aws`。`instance`：**必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），不要用真实实例名。
-
-### `archery_describe_table(site, instance, db, table)` / `archery_list_columns(...)`
-- 同上 `site`/`instance` 规则；库名/表名以 `archery_list_databases` 返回为准。
-
-### `archery_query(sql, site="cn", instance=None, db=None, limit=100)`
-- `site`：`cn` | `aws`；`instance`：别名（同上）。
-- `db`：常用 `srm`、`srm_logistics_delivery`；跨库 JOIN 带库前缀（默认 `srm`）。
-- `limit`：返回行数上限（1~5000，默认 100）。
-- `sql`：只读查询；同样遵守本技能「数据库约束与安全规则」（租户 ID、索引、LIMIT、禁止写操作）。
-
-### `archery_query_tenant(tenant="", site="cn", instance=None, db=None)`
-- 辅助按租户编码/名称定位租户；`site`/`instance`/`db` 规则同上。
-- `tenant`：空时列出前 100 个租户；传入后按 `tenant_num = '值'` 或 `tenant_name LIKE '%值%'` 匹配。
-
-> **实例别名映射（避免瞎传真实名）**：`prod`→`SAAS-SRM-PROD数据库`、`prod-ro`→`SAAS-SRM-PROD只读数据库`、`test`→`SAAS-SRM-TEST数据库`、`dev`→`SAAS-SRM-DEV数据库`、`aws`→aws 站点库。`site` 只接受 `cn`/`aws`。
+速记：拿不准 `site`/`instance`/`db_name` 时优先调「列举类」工具（`archery_list_instances` / `archery_list_databases`）或询问用户；`archery_query` 的 `sql` 只读，遵守本技能「数据库约束与安全规则」（租户 ID、索引、LIMIT、禁止写操作）。
 
 ## 总结
 

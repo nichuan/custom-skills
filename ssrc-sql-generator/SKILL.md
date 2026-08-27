@@ -56,20 +56,10 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - 输出用 `<...>` 占位符，附「替换为真实值的方法」。
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
-统一经 `zhenyun-pangu-mcp` 的 Archery 访问（覆盖 cn/aws 双站点）。
 
-| 用户说 | site / instance | 真实实例 |
-|--------|-----------------|----------|
-| 「生产」/ 不提环境 → **仅用于查询** | `cn` / `prod` | SAAS-SRM-PROD |
-| 「生产只读」/「prod 只读」 | `prod-ro` | SAAS-SRM-PROD 只读 |
-| 「测试」/「test」 | `test` | SAAS-SRM-TEST |
-| 「开发」/「dev」 | `dev` | SAAS-SRM-DEV |
-| 「aws」/ 海外 | `aws` / `aws` | aws 站点寻源库 |
+**数据库访问统一由 `archery` Skill 管辖**（实例别名映射、各环境库清单、双站点 site/instance 规范、查询/修改分离、安全降级）。本 Skill 只生成 SQL 内容，**不重复定义落库规则**，调用 Archery 工具前先 `use_skill("archery")`。
 
-- `site` 只能是 `cn` / `aws`；`instance` 必须用别名（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直传真实实例名**。
-- **查询类**：不提环境可默认 prod。
-- **修改类（含数据修复、生产数据）**：**必须显式确认目标环境 + 目标租户 + 影响范围**，不得因「默认 prod」就直接生成。拿不准先问清。
-- 库名默认 `srm`；跨库显式传 `db_name`，可用库以 `archery_list_databases` 实际返回为准，严禁猜库名。拿不准实例/库先调 `archery_list_instances()` / `archery_list_databases(site, instance)`。
+要点速记：查询类不提环境默认 `cn`/`prod`；修改类（含数据修复）必须显式确认环境+租户+影响范围；`instance` 一律用别名（`prod`/`prod-ro`/`aws`/`dev`/`test`），严禁直传真实实例名。
 
 ---
 
@@ -132,13 +122,10 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 > `execution_flow`、`example_case`、`schema_verified`、`problem_description` 等字段。
 
 ### Archery（zhenyun-pangu-mcp，只读）
-- `archery_query(sql, site, instance, db)`：执行只读 SQL，逐步获取租户/主键/状态真实值。MCP 只接受**单条基础 SELECT、EXPLAIN SELECT 或 SHOW CREATE TABLE**；不支持其它 SHOW/DESC、WITH、多语句、注释、函数/子查询、窗口函数、集合运算或任何写入语法。表结构/字段请使用专用 describe/list_columns 工具。
-- `archery_list_columns(table, site, instance, db)`：返回字段名列表，生成 UPDATE/WHERE 前核对拼写。
-- `archery_describe_table(table, site, instance, db)`：返回 SHOW CREATE TABLE（结构+注释+索引），不确定字段/需完整结构时调用。
-- `archery_list_instances()` / `archery_list_databases(site, instance)` / `archery_query_tenant(...)`：确认实例/库/租户。
-- 工具真实签名由 MCP 运行时提供，本文件不维护参数附录。
 
-> **MCP 异常降级**：认知层 / Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注、完成后提示对应能力缺失。
+> `archery_query` / `archery_list_columns` / `archery_describe_table` / `archery_list_instances` / `archery_list_databases` / `archery_query_tenant` 的统一调用规范、实例别名映射、各环境库清单、双站点 site/instance 规则、安全降级，全部由 **`archery` Skill** 管辖。调用前先 `use_skill("archery")`。本 Skill 仅生成 SQL 内容，落库细节不重复定义。
+
+> **MCP 异常降级**：认知层 / Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注、完成后提示对应能力缺失（以 `archery` Skill 的降级策略为准）。
 
 ---
 

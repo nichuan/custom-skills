@@ -1,0 +1,50 @@
+{
+  "name": "archery",
+  "version": "1.0.0",
+  "description": "Archery 数据库查询助手（统一数据访问层）：集中管理双站点实例别名与真实名映射、各环境/实例下有哪些库（如 SAAS-SRM-PROD 的 srm / srm_logistics_delivery 等）、什么场景用哪个 site+instance、archery_query/describe/list_columns/list_databases/list_instances/query_tenant 的调用规范与安全降级。各 SQL 技能（ssrc / spuc）只生成 SQL 内容，查询落到哪里、怎么查一律交给本 Skill。只读取数；写 SQL 由各 SQL 技能生成后交用户人工确认执行。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "archery",
+    "database",
+    "query",
+    "mysql",
+    "prod",
+    "srm"
+  ],
+  "features": {
+    "instance_alias_map": "双站点实例别名→真实名映射（cn: prod/prod-ro/dev/test；aws: aws），严禁直传真实名",
+    "database_inventory": "各环境实例下的库清单（SAAS-SRM-PROD 实测：srm / srm_logistics_delivery / srm_budget / srm_data_application / srm_open_platform / srm_requisition_plan / srm_workbench / scavenger_prod），跨库带库前缀",
+    "environment_selection": "查询默认 cn/prod；修改类必确认环境+租户+影响范围；非生产显式传 site+instance",
+    "call_spec": "archery_query / archery_describe_table / archery_list_columns / archery_list_databases / archery_list_instances / archery_query_tenant 的统一调用规范",
+    "degradation": "MCP 异常/参数错（如 aws 缺 site）的降级与纠错策略，禁止假装执行通过",
+    "read_only": "只读取数，不执行写入；写 SQL 交用户人工确认"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "archery_query",
+        "archery_list_columns",
+        "archery_describe_table",
+        "archery_list_databases",
+        "archery_list_instances",
+        "archery_query_tenant"
+      ],
+      "description": "Pangu 统一 MCP：Archery 只读查询与表/字段结构校验（实例名由别名自动解析）。archery 是这些工具的统一调用规范与实例/库映射源"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "database",
+    "query",
+    "development"
+  ],
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "none",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "last_updated": "2026-08-27"
+  }
+}
