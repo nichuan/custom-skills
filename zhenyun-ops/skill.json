@@ -1,0 +1,45 @@
+{
+  "name": "zhenyun-ops",
+  "version": "1.0.0",
+  "description": "甄云 SRM 全局智能路由中心（兜底总入口 Skill，三层架构 Level 1 Router/Orchestrator）。仅当用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且无法直接命中某个具体子 Skill 时（意图不明确、一句话混多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、拿不准子 Skill 是否存在），才加载本 Skill 进行路由。路由目标：猪齿鱼任务查询→choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障→java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复→ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复→spuc-sql-generator；代码检索→gitlab-code；查数据库/确认环境实例库→archery。本 Skill 仅做路由兜底，不抢占子 Skill 的直接触发。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "router",
+    "orchestration",
+    "srm",
+    "甄云",
+    "路由",
+    "兜底",
+    "多技能协作",
+    "意图识别"
+  ],
+  "features": {
+    "router_only": "纯路由层：只判断用户意图并 use_skill 加载对应子 Skill，不直接调用 MCP 工具、不实现任何业务逻辑",
+    "direct_hit_first": "子 Skill 直接命中优先：用户请求能一眼锁定子 Skill 时不经过本 Skill，仅作兜底",
+    "route_table": "路由判定表（用户意图/关键词 → 子 Skill），含误路由判定要点（SRM 模块名不触发排障、ssrc/spuc 二选一区分、先判排障再判业务域）",
+    "registry": "子 Skill 清单登记表：新增子 Skill 只需在路由判定表加一行并在登记表追加一条",
+    "tool_routing": "zhenyun-pangu-mcp 工具路由表：声明各类工具由哪个子 Skill 主用调用，但本 Skill 自身不调用",
+    "multi_skill_coordination": "跨域需求协调：先定位根因再修复、按需串行切换（use_skill）、共享认知层、最终由路由 Skill 汇总结论",
+    "capability_matrix": "Skill→MCP 能力矩阵约束表：新增 Skill 按矩阵判断可依赖哪些 MCP 能力，防止 Skill 无节制引用工具"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [],
+      "description": "本 Skill 为纯路由层，不直接调用任何 MCP 工具。各子 Skill 的工具依赖见各自 skill.json 的 mcp_servers.tools 声明；各能力域（数据/日志/代码/猪齿鱼/认知层）的主用 Skill 见本 Skill SKILL.md 第四章工具路由表"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "orchestration",
+    "routing"
+  ],
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "none",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "last_updated": "2026-08-29"
+  }
+}

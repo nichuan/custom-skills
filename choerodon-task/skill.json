@@ -31,9 +31,10 @@
         "choerodon_search_users",
         "choerodon_get_status_map",
         "choerodon_list_attachments",
-        "choerodon_download_attachment"
+        "choerodon_download_attachment",
+        "choerodon_add_comment"
       ],
-      "description": "猪齿鱼协作平台：任务/issue 查询、成员搜索、状态映射、附件下载；Token 由 .env 凭据登录获取，带缓存与失效重登"
+      "description": "猪齿鱼协作平台：任务/issue 查询、成员搜索、状态映射、附件下载；Token 由 .env 凭据登录获取，带缓存与失效重登。注意：choerodon_add_comment 是唯一写操作（写评论区，需先向用户确认内容，comment 必须为规范 Markdown），其余均为只读查询"
     }
   ],
   "entry_point": "SKILL.md",
@@ -47,6 +48,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-08-18"
+    "last_updated": "2026-08-29"
   }
 }

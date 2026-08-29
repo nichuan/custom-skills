@@ -1,9 +1,10 @@
 {
   "name": "spuc-sql-generator",
-  "version": "1.0.0",
-  "description": "SRM 盘古订单履约域 SQL 生成助手：覆盖采购订单（SODR）、收货工作台事务（SINV_RCV）、发货工作台（SLOD 送货/计划/标签）、老送货单（SINV_ASN）、状态机（SIEC）、委外等核心场景。通过 zhenyun-pangu-mcp 的 Archery 工具实时获取表结构与真实值，通过 zhenyun-pangu-mcp 认知层 search_sql_templates（盘古专属分类）检索/沉淀模板。与 ssrc-sql-generator（采购寻源）互补。",
-  "author": "SRM Team",
-  "tags": [
+  "version": "1.1.0",
+  "description": "基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务、SLOD 发货工作台、老送货单、SIEC 状态机、委外）的 SQL 生成助手，支持业务查询 SQL 生成、数据修复 SQL 生成、表结构及关联关系查询。通过 zhenyun-pangu-mcp 对接真实数据库与认知层：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）+ 分级校验」：生成前先 search_sql_templates 按盘古专属分类/关键词检索模板复用，生成后询问用户沉淀结果。与 ssrc-sql-generator（采购寻源：询价/招标/报价/评分）互补，寻源类需求请勿使用本技能。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
     "sql",
     "srm",
     "spuc",
@@ -14,21 +15,57 @@
     "物流",
     "数据修复"
   ],
-  "entry": "SKILL.md",
+  "features": {
+    "order_sql": "采购订单（SODR）查询与状态修复 SQL 生成（sodr_* UPDATE 必带乐观锁 object_version_number = object_version_number + 1）",
+    "receiving_sql": "收货工作台事务（SINV_RCV）查询/导出状态修复/清理 SQL 生成",
+    "shipping_sql": "发货工作台（SLOD 送货/计划/标签）查询与修复 SQL 生成",
+    "legacy_asn_sql": "老送货单（SINV_ASN）查询与占用数量修复 SQL 生成（老送货单与发货工作台送货单是两套表）",
+    "execution_flow": "命中修复模板或任务涉及写 SQL 时强制进入「执行过程驱动模式」：按 [STEP] 顺序逐个 archery_query 执行 QUERY、校验 ASSERT、提取真实变量（EXTRACT/CONDITION）后才生成修复 SQL，杜绝猜测主键/状态",
+    "graded_validation": "分级校验：search_tables 命中/get_table_relations/verified 模板 core_tables/references 明确项可直接信任；attribute_* 拓展字段等不明确项必须 archery_describe_table / archery_list_columns 校验",
+    "template_loop": "DB 模板库闭环：盘古专属分类（订单SPUC/物流收货SINV/物流发货SLOD/盘古通用查询/数据修复-盘古）检索复用 + save_sql_template 沉淀 + record_template_usage 统计",
+    "db_scope": "默认库 srm，发货工作台域在 srm_logistics_delivery（slod_*）；跨库 JOIN 必须带库前缀；实例别名/库清单/落库规范统一由 archery Skill 管辖",
+    "read_only": "MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "archery_query",
+        "archery_list_columns",
+        "archery_describe_table",
+        "archery_list_databases",
+        "archery_list_instances",
+        "archery_query_tenant",
+        "search_tables",
+        "get_table_relations",
+        "add_table_relation",
+        "record_table_usage",
+        "upsert_table_knowledge",
+        "search_sql_templates",
+        "get_sql_template",
+        "list_sql_templates",
+        "save_sql_template",
+        "update_sql_template",
+        "record_template_usage"
+      ],
+      "description": "Pangu 统一 MCP：Archery 只读查数与表/字段结构校验（实例名由别名自动解析）+ 表目录/关联关系检索与沉淀 + SQL 模板库（盘古专属分类检索/沉淀）。spuc 是订单履约域 SQL 内容的行为源，落库规范与实例/库映射由 archery Skill 管辖，模板/表能力沉淀于 Supabase 认知层"
+    }
+  ],
+  "entry_point": "SKILL.md",
   "references": [
     "references/table_meta.md",
     "references/relations.md"
   ],
-  "capabilities": [
-    "订单查询与状态修复 SQL 生成",
-    "收货事务查询/导出状态修复/清理 SQL 生成",
-    "发货工作台（送货/计划/标签）查询与修复 SQL 生成",
-    "老送货单查询与占用数量修复 SQL 生成",
-    "表结构查询与字段校验（zhenyun-pangu-mcp Archery 工具）",
-    "SQL 模板检索与沉淀（zhenyun-pangu-mcp search_sql_templates，盘古专属分类）"
+  "categories": [
+    "database",
+    "sql",
+    "development"
   ],
-  "requirements": {
-    "mcp": ["zhenyun-pangu-mcp"],
-    "database": "MySQL（默认库 srm，发货工作台域在 srm_logistics_delivery；实例默认 prod=SAAS-SRM-PROD，实例名由别名自动解析，真实名以 archery_list_instances 返回为准）"
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "supabase",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "last_updated": "2026-08-29"
   }
 }

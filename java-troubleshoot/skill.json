@@ -1,0 +1,80 @@
+{
+  "name": "java-troubleshoot",
+  "version": "1.0.0",
+  "description": "Java 微服务故障排查助手：仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用。通过 zhenyun-pangu-mcp 查日志（Loki/SLS 双平台路由）、查数据库（Archery 只读交叉验证）、搜源码（本地 search_repo + GitLab）、查猪齿鱼补业务上下文、查认知层（search_knowledge / search_tables / get_table_relations）。证据驱动排障循环（假设→证据→更新置信度），带 Stop Condition 与调查预算（同类查询连续 3 次未改变假设即停）。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "troubleshoot",
+    "java",
+    "microservice",
+    "log",
+    "trace",
+    "loki",
+    "sls",
+    "排障",
+    "报错",
+    "日志",
+    "traceId",
+    "根因"
+  ],
+  "features": {
+    "evidence_driven": "证据驱动排障循环（提出假设→获取最有价值证据→更新假设与 confidence→满足 Stop Condition 即停），非固定 SOP",
+    "investigation_context": "InvestigationContext 上下文模型（system/environment/region/service/tenant/trace_id/evidence[]/confidence），已从用户输入获得的信息不重复询问",
+    "log_routing": "日志平台路由由 MCP 自动完成：cn 盘古 prod → 阿里云 SLS；cn 非生产 + 全部 AWS → Loki；不确定先 obs_log_datasources 探底",
+    "stop_condition": "Stop Condition（两类独立证据/一份直接证据/证据饱和即停）+ 调查预算（同类查询连续 3 次未改变假设即停），禁止相同参数原样重调",
+    "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
+    "knowledge_base": "本地 knowledge/ 目录为精确操作手册（含 SQL 范式与判定约束），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
+    "evidence_report": "结构化输出：问题结论/根因分析/证据链（每条标注 source 与 confidence）/Confirmed-Probable-Unknown 分级，禁止把推测写成事实、禁止输出原始日志全文",
+    "read_only": "数据库仅只读（archery_query 仅基础 SELECT/EXPLAIN/SHOW CREATE TABLE），严禁写操作；凭据不外泄"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "obs_log_query",
+        "obs_log_trace",
+        "obs_log_datasources",
+        "obs_sls_query",
+        "archery_query",
+        "archery_describe_table",
+        "archery_list_columns",
+        "archery_list_databases",
+        "archery_list_instances",
+        "archery_query_tenant",
+        "search_knowledge",
+        "get_knowledge",
+        "search_tables",
+        "get_table_relations",
+        "record_table_usage",
+        "search_repo",
+        "gitlab_search_projects",
+        "gitlab_search_code",
+        "gitlab_list_branches",
+        "gitlab_list_tree",
+        "gitlab_get_file",
+        "choerodon_query_issue",
+        "choerodon_list_issue",
+        "choerodon_search_users",
+        "choerodon_search_tasks_by_person",
+        "choerodon_list_attachments",
+        "choerodon_download_attachment"
+      ],
+      "description": "Pangu 统一 MCP：日志（Loki/SLS 双平台路由）+ Archery 只读查数与结构校验 + 认知层（知识/表目录/关联关系）+ 本地与 GitLab 代码检索 + 猪齿鱼业务上下文。java-troubleshoot 是排障调查策略与证据链的行为源；工具真实参数以 MCP 为唯一事实源"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "troubleshooting",
+    "logging",
+    "database",
+    "development"
+  ],
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "none",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "last_updated": "2026-08-29"
+  }
+}
