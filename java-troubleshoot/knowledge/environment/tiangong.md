@@ -8,7 +8,7 @@
 
 ## 日志
 
-- 天工日志走 Loki（`obs_log_query(region="cn")`）或 SLS（`obs_sls_query(system="天工")`），具体由 MCP 按环境路由。
+- 天工日志走阿里云 SLS（`obs_sls_query(system="天工", environment=...)`），具体由 MCP 按环境路由；Loki（`obs_log_*`）现仅服务 AWS 海外。
 - 系统别名：`tg`/`tiangong` 归一化为 `天工`，`pg`/`pangu` 归一化为 `盘古`，**不要混用天工 `paas-*` 命名与盘古路由**。
 
 ## 数据库

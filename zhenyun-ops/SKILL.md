@@ -74,8 +74,8 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | 业务知识/排查经验检索（企业事实、系统架构、环境、SRM 机制） | `search_knowledge` / `get_knowledge` / `diagnose_context` / `search_pangu` | 全部 Skill（排障/生成 SQL 前的认知层查询） |
 | 可复用 SQL/修复模板检索与沉淀 | `search_sql_templates` / `get_sql_template` / `save_sql_template` / `list_sql_templates` / `update_sql_template` / `delete_sql_template` / `record_template_usage` | ssrc-sql-generator / spuc-sql-generator |
 | 表目录 / 关联关系 / 表元数据 | `search_tables` / `get_table` / `get_table_relations` / `add_table_relation` / `record_table_usage` / `upsert_table_knowledge` | java-troubleshoot / ssrc-sql-generator / spuc-sql-generator |
-| 查 Loki 日志（k8s 容器日志、TraceId、关键字；cn 国内非生产 dev/test + AWS 海外全环境） | `obs_log_query` / `obs_log_datasources` | java-troubleshoot |
-| 查阿里云 SLS 日志（仅 cn 国内盘古 prod，按 traceId/关键字） | `obs_sls_query` | java-troubleshoot |
+| 查阿里云 SLS 日志（国内公有云盘古 prod + 非生产 dev/test，按 traceId/关键字/级别） | `obs_sls_query` / `obs_sls_targets` | java-troubleshoot |
+| 查 Loki 日志（k8s 容器日志、TraceId、关键字；仅 AWS 海外全环境） | `obs_log_query` / `obs_log_trace` / `obs_log_datasources` | java-troubleshoot |
 | 查数据库（Archery 执行 SQL、看表结构、看库/实例列表、确认环境/实例/库映射） | `archery_query` / `archery_describe_table` / `archery_list_columns` / `archery_list_databases` / `archery_list_instances` / `archery_query_tenant` | **`archery`（主用：统一数据访问层，环境/实例/库映射与调用规范）**；ssrc-sql-generator / spuc-sql-generator（生成 SQL 时调用，只关心 SQL 内容不关心落库） |
 | 猪齿鱼协作（查任务、查 issue、下载附件、看状态流） | `choerodon_search_tasks_by_person` / `choerodon_list_issue` / `choerodon_query_issue` / `choerodon_list_attachments` / `choerodon_download_attachment` / `choerodon_get_status_map` / `choerodon_search_users` | **`choerodon-task`（主用，只读查询）**；java-troubleshoot（仅排障时定位需求/缺陷上下文） |
 | 代码搜索（本地跨仓关键字 + GitLab 仓库/分支/文件） | `search_repo`；`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree` | **`gitlab-code`（主用：定位与读取源码）**；java-troubleshoot（排障时定位根因相关源码） |

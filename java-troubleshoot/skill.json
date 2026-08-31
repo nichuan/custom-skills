@@ -21,7 +21,7 @@
   "features": {
     "evidence_driven": "证据驱动排障循环（提出假设→获取最有价值证据→更新假设与 confidence→满足 Stop Condition 即停），非固定 SOP",
     "investigation_context": "InvestigationContext 上下文模型（system/environment/region/service/tenant/trace_id/evidence[]/confidence），已从用户输入获得的信息不重复询问",
-    "log_routing": "日志平台路由由 MCP 自动完成：cn 盘古 prod → 阿里云 SLS；cn 非生产 + 全部 AWS → Loki；不确定先 obs_log_datasources 探底",
+    "log_routing": "日志平台路由由 MCP 自动完成：cn 盘古全部环境(prod/dev/test) → 阿里云 SLS(obs_sls_query)；AWS 海外(jp-saas-1) → Loki(obs_log_*)；不确定先 obs_sls_targets / obs_log_datasources 探底",
     "stop_condition": "Stop Condition（两类独立证据/一份直接证据/证据饱和即停）+ 调查预算（同类查询连续 3 次未改变假设即停），禁止相同参数原样重调",
     "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
     "knowledge_base": "本地 knowledge/ 目录为精确操作手册（含 SQL 范式与判定约束），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
@@ -36,6 +36,7 @@
         "obs_log_trace",
         "obs_log_datasources",
         "obs_sls_query",
+        "obs_sls_targets",
         "archery_query",
         "archery_describe_table",
         "archery_list_columns",

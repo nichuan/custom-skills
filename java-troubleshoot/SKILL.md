@@ -90,7 +90,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ### 证据选择的优先级启发
 
-1. **有 traceId** → 直接 `obs_log_trace` 追全链路（优先于手写日志查询）。
+1. **有 traceId** → 直接追全链路（优先于手写日志查询）：国内盘古用 `obs_sls_query(trace_id=..., environment=...)`，AWS 海外用 `obs_log_trace(trace_id, region="aws")`。
 2. **无 trace，有 service + keyword** → 按 `service + keyword + time` 查日志，定位首个失败点。
 3. **日志暴露类名/方法名/错误码** → 仅当源码能验证当前假设时才搜源码（不机械"出现类名就必须查"）。
 4. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
@@ -107,13 +107,15 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 > 工具**真实参数 Schema 以 MCP 为唯一事实源**，严禁在本 Skill 猜测/重复定义。下面只写"何时用、怎么选、安全约束"。
 
-### 日志（zhenyun-pangu-mcp：obs_log_query / obs_log_trace / obs_sls_query）
+### 日志（zhenyun-pangu-mcp：obs_sls_query / obs_log_query / obs_log_trace）
 
 - **平台/数据源选择由 MCP 自动完成**，Skill 不接触 Project/Logstore/namespace/AccessKey（详见 `knowledge/environment/log-routing.md`）。
-- 路由原则速记：cn 盘古 prod → SLS；cn 非生产 + 全部 AWS → Loki；默认 cn、默认非 aws。
-- 不确定 region/env → 先 `obs_log_datasources(region)` 确认真实键，不要瞎猜。
+- 路由原则速记：**国内公有云盘古 prod + 非生产 dev/test → 阿里云 SLS（`obs_sls_query`）；AWS 海外全部环境 → Loki（`obs_log_query`/`obs_log_trace`）**。默认 cn/盘古、默认非 aws。
+- ⚠️ 盘古非生产已迁回阿里云 SLS：`obs_log_*` 不再接受 `region="cn"`，查国内盘古非生产必须用 `obs_sls_query(environment="dev"/"test")`。
+- 不确定 environment → `obs_sls_targets()`；不确定 Loki 的 env → `obs_log_datasources(region="aws")`，不要瞎猜。
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
-- 首次 `limit` 给 100~200；query 必须带标签过滤（如 `{namespace="..."}`），否则范围过大易超时。
+- 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
+- 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
 ### 代码（search_repo + gitlab_*）
 
@@ -254,7 +256,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 | 需要调查的内容 | 本地手册 | 知识库检索（search_knowledge） |
 |----------------|----------|------------------------------|
-| 日志平台路由 / Loki vs SLS / region-env 获取 | `knowledge/environment/log-routing.md` | `search_knowledge("日志平台路由", system="天工")` |
+| 日志平台路由 / Loki vs SLS / environment 获取 | `knowledge/environment/log-routing.md` | `search_knowledge("日志平台路由", system="天工")` |
 | 盘古环境与 Archery 实例别名 | `knowledge/environment/pangu.md` | `search_knowledge("盘古环境 实例别名")` |
 | 天工环境与实例 | `knowledge/environment/tiangong.md` | `search_knowledge("天工环境")` |
 | SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` | `search_knowledge("代码库拓扑 二开")` |
