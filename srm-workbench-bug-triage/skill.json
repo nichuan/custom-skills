@@ -1,0 +1,78 @@
+{
+  "name": "srm-workbench-bug-triage",
+  "version": "1.0.0",
+  "description": "srm-workbench（采购员工作台 / 角色工作台）服务 bug 排查助手：仅在用户报告采购员工作台相关问题（待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致）时使用。先查认知层（search_knowledge / get_knowledge），再按「先排除配置与数据、再怀疑代码」的顺序排查：待办定义与维度映射等配置、消费失败记录 swbh_err_record、各环境 ES 待办与单据索引（prod/dev/test，es_search 带 env 参数）、srm-workbench 源码。证据驱动（假设→证据→置信度），带技能专属铁律（两段式 ES 查询、access 块语义、待办与单据分开存储需分页重排、工作流挂起无 binlog 的设计限制）与库路由规则（swbh_*→srm_workbench、业务源表→srm、slod_*→srm_logistics_delivery；Archery 按 environment 选 prod/dev/test 实例）。数据库与 ES 均只读，写操作一律交用户执行。",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "keywords": [
+    "srm-workbench",
+    "workbench",
+    "采购员工作台",
+    "角色工作台",
+    "待办",
+    "关注",
+    "超级搜索",
+    "卡片",
+    "整改",
+    "ES",
+    "权限维度",
+    "troubleshooting"
+  ],
+  "features": {
+    "evidence_driven": "证据驱动排查循环（提出假设→获取最有价值证据→更新假设与置信度→证据足够即停止），非固定 SOP",
+    "investigation_context": "InvestigationContext 上下文模型（environment/tenant/user_id/role_id/module/combine_code/todo_code/document_id/hypothesis），已从用户输入获得的信息不重复询问",
+    "config_first": "排查顺序铁律：绝大多数工作台问题根因在配置/数据（待办定义、维度映射、字段登记、ES 发布状态），先排除配置再怀疑代码",
+    "two_phase_es_query": "两段式 ES 查询模型：待办只按订阅命中不拼权限，回查单据才 permissionQueryBuild 拼权限（USER 维度 createdBy / BIZ 维度 access），count 有值但无单据属设计使然",
+    "access_semantics": "ES access 块语义：字段名是大写维度类型（COMPANY/PURCHASE_AGENT），值是权限组 id 集合（swbh_auth_access.auth_access），非业务 id；USER 维度不过维度映射、BIZ 维度才过",
+    "db_routing": "库路由规则：swbh_*→srm_workbench、业务源表→srm、slod_*→srm_logistics_delivery，拿不准跨库探测，永远显式传 db_name",
+    "diagnostic_rules": "rules/diagnostic-rules.yaml：7 组故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
+    "knowledge_base": "knowledge/ 目录为架构、配置模型、案例与作业规范（10 篇），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
+    "read_only": "数据库仅只读（archery_query 仅 SELECT/SHOW/EXPLAIN）；各环境 ES（prod/dev/test）严禁写且单次≤100 条；凭据只存于各 MCP 自身 .env，严禁入库"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "search_knowledge",
+        "get_knowledge",
+        "archery_query",
+        "archery_describe_table",
+        "archery_list_columns",
+        "archery_list_databases",
+        "archery_list_instances",
+        "archery_query_tenant",
+        "obs_log_query",
+        "obs_log_trace",
+        "obs_sls_query",
+        "obs_sls_targets",
+        "search_tables",
+        "get_table_relations",
+        "search_repo",
+        "gitlab_search_projects",
+        "gitlab_search_code",
+        "gitlab_list_branches",
+        "gitlab_list_tree",
+        "gitlab_get_file",
+        "es_search",
+        "es_count",
+        "es_get"
+      ],
+      "description": "Pangu 统一 MCP：认知层（知识检索）+ Archery 只读查数与表结构校验（库路由判定）+ 日志（捞 /card-search/query 两段 DSL）+ 代码检索 + 各环境 ES 只读查询（es_search/es_count/es_get，带 env 参数选 prod/dev/test）。凭证全部统一维护在 zhenyun-pangu-mcp/.env：Archery/日志/代码/认知层与标准一致，仅 ES 链接与凭证为维护者需额外补入的唯一一项（按环境维护 prod/dev/test 三套，占位符见 zhenyun-pangu-mcp/.env.example 的「正式环境 ES」段：prod 用 ES_BASE_URL/ES_USERNAME/ES_PASSWORD，dev/test 用 ES_DEV_*/ES_TEST_*）。未配置某环境 ES 时工具返回 es_unconfigured，skill 降级为 Kibana 人工查询（生成 DSL 让用户查询后贴回），不影响排查。工具真实参数以 MCP 为唯一事实源"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "troubleshooting",
+    "srm",
+    "workbench",
+    "elasticsearch"
+  ],
+  "metadata": {
+    "tables_count": 0,
+    "template_store": "none",
+    "sql_templates_count": 0,
+    "sql_examples_count": 0,
+    "knowledge_docs_synced": "35-41",
+    "last_updated": "2026-09-01"
+  }
+}

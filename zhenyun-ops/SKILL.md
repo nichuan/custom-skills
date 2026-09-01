@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三层架构 Level 1 Router/Orchestrator）。【仅当】用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且【无法直接命中某个具体子 Skill 时】（包括：意图不明确、一句话里混了多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、或拿不准子 Skill 是否存在），才加载本 Skill 进行路由。本 Skill 本身不执行具体业务，只负责根据用户意图精准路由并调用 use_skill 加载对应子 Skill：猪齿鱼任务查询 → choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障/配置升级问题 → java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复 → ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复 → spuc-sql-generator。三层架构：zhenyun-ops（Router，管行为/路由）→ 专业 Skill（管领域流程/判断）→ zhenyun-pangu-mcp（管事实/知识/执行）。【若用户请求能直接明确命中某子 Skill，则不要加载本 Skill，直接使用对应子 Skill。】本 Skill 仅作为路由兜底，不抢占子 Skill 的直接触发。
+description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三层架构 Level 1 Router/Orchestrator）。【仅当】用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且【无法直接命中某个具体子 Skill 时】（包括：意图不明确、一句话里混了多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、或拿不准子 Skill 是否存在），才加载本 Skill 进行路由。本 Skill 本身不执行具体业务，只负责根据用户意图精准路由并调用 use_skill 加载对应子 Skill：猪齿鱼任务查询 → choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障/配置升级问题 → java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复 → ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复 → spuc-sql-generator；采购员工作台/角色工作台（待办缺失或计数不对、整改模块异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致）→ srm-workbench-bug-triage。三层架构：zhenyun-ops（Router，管行为/路由）→ 专业 Skill（管领域流程/判断）→ zhenyun-pangu-mcp（管事实/知识/执行）。【若用户请求能直接明确命中某子 Skill，则不要加载本 Skill，直接使用对应子 Skill。】本 Skill 仅作为路由兜底，不抢占子 Skill 的直接触发。
 ---
 
 # 甄云 SRM 全局智能路由中心（zhenyun-ops）
@@ -26,6 +26,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | **盘古订单履约 SQL**：采购订单(SODR)、收货工作台事务(SINV)、发货工作台(SLOD 送货/计划/标签)、老送货单、状态机(SIEC)、委外 的查询 SQL / 数据修复 SQL / 清理 SQL | `spuc-sql-generator` | `use_skill("spuc-sql-generator")` |
 | **GitLab / 本地代码检索**：找某个类/DTO/接口/方法在哪个仓库、分支、路径；从 GitLab 或本地 `PG_ROOT` 读取完整源码；"某功能在哪个类" | `gitlab-code` | `use_skill("gitlab-code")` |
 | **查数据库 / 确认环境实例库**：用 Archery 取数、看表结构、确认某环境用哪个 site/instance、某实例有哪些库、跨库怎么写 | `archery` | `use_skill("archery")` |
+| **采购员工作台（srm-workbench）**：待办缺失/计数不对、整改模块单据或待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致 | `srm-workbench-bug-triage` | `use_skill("srm-workbench-bug-triage")` |
 
 ### 判定要点（避免误路由）
 
@@ -34,6 +35,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
   - 采购**寻源**（询价/招标/报价/评分/寻源结果）→ `ssrc-sql-generator`
   - 采购**订单及下游履约**（订单/收货/发货/老送货单/委外）→ `spuc-sql-generator`
 - **先判定是否排障，再判定业务域**：有异常/报错/日志线索时优先 `java-troubleshoot`；纯数据查询/修复 SQL 才走两个 SQL 技能。
+- **工作台现象优先走专属 Skill**：待办/关注/超级搜索/卡片/整改等采购员工作台（srm-workbench）现象，直接走 `srm-workbench-bug-triage`——它内置两段式 ES 查询、权限维度模型与库路由；只有当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
 - **意图混合**（既像排障又要改数据）：先走 `java-troubleshoot` 定位根因，再按需用 SQL 技能做数据修复。
 
 ---
@@ -62,6 +64,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | `spuc-sql-generator` | `custom-skills/spuc-sql-generator/` | 盘古订单履约域（订单/收货/发货/老送货单/委外）SQL 生成与修复 |
 | `gitlab-code` | `custom-skills/gitlab-code/` | GitLab / 本地源码检索：先看 .env 的 PG_ROOT 与 GITLAB_SEARCH_ROOT_GROUP，本地优先 + group 限定，忽略 op-deliver-* 快照，list_tree+get_file 读全文件 |
 | `archery` | `custom-skills/archery/` | Archery 统一数据访问层：双站点实例别名/真实名映射、各环境库清单、环境选择、archery_* 工具调用规范与安全降级；各 SQL 技能只生成 SQL、不关心落库 |
+| `srm-workbench-bug-triage` | `custom-skills/srm-workbench-bug-triage/` | 采购员工作台（角色工作台）bug 排查：待办/关注/超级搜索/卡片/整改，两段式 ES 查询与权限维度模型；需改数据时再转 SQL 技能 |
 
 ---
 
@@ -109,6 +112,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | `choerodon-task` | ✓ | — | — | — | — | ✓ | ✓ |
 | `gitlab-code` | — | — | — | — | — | ✓ | — |
 | `archery` | — | — | — | ✓ | — | — | — |
+| `srm-workbench-bug-triage` | ✓ | ✓ | — | ✓ | ✓ | ✓ | — |
 
 - ✓ = 该 Skill 可调用对应能力；— = 通常不需要（特殊场景例外但需克制）。
 - **认知层（Knowledge）是全 Skill 通用底座**：排障/生成 SQL 前，先 `search_knowledge` 看是否有既有的企业事实、系统机制、排查经验。
@@ -124,6 +128,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | 「接口报错 + 要查库确认数据」 | `java-troubleshoot`（定位根因）→ `ssrc/spuc-sql-generator`（数据修复） |
 | 「任务提到某个需求 + 要排障」 | `choerodon-task`（补需求上下文）→ `java-troubleshoot`（排障） |
 | 「寻源异常 + 可能是配置问题」 | `ssrc-sql-generator`（查表/数据）→ `java-troubleshoot`（若涉及服务行为） |
+| 「工作台待办/单据异常 + 确实要改数据」 | `srm-workbench-bug-triage`（定位根因）→ `ssrc/spuc-sql-generator`（生成修复 SQL，交用户执行） |
 
 协作原则：
 1. **先定位根因，再执行修复**：混合"排障 + 改数据"时，先用 `java-troubleshoot` 弄清根因，再按需用 SQL 技能生成修复 SQL。

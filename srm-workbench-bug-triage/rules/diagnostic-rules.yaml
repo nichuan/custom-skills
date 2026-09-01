@@ -1,0 +1,124 @@
+# Diagnostic Rules（诊断规则独立层 · srm-workbench）
+#
+# 结构约束（严禁"信号→直接断定原因"）：
+#   signals             → 观察到的故障信号（用户描述 / 日志 / ES / 数据库）
+#   hypothesis          → 由信号推导的待验证假设（非结论）
+#   evidence            → 验证假设所需的证据来源
+#   conclusion_requires → 下结论前必须满足的证据条件
+#   knowledge_ref       → 对应的知识文件（knowledge/ 目录下）
+#
+# 排障 Agent 在 InvestigationContext 中匹配 signals，提出 hypothesis，
+# 按 evidence 获取事实，满足 conclusion_requires 后才可定论。
+
+- id: todo_count_no_doc
+  signals:
+    - /card-search/query 待办 count 有值但列表无单据
+    - 卡片显示有 N 条待办，点进去列表为空
+  hypothesis:
+    - 两段式 ES 查询：待办按订阅命中，回查单据时被权限过滤（用户对单据只有 USER 维度 createdBy，而单据非其创建）
+    - 待办订阅配置错误，订阅给了不该处理该单据的人/角色
+    - 单据已被删除或 ES 单据索引缺失该文档
+  evidence:
+    - /card-search/query 请求日志的两段 DSL（待办段 srm_todo_record vs 单据段）
+    - 用户对目标单据类型的权限维度（USER/BIZ）
+    - 单据 ES 文档中的 createdBy 与 access 块
+  conclusion_requires:
+    - 拿到两段 DSL 并确认：待办段无权限条件、单据段被 createdBy 或 access 过滤
+  knowledge_ref: knowledge/srm/case-todo-count-no-doc.md
+
+- id: search_doc_not_found
+  signals:
+    - 超级搜索按某条件查不到单据，换条件能查到
+    - 某类单据整体搜不到
+  hypothesis:
+    - 权限维度映射字段名与源表真实字段名不一致（驼峰 vs 下划线）
+    - 源字段值为 null，维度未写入 ES
+    - 权限维度挂在头表但值实际在行表（头/行表挂错）
+    - 单据类型未登记到 swbh_doc_type_search_filed
+    - 租户未启用或存量未刷 ES
+  evidence:
+    - ES 中该单据是否存在、维度字段值是否为预期值
+    - swbh_doc_type_dimension_mapping 配置的字段名 vs 源表真实字段名
+    - 源表该字段的实际值（是否 null）
+  conclusion_requires:
+    - 明确指出是哪一类（配置字段名不匹配 / 值为 null / 表挂错 / 未登记 / 未刷数）
+  knowledge_ref: knowledge/srm/case-search-rcv-not-found.md
+
+- id: todo_missing_or_count_wrong
+  signals:
+    - 待办不显示 / 待办缺失
+    - 待办计数不对（多了或少了）
+  hypothesis:
+    - 待办生成条件（swbh_todo_definition）配置不满足
+    - 消费失败，落在 swbh_err_record 未补偿
+    - 变更靠定时脚本生效，尚未执行（见变更-生效规则）
+    - 待办与关注定义存在新老两套并存
+  evidence:
+    - swbh_todo_definition 中该 todoCode 的条件与订阅对象
+    - swbh_err_record 中该单据/租户的失败记录
+    - 变更时间与定时任务执行时间的关系
+  conclusion_requires:
+    - 区分「配置不满足」「消费失败」「定时脚本未生效」「新老两套冲突」
+  knowledge_ref: knowledge/srm/bug-triage-playbook.md
+
+- id: card_count_mismatch
+  signals:
+    - 卡片条数与列表条数对不上
+    - 卡片计数延迟/偏大偏小
+  hypothesis:
+    - 待办与单据分开存储 + 分页重排（筛选器是单据字段、排序按待办生成时间）
+    - CardSearchServiceImpl 异步聚合抛错
+    - 待办/关注定义新老两套并存
+  evidence:
+    - 异步聚合任务是否抛错（日志）
+    - 卡片定义与待办定义的一致性
+  conclusion_requires:
+    - 定位到是分页重排逻辑、异步聚合失败，还是新老两套定义冲突
+  knowledge_ref: knowledge/srm/bug-triage-playbook.md
+
+- id: super_search_field_not_searchable
+  signals:
+    - 新增字段后超级搜索搜不到
+    - ES 中没有该字段 / 老单据搜不到但新单据能搜到
+  hypothesis:
+    - 字段未在 swbh_doc_object_rel_field 登记（index_flag=1）→ 没进 mapping
+    - mapping 已更新但历史数据未刷
+    - 字段已入 ES 但未登记到 swbh_doc_type_search_filed → multiMatch 不匹配
+    - 字段值是写入时实时计算的（需按单据号重灌，updateByQuery 无法造出值）
+  evidence:
+    - swbh_doc_object_rel_field 中该字段的 index_flag / publish_status
+    - ES mapping 是否已含该字段
+    - swbh_doc_type_search_filed 是否已登记
+  conclusion_requires:
+    - 明确落在「没进 mapping」「mapping 有但没登记搜索」「登记了但历史没刷」中的哪一类
+  knowledge_ref: knowledge/srm/super-search-field-config.md
+
+- id: workflow_todo_not_cleared
+  signals:
+    - 已办/已挂起的单据待办仍显示
+    - .WFL 类待办不清除
+  hypothesis:
+    - 工作流挂起时 act_hi_actinst 无变化 → 无 binlog → 无法捕捉挂起（设计限制）
+    - 待办补偿/清除 JobHandler 未执行或失败
+  evidence:
+    - act_hi_actinst 中该流程实例的历史活动变化
+    - 待办清除 JobHandler 的执行记录
+  conclusion_requires:
+    - 确认是「无 binlog 导致的设计限制」还是「补偿任务失败」
+  knowledge_ref: knowledge/architecture/overview.md
+
+- id: es_interaction_error
+  signals:
+    - java.io.IOException: Broken pipe
+    - java.io.IOException: Connection reset by peer
+    - ES 权限变更任务堆外 OOM
+  hypothesis:
+    - ES 报文过大（主要是 access 权限内容多）
+    - 客户端与 ES 的 TCP 长连接被中断
+    - ES Bulk 批量过大导致堆外内存溢出
+  evidence:
+    - 报错发生的具体阶段（消费 / ES 权限更新 / 查询）
+    - access 块大小与 bulk 批次大小
+  conclusion_requires:
+    - 定位到具体阶段并给出降报文/分批/重试的处理建议
+  knowledge_ref: knowledge/srm/bug-triage-playbook.md
