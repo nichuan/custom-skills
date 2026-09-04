@@ -93,7 +93,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 1. **有 traceId** → 直接追全链路（优先于手写日志查询）：国内盘古用 `obs_sls_query(trace_id=..., environment=...)`，AWS 海外用 `obs_log_trace(trace_id, region="aws")`。
 2. **无 trace，有 service + keyword** → 按 `service + keyword + time` 查日志，定位首个失败点。
 3. **日志暴露类名/方法名/错误码** → 仅当源码能验证当前假设时才搜源码（不机械"出现类名就必须查"）。
-4. **二开/租户定制/外部接口/回调/推送/同步/报文/字段映射** → 主动检索数据库适配器脚本；本地代码只用于确认平台入口。
+4. **二开/租户定制/外部接口/回调/推送/同步/报文/字段映射** → 主动检索数据库脚本，**适配器脚本与独立脚本两套体系都要查**（路由见 `knowledge/architecture/standard-customization.md`）；本地代码只用于确认平台入口。
 5. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
 6. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
 
@@ -122,16 +122,23 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 - 普通类名、方法名、配置键和错误文本统一用 `search_repo(keyword)` 检索本地 `PG_ROOT`。当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
 - 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
-- 二开、租户专属、适配器、独立脚本、ERP/WMS/OA/SAP 对接、回调、Webhook、推送、同步、报文、字段映射、签名或接口地址等场景，优先执行：`search_adapter_scripts` → `get_adapter_script_info` → `search_adapter_script_source` → `get_adapter_script_source(start_line,end_line)`。只有全局分析确有必要时才 `full=true`。
-- 脚本 Tool 已在 MCP 服务端完成 Base64(UTF-16BE) 解码；禁止通过通用 SQL 把 `script_content` Base64 正文返回给 Agent。
+- 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）：
+  - **适配器埋点脚本**（挂钩点 BEFORE/AFTER 执行，报文映射、回调、单据前后处理）：
+    `search_adapter_scripts` → `get_adapter_script_info` → `search_adapter_script_source` → `get_adapter_script_source(start_line,end_line)`。
+  - **独立脚本**（Marmot 脚本库：定时任务、打印/PDF 模板、Excel 导入、消息/邮件提醒、外部 API 配置等非挂钩点执行）：
+    `search_standalone_scripts` → `get_standalone_script_info` → `search_standalone_script_source` → `get_standalone_script_source(start_line,end_line)`。
+    独立脚本存于 rel-table 宽表 `spfm_rel_table_record`（`table_code='marmot_script_library'`），**租户过滤用 `tenant` 参数（底层 value2 槽位，tenant_id 恒为 0，勿按 tenant_id 查）**。
+  - **拿不准是哪套时两套都查**（先适配器后独立）；场景信号冲突时以两套命中的实际脚本逻辑为准。
+  - 只有全局分析确有必要时才 `full=true`。
+- 脚本 Tool 已在 MCP 服务端完成 Base64 解码（适配器 UTF-16BE；独立脚本自动探测 UTF-16LE/BE/UTF-8）；禁止通过通用 SQL 把 Base64 正文返回给 Agent。
 - 命中启用脚本时，以脚本实际逻辑为准，标准库只用于解释执行入口和默认行为。本地 Java 无命中不能作为“没有实现”的证据。
 - 本地代码报告路径与行号；数据库脚本报告租户、运行服务、`script_id`、`task_code`、版本和源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
-- 标准 vs 二开判定、适配器 JS、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/virtual-table.md`。
+- 标准 vs 二开判定、适配器 JS、独立脚本、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/standalone-script.md`、`knowledge/srm/virtual-table.md`。
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
 - **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 仅接受单条基础 `SELECT`、`EXPLAIN SELECT` 或 `SHOW CREATE TABLE`，不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、函数/子查询、窗口函数或集合运算；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
-- **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
+- **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；独立脚本宽表按 `table_code + value2`（value2=租户编码，tenant_id 恒为 0）；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
 - **明确 WHERE + LIMIT**（≤100）：禁止 `SELECT *`、无 WHERE、无 LIMIT、全表扫描。
 - **索引意识**：优先命中以 `tenant_id` 打头的联合索引；不在索引列套函数/隐式转换；避免前置 `%` 模糊；大表叠加时间范围。
 - **环境对齐**：site/instance 必须与 InvestigationContext 的环境一致，显式传参（默认实例是 PROD，误查生产会得错误结论）。拿不准先 `archery_list_instances` / `archery_list_databases`。
@@ -262,7 +269,8 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 天工环境与实例 | `knowledge/environment/tiangong.md` | `search_knowledge("天工环境")` |
 | SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` | `search_knowledge("代码库拓扑 二开")` |
 | 标准 vs 二开判定口径 | `knowledge/architecture/standard-customization.md` | `search_knowledge("标准二开判定")` |
-| 适配器 JS 脚本（存库二开） | `knowledge/srm/adapter-js.md` | `search_knowledge("适配器 JS 脚本")` |
+| 适配器 JS 脚本（埋点二开） | `knowledge/srm/adapter-js.md` | `search_knowledge("适配器 JS 脚本")` |
+| 独立脚本（Marmot 脚本库，rel-table 宽表） | `knowledge/srm/standalone-script.md` | `search_knowledge("独立脚本")` |
 | 配置表（虚拟表）机制 | `knowledge/srm/virtual-table.md` | `search_knowledge("虚拟表 配置表")` |
 | 故障信号 → 假设 → 证据 | `rules/diagnostic-rules.yaml` | —（规则，留在 Skill） |
 
