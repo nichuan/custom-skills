@@ -1,7 +1,7 @@
 {
   "name": "gitlab-code",
   "version": "1.0.0",
-  "description": "GitLab 代码检索助手：明确 GitLab 应该怎么找——先看 .env 的 PG_ROOT（本地优先，search_repo 搜本地已拉取完整源码）与 GITLAB_SEARCH_ROOT_GROUP（搜索范围），用 group 限定而非关键词瞎搜，忽略 op-deliver-* 快照仓库，锁定标准库/二开库与正确分支后用 gitlab_get_file 读全文。不生成 SQL、不排障、不改业务代码。",
+  "description": "甄云代码与数据库脚本定位助手：普通代码直接使用 PG_ROOT/search_repo 本地检索；GitLab 项目与代码搜索当前禁用，不做失败探测或远端回退，仅在 project/ref/path 已知时精确读取文件。二开、租户定制、外部接口、回调、推送、同步、报文和字段映射优先检索适配器脚本。只读定位，不排障、不生成 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -13,11 +13,11 @@
     "srm"
   ],
   "features": {
-    "local_first": "PG_ROOT 已拉取源码时优先用 search_repo（content/filename）本地检索，最快最稳",
-    "group_scoped": "目标库必须由 GITLAB_SEARCH_ROOT_GROUP 推导（标准库 operation-srm/srm-{模块} / 二开库 operation-srm-{租户}/srm-{模块}-{租户}），不信任 gitlab_search_projects 的全站快照结果",
+    "local_only_search": "普通源码检索直接使用 PG_ROOT/search_repo；本地无结果也不尝试当前不可用的 GitLab 搜索",
+    "gitlab_search_disabled": "gitlab_search_projects/gitlab_search_code 当前不暴露；仅在 project_id/ref/path 已知时允许精确读取",
+    "script_first": "二开、租户定制和外部系统对接优先 search_adapter_scripts，再搜索正文并按行局部读取",
     "ignore_snapshots": "op-deliver-* 快照仓库一律忽略，禁止作为检索目标",
-    "branch_first": "读取前用 gitlab_list_branches 确认真实分支（标准库 hotfix / 二开库 release），不默认 master",
-    "read_file": "gitlab_list_tree 逐层定位 + gitlab_get_file 读取完整文件；平台 search 接口 404 时走 list_tree+get_file 降级",
+    "read_file": "仅对已知 GitLab project/ref/path 使用 gitlab_list_branches/list_tree/get_file 精确核实，不遍历项目模拟搜索",
     "read_only": "只读检索，不修改业务代码"
   },
   "mcp_servers": [
@@ -25,13 +25,15 @@
       "name": "zhenyun-pangu-mcp",
       "tools": [
         "search_repo",
-        "gitlab_search_projects",
-        "gitlab_search_code",
+        "search_adapter_scripts",
+        "get_adapter_script_info",
+        "search_adapter_script_source",
+        "get_adapter_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file"
       ],
-      "description": "Pangu 统一 MCP：本地代码库检索（search_repo，基于 .env 的 PG_ROOT）与 GitLab 仓库/分支/文件访问（gitlab_*）。gitlab-code 是这些工具的代码定位 SOP 源"
+      "description": "Pangu 统一 MCP：本地代码检索、数据库适配器脚本检索/解码/局部读取，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -45,6 +47,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-08-27"
+    "last_updated": "2026-09-04"
   }
 }

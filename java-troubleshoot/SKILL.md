@@ -1,6 +1,6 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangu-mcp 查日志/查数据库/搜源码/查猪齿鱼/查认知层（数据字典 search_tables、join 关系 get_table_relations、排查知识 search_knowledge），gitlab_* 读取 GitLab 仓库完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述异常、报错、traceId、日志、接口失败、超时、线上故障或操作/配置/升级问题时使用；通过 zhenyun-pangu-mcp 查日志、数据库、本地源码、适配器脚本、猪齿鱼和认知层。普通源码直接查本地 PG_ROOT；GitLab 搜索当前禁用。二开、租户定制和外部接口对接必须主动检查数据库脚本。仅查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
@@ -93,8 +93,9 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 1. **有 traceId** → 直接追全链路（优先于手写日志查询）：国内盘古用 `obs_sls_query(trace_id=..., environment=...)`，AWS 海外用 `obs_log_trace(trace_id, region="aws")`。
 2. **无 trace，有 service + keyword** → 按 `service + keyword + time` 查日志，定位首个失败点。
 3. **日志暴露类名/方法名/错误码** → 仅当源码能验证当前假设时才搜源码（不机械"出现类名就必须查"）。
-4. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
-5. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
+4. **二开/租户定制/外部接口/回调/推送/同步/报文/字段映射** → 主动检索数据库适配器脚本；本地代码只用于确认平台入口。
+5. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
+6. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
 
 ### 调用链分析要点
 
@@ -117,14 +118,14 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
 - 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
-### 代码（search_repo + gitlab_*）
+### 代码与数据库脚本
 
-- 关键字检索统一用 `search_repo(keyword)`（本地跨仓）；需要精确到 GitLab 仓库/分支/文件的，用 `gitlab_*` 系列：`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree`。锁定仓库与分支后用 `gitlab_get_file(project_id, path, ref)` 读完整文件（读完整文件是 GitLab 能力）。
-- 搜索范围必须收敛（详见 `knowledge/architecture/srm-repository-topology.md`）：
-  - 标准库只在 `operation-srm/srm-{模块}`；二开库 `operation-srm-{租户}/srm-{模块}-{租户}`；`op-deliver-*` 等快照仓库忽略。
-  - 分支：标准库用最新 `x-y-z-hotfix`（`gitlab_list_branches` 取 `recommended_ref`），二开库用 `release`。
-  - 仓库名/分支名以 MCP 实时返回为准，**不硬编码**。
-- 报告中必须标注完整 `path_with_namespace@branch:file:line` 并标明标准/二开来源。
+- 普通类名、方法名、配置键和错误文本统一用 `search_repo(keyword)` 检索本地 `PG_ROOT`。当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
+- 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
+- 二开、租户专属、适配器、独立脚本、ERP/WMS/OA/SAP 对接、回调、Webhook、推送、同步、报文、字段映射、签名或接口地址等场景，优先执行：`search_adapter_scripts` → `get_adapter_script_info` → `search_adapter_script_source` → `get_adapter_script_source(start_line,end_line)`。只有全局分析确有必要时才 `full=true`。
+- 脚本 Tool 已在 MCP 服务端完成 Base64(UTF-16BE) 解码；禁止通过通用 SQL 把 `script_content` Base64 正文返回给 Agent。
+- 命中启用脚本时，以脚本实际逻辑为准，标准库只用于解释执行入口和默认行为。本地 Java 无命中不能作为“没有实现”的证据。
+- 本地代码报告路径与行号；数据库脚本报告租户、运行服务、`script_id`、`task_code`、版本和源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
 - 标准 vs 二开判定、适配器 JS、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/virtual-table.md`。
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
@@ -189,7 +190,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 返回 | 含义 | 处理 |
 |------|------|------|
 | 401 | 凭据缺失/过期 | 提示配置 MCP `.env`/`env`，不让用户在对话粘贴 Token |
-| 403 | 权限不足 | 提示申请对应项目/资源权限；不可见时用 `gitlab_search_projects` 确认，不断言不存在 |
+| 403 | 权限不足 | 提示申请对应项目/资源权限；记录已知范围，不调用当前禁用的 GitLab 搜索，不断言资源不存在 |
 | 404 | 资源/ID 问题 | 先用列举类工具确认资源是否存在，再决定 |
 | timeout | 范围过大 | 缩小时间范围、补齐标签/租户条件、改走索引字段 |
 | empty | 查询条件 vs 确实无数据 | 判断是条件过严还是真无数据；用户指定时间不擅自扩大 |

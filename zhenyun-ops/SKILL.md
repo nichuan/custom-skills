@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三层架构 Level 1 Router/Orchestrator）。【仅当】用户的请求属于 SRM（供应商关系管理）、甄云、Java 微服务、天工/盘古系统相关场景，且【无法直接命中某个具体子 Skill 时】（包括：意图不明确、一句话里混了多个业务域、不知道该走排障还是生成 SQL、不确定该用哪个 SQL 技能、或拿不准子 Skill 是否存在），才加载本 Skill 进行路由。本 Skill 本身不执行具体业务，只负责根据用户意图精准路由并调用 use_skill 加载对应子 Skill：猪齿鱼任务查询 → choerodon-task；排障/bug/报错/日志/traceId/超时/线上故障/配置升级问题 → java-troubleshoot；采购寻源（询价/招标/报价/评分/资格预审/寻源结果/征询单）SQL 与数据修复 → ssrc-sql-generator；盘古订单履约（采购订单/收货/发货工作台/老送货单/状态机/委外）SQL 与数据修复 → spuc-sql-generator。三层架构：zhenyun-ops（Router，管行为/路由）→ 专业 Skill（管领域流程/判断）→ zhenyun-pangu-mcp（管事实/知识/执行）。【若用户请求能直接明确命中某子 Skill，则不要加载本 Skill，直接使用对应子 Skill。】本 Skill 仅作为路由兜底，不抢占子 Skill 的直接触发。
+description: 甄云 SRM 全局智能路由中心，仅在请求属于甄云/SRM/Java 微服务但无法直接命中具体子 Skill 时使用。路由任务查询、故障排查、寻源/履约 SQL、数据库访问，以及本地代码或数据库脚本定位；二开和外部对接实现路由到 gitlab-code 并优先查脚本。若能直接命中子 Skill，不加载本 Skill。
 ---
 
 # 甄云 SRM 全局智能路由中心（zhenyun-ops）
@@ -24,7 +24,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | **Java 微服务排障**：异常/报错/错误码、traceId、日志、接口失败、500、超时、服务"不正常"、操作/配置/升级类问题（"怎么操作""功能在哪""配置不对""标准升级后""版本更新"）、线上故障 | `java-troubleshoot` | `use_skill("java-troubleshoot")` |
 | **采购寻源 SQL**：询价单、招标单、报价单、评分/评标、资格预审、寻源结果、征询单 的查询 SQL / 数据修复 SQL / 表结构 | `ssrc-sql-generator` | `use_skill("ssrc-sql-generator")` |
 | **盘古订单履约 SQL**：采购订单(SODR)、收货工作台事务(SINV)、发货工作台(SLOD 送货/计划/标签)、老送货单、状态机(SIEC)、委外 的查询 SQL / 数据修复 SQL / 清理 SQL | `spuc-sql-generator` | `use_skill("spuc-sql-generator")` |
-| **GitLab / 本地代码检索**：找某个类/DTO/接口/方法在哪个仓库、分支、路径；从 GitLab 或本地 `PG_ROOT` 读取完整源码；"某功能在哪个类" | `gitlab-code` | `use_skill("gitlab-code")` |
+| **代码/脚本定位**：找类/DTO/接口/方法/文件；二开、租户定制、适配器脚本、外部系统对接、回调、推送、同步、报文或字段映射实现 | `gitlab-code` | `use_skill("gitlab-code")` |
 | **查数据库 / 确认环境实例库**：用 Archery 取数、看表结构、确认某环境用哪个 site/instance、某实例有哪些库、跨库怎么写 | `archery` | `use_skill("archery")` |
 
 ### 判定要点（避免误路由）
@@ -35,6 +35,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
   - 采购**订单及下游履约**（订单/收货/发货/老送货单/委外）→ `spuc-sql-generator`
 - **先判定是否排障，再判定业务域**：有异常/报错/日志线索时优先 `java-troubleshoot`；纯数据查询/修复 SQL 才走两个 SQL 技能。
 - **意图混合**（既像排障又要改数据）：先走 `java-troubleshoot` 定位根因，再按需用 SQL 技能做数据修复。
+- **实现载体先判断**：普通 Java 实现查本地 `PG_ROOT`；二开和外部对接优先查数据库脚本。当前 GitLab 项目/代码搜索禁用，不作为回退路径。
 
 ---
 
@@ -60,7 +61,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | `java-troubleshoot` | `custom-skills/java-troubleshoot/` | Java 微服务故障排查：日志/调用链/源码/数据库交叉验证 |
 | `ssrc-sql-generator` | `custom-skills/ssrc-sql-generator/` | 采购寻源域（询价/招标/报价/评分/寻源结果）SQL 生成与修复 |
 | `spuc-sql-generator` | `custom-skills/spuc-sql-generator/` | 盘古订单履约域（订单/收货/发货/老送货单/委外）SQL 生成与修复 |
-| `gitlab-code` | `custom-skills/gitlab-code/` | GitLab / 本地源码检索：先看 .env 的 PG_ROOT 与 GITLAB_SEARCH_ROOT_GROUP，本地优先 + group 限定，忽略 op-deliver-* 快照，list_tree+get_file 读全文件 |
+| `gitlab-code` | `custom-skills/gitlab-code/` | 本地源码与数据库脚本定位：普通代码查 PG_ROOT；二开/外部对接查适配器脚本；GitLab 搜索禁用，仅允许已知路径精确读取 |
 | `archery` | `custom-skills/archery/` | Archery 统一数据访问层：双站点实例别名/真实名映射、各环境库清单、环境选择、archery_* 工具调用规范与安全降级；各 SQL 技能只生成 SQL、不关心落库 |
 
 ---
@@ -78,7 +79,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | 查 Loki 日志（k8s 容器日志、TraceId、关键字；仅 AWS 海外全环境） | `obs_log_query` / `obs_log_trace` / `obs_log_datasources` | java-troubleshoot |
 | 查数据库（Archery 执行 SQL、看表结构、看库/实例列表、确认环境/实例/库映射） | `archery_query` / `archery_describe_table` / `archery_list_columns` / `archery_list_databases` / `archery_list_instances` / `archery_query_tenant` | **`archery`（主用：统一数据访问层，环境/实例/库映射与调用规范）**；ssrc-sql-generator / spuc-sql-generator（生成 SQL 时调用，只关心 SQL 内容不关心落库） |
 | 猪齿鱼协作（查任务、查 issue、下载附件、看状态流） | `choerodon_search_tasks_by_person` / `choerodon_list_issue` / `choerodon_query_issue` / `choerodon_list_attachments` / `choerodon_download_attachment` / `choerodon_get_status_map` / `choerodon_search_users` | **`choerodon-task`（主用，只读查询）**；java-troubleshoot（仅排障时定位需求/缺陷上下文） |
-| 代码搜索（本地跨仓关键字 + GitLab 仓库/分支/文件） | `search_repo`；`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree` | **`gitlab-code`（主用：定位与读取源码）**；java-troubleshoot（排障时定位根因相关源码） |
+| 代码/脚本定位 | 本地 `search_repo`；脚本 `search_adapter_scripts` / `get_adapter_script_info` / `search_adapter_script_source` / `get_adapter_script_source`；已知 GitLab 路径时 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` | **`gitlab-code`（主用）**；java-troubleshoot（排障证据）。GitLab 搜索当前禁用 |
 | 需求/缺陷跟踪任务 id（按任务号查详情） | `choerodon_query_issue` | java-troubleshoot（排障时关联需求/缺陷上下文） |
 
 > 本路由 Skill 不直接调用上述工具，只负责判断「该用哪类工具、由哪个子 Skill 调用」。工具的准确参数取值规则由各子 Skill 自行声明与执行。
@@ -107,7 +108,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | `ssrc-sql-generator` | ✓ | ✓ | ✓ | ✓ | — | — | — |
 | `spuc-sql-generator` | ✓ | ✓ | ✓ | ✓ | — | — | — |
 | `choerodon-task` | ✓ | — | — | — | — | ✓ | ✓ |
-| `gitlab-code` | — | — | — | — | — | ✓ | — |
+| `gitlab-code` | — | — | — | ✓（脚本只读） | — | ✓ | — |
 | `archery` | — | — | — | ✓ | — | — | — |
 
 - ✓ = 该 Skill 可调用对应能力；— = 通常不需要（特殊场景例外但需克制）。
@@ -124,6 +125,7 @@ description: 甄云 SRM 全局智能路由中心（兜底总入口 Skill，三�
 | 「接口报错 + 要查库确认数据」 | `java-troubleshoot`（定位根因）→ `ssrc/spuc-sql-generator`（数据修复） |
 | 「任务提到某个需求 + 要排障」 | `choerodon-task`（补需求上下文）→ `java-troubleshoot`（排障） |
 | 「寻源异常 + 可能是配置问题」 | `ssrc-sql-generator`（查表/数据）→ `java-troubleshoot`（若涉及服务行为） |
+| 「二开/外部接口实现在哪里」 | `gitlab-code`（脚本优先定位；必要时补本地平台入口） |
 
 协作原则：
 1. **先定位根因，再执行修复**：混合"排障 + 改数据"时，先用 `java-troubleshoot` 弄清根因，再按需用 SQL 技能生成修复 SQL。
