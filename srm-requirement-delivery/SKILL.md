@@ -1,0 +1,106 @@
+---
+name: srm-requirement-delivery
+description: 按猪齿鱼需求号或明确业务说明开发甄云 SRM Marmot 纯二开代码，覆盖埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock；负责读取需求与平台空模板、拉取到本地分类目录、实现并快速检查。标准 Java 改造、故障排查和单纯 SQL 修复不使用本 Skill。
+---
+
+# SRM 纯二开需求开发
+
+本 Skill 只做一件事：把已经确定采用 Marmot 二开的需求快速变成可复制回平台的成品代码。需求中的技术设计是实现依据，不重新进行 `STANDARD / ADAPTOR / MIXED` 判型，也不创建 `requirements/`、Gate、审阅包或完整取证文档。
+
+## 支持的产物
+
+| 业务形态 | 平台来源 | 需求目录内路径 |
+| --- | --- | --- |
+| 埋点脚本 | 适配器脚本 | `srm-adaptor/<code>/entry.js` |
+| API 前置挂载 | 独立脚本 | `SCRIPT_LIB/<code>/entry.js` |
+| API 后置挂载 | 独立脚本 | `SCRIPT_LIB/<code>/entry.js` |
+| API 发布 | 独立脚本 | `SCRIPT_LIB/<code>/entry.js` |
+| 公共 JavaScript | 独立脚本库中的 CodeBlock | `CodeBlock/<code>/entry.js` |
+| 查询块 | 独立脚本库中的 QueryBlock | `QueryBlock/<code>/query.sql` |
+
+API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段，不改变产物类型。目标标准 Controller、服务和数据库是只读实现依据，不是本 Skill 的交付物。
+
+## 本地产物根目录
+
+不要在 Skill 中写死个人绝对路径，也不要默认依赖 `marmot-dev` 工程。
+
+1. 用户在当前请求中明确指定输出目录时，以该目录为本次覆盖值。
+2. 否则先调用 `marmot_get_delivery_config`，读取 MCP `.env` 中的 `MARMOT_DELIVERY_ROOT`。
+3. 配置缺失或 `valid=false` 时停止创建文件，明确提示用户在 MCP 的 `.env` 中加入 `MARMOT_DELIVERY_ROOT=/绝对路径`。不得静默回退到当前目录、Skill 目录或某个固定工程。
+4. 配置有效后，需求根目录固定为 `<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/`。若目录不在当前 Codex 可写工作区内，先说明目标路径并请求相应文件系统授权。
+
+需求目录结构如下：
+
+```text
+<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/
+  request.md
+  artifacts.json
+  srm-adaptor/<code>/entry.js
+  SCRIPT_LIB/<code>/entry.js
+  CodeBlock/<code>/entry.js
+  QueryBlock/<code>/query.sql
+```
+
+## 输入
+
+### 给出需求号
+
+这是默认入口。按下面的最短闭环执行到代码完成，不要先询问用户是否需要开始：
+
+1. 先按“本地产物根目录”规则解析本次输出位置，再用 `choerodon_list_issue(keyword=<需求号>)` 找到唯一任务，随后用真实加密 `issueId` 调用 `choerodon_query_issue` 和 `choerodon_list_comments`。用户指定项目时先解析并始终传同一个真实 `project_id`；未指定时沿用 MCP 默认项目。附件只在需求理解依赖它时读取。
+2. 从描述和评论提取租户、目标环境、产物角色、脚本编码、挂载接口/埋点、输入输出和业务规则。评论中的后续技术设计优先于较早描述；冲突时明确指出。
+3. 最少需要确定 `tenant + 产物角色 + code`。仅当猪齿鱼内容和平台搜索都无法补齐其中某项时，才向用户问一个聚焦问题。
+
+推荐但不强制用户在猪齿鱼技术设计中按下列字段书写：
+
+```text
+租户：SRM-XXX
+环境：prod / test / dev
+产物：埋点 | API前置挂载 | API后置挂载 | API发布 | CodeBlock | QueryBlock
+编码：SCRIPT_CODE
+目标：埋点编码，或 METHOD /path 与挂载阶段
+逻辑：输入、处理规则、返回、副作用、异常分支
+依赖：其它 CodeBlock / QueryBlock / 模块编码
+```
+
+### 给出本地文件
+
+用户已给出明确本地文件和逻辑时，跳过猪齿鱼与平台拉取，直接实现并运行快速检查。不要为了补齐流程反向创建需求记录。
+
+## 拉取平台空模板
+
+需求号入口必须先取得平台现有内容，再开始编码，避免覆盖用户提前建立的模板或配置。
+
+1. 埋点脚本使用 `search_adapter_scripts(tenant=<tenant>, query=<code>, enabled_only=false)`；API 挂载、API 发布、CodeBlock、QueryBlock 使用 `search_standalone_scripts(tenant=<tenant>, query=<code>)`。
+2. 只接受租户和编码精确匹配的唯一结果。存在多个版本或同名项时，结合需求环境、服务、描述和更新时间判断；仍不唯一就停止该产物并请用户选择，不猜 `script_id`。
+3. 先读 `get_*_script_info`，再用 `get_*_script_source(full=true)` 获取完整已解码正文。空模板也要保留原有注释、入口形态和配置线索。
+4. 本地目标不存在时，直接按需求目录结构创建对应目录和文件，再把平台正文写入目标文件；不调用 `marmot-dev` 的建档命令。本地目标已存在时先比较；本地和平台都已有非模板逻辑且内容不一致时，不静默覆盖，保留本地文件并报告冲突。
+5. 在 `<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/` 维护两个轻量文件：
+   - `request.md`：需求标题、目标行为、关键约束和验收点的简要快照。
+   - `artifacts.json`：每个产物的角色、类型、编码、平台 `script_id`、平台更新时间、拉取时源码 SHA-256 和本地文件路径。长整型 ID 以字符串保存。
+
+不要为这一流程运行 `req:new`，也不要生成 manifest、decision、workflow、verification、design、rollback 或 bundle。已有正式目录不删除；本次只维护上述轻量记录和实际代码。
+
+## 实现
+
+- 直接按猪齿鱼已有技术设计实现，不重复做全库调研。
+- 埋点脚本只在输入、返回消费或模块调用不清楚时，用 `search_repo(depth=20)` 定向读取该埋点的 Java 调用位置。
+- API 前置/后置挂载只定向核对目标 Controller 的请求构造、原接口返回和挂载阶段。前置脚本不得假定能看到响应；后置脚本不得凭字段名猜测响应结构。
+- API 发布按需求明确请求参数、响应、权限/租户上下文和副作用；数据库与标准服务调用复用平台现有模块。
+- 模块用法依次查本地 `_helper/md`、类型声明和 `@M` 实现。表名或字段是正确编码的必要事实时，再通过 Archery 对目标环境做一次定向只读核实。
+- 长整型 ID 保持字符串；写操作核对租户过滤、业务过滤、更新字段、调用次数、空输入、重复调用和异常行为。
+- 只读取与当前产物直接相关的源码和最多两个相似脚本。一个未知事实阻止正确编码时去核实；不要因为“可能有帮助”扩大调查。
+
+如果实现必须修改标准 Java、公共 DTO、标准数据库结构或标准事务，本 Skill 停止该部分并说明它已超出纯二开范围；不要在本流程中偷偷修改标准仓。
+
+## 验证与交付
+
+1. 为可本地表达的关键分支补少量 `fixtures/*.json`；依赖真实 Java、事务、权限或远程系统的行为明确保留为未验证。
+2. JavaScript 至少执行 `node --check <entry.js>`，并检查只有一个同步全局 `function process(input)` 入口、没有 ESM/CommonJS 导出以及 Node/浏览器专属全局误用。QueryBlock 检查非空、占位符闭合及只读/写入意图是否符合需求。当前工作区若另有兼容的增强检查器，可作为附加验证，但不得把它变成使用本 Skill 的前置依赖。
+3. 最终按产物列出：角色与编码、本地可点击文件、实现摘要、检查结果、仍需平台联调的假设。代码文件就是用户复制回平台的交付物，不额外生成审阅包。
+
+## 外部写入边界
+
+- 当前默认只读猪齿鱼和平台脚本；不自动改任务状态、写评论、保存脚本、挂载或发布。
+- 用户明确要求写猪齿鱼评论时，先展示 Markdown 内容并获得确认。
+- 将来接入平台写工具后，只有用户明确要求“保存/发布到平台”才能执行；写前比较平台版本或源码哈希，发现平台已变化就停止，不能覆盖并发修改。

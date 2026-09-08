@@ -1,7 +1,7 @@
 {
   "name": "gitlab-code",
   "version": "1.0.0",
-  "description": "甄云代码与数据库脚本定位助手：普通代码直接使用 PG_ROOT/search_repo 本地检索；GitLab 项目与代码搜索当前禁用，不做失败探测或远端回退，仅在 project/ref/path 已知时精确读取文件。二开、租户定制、外部接口、回调、推送、同步、报文和字段映射优先检索适配器脚本。只读定位，不排障、不生成 SQL。",
+  "description": "甄云代码与数据库脚本定位助手：普通代码使用 PG_ROOT/search_repo；二开与外部对接分别检索适配器和独立脚本；GitLab 仅在 project/ref/path 已知时精确读取。只读定位，不排障、不生成 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -15,7 +15,8 @@
   "features": {
     "local_only_search": "普通源码检索直接使用 PG_ROOT/search_repo；本地无结果也不尝试当前不可用的 GitLab 搜索",
     "gitlab_search_disabled": "gitlab_search_projects/gitlab_search_code 当前不暴露；仅在 project_id/ref/path 已知时允许精确读取",
-    "script_first": "二开、租户定制和外部系统对接优先 search_adapter_scripts，再搜索正文并按行局部读取",
+    "script_first": "二开、租户定制和外部系统对接按载体检索适配器或独立脚本，再搜索正文并按行局部读取",
+    "standalone_script_search": "独立 API 和独立二开脚本使用 search/get_standalone_* 完整只读链路",
     "ignore_snapshots": "op-deliver-* 快照仓库一律忽略，禁止作为检索目标",
     "read_file": "仅对已知 GitLab project/ref/path 使用 gitlab_list_branches/list_tree/get_file 精确核实，不遍历项目模拟搜索",
     "read_only": "只读检索，不修改业务代码"
@@ -29,11 +30,15 @@
         "get_adapter_script_info",
         "search_adapter_script_source",
         "get_adapter_script_source",
+        "search_standalone_scripts",
+        "get_standalone_script_info",
+        "search_standalone_script_source",
+        "get_standalone_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file"
       ],
-      "description": "Pangu 统一 MCP：本地代码检索、数据库适配器脚本检索/解码/局部读取，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
+      "description": "Pangu 统一 MCP：本地代码检索、数据库适配器与独立脚本检索/解码/局部读取，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -47,6 +52,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-04"
+    "last_updated": "2026-09-07"
   }
 }

@@ -50,7 +50,9 @@ GitLab 只保留精确读取：当 `project_id`、`ref`、`path` 已由用户或
 ## 二开与外部对接脚本
 
 出现二开、定制、租户专属、适配器、独立脚本、外部接口、回调、推送、同步、
-报文、字段转换、接口地址、签名或鉴权等信号时，主动执行：
+报文、字段转换、接口地址、签名或鉴权等信号时，先判断脚本类型，再执行对应只读链路。
+
+适配器、标准 API 前后置、埋点脚本：
 
 ```text
 search_adapter_scripts
@@ -60,14 +62,24 @@ search_adapter_scripts
   → 确需全局分析时才 full=true
 ```
 
+独立 API 或其它独立二开脚本：
+
+```text
+search_standalone_scripts
+  → get_standalone_script_info
+  → search_standalone_script_source
+  → get_standalone_script_source(start_line, end_line)
+  → 确需全局分析时才 full=true
+```
+
 要求：
 
 - 从请求提取租户、运行服务、业务关键词和接口名称，已知信息不重复询问。
-- `search_adapter_scripts` 先查元信息，不直接读取所有脚本正文。
+- `search_adapter_scripts` / `search_standalone_scripts` 先查元信息，不直接读取所有脚本正文。
 - 定位字段、函数、URL 或报文时，先搜索正文再读取局部行号。
 - MCP 返回的 `source` 已在服务端解码；不要查询、展示或让 LLM 处理 Base64。
 - 命中启用脚本时，以脚本实际逻辑为准，标准代码只作平台入口和默认行为对照。
-- 现有事实只确认 `sada_adaptor_task_*` 适配器存储；若“独立脚本”未命中，不得编造其它表，应报告当前已覆盖的脚本来源。
+- 适配器结果来自 `sada_adaptor_task_*`；独立脚本结果来自 MCP 已实现的 standalone-script 数据源。两类结果必须按工具返回标识，不得混写或自行猜表。
 
 ## 输出
 
