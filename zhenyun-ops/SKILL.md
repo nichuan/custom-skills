@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、猪齿鱼查询、故障排查、寻源/履约 SQL、数据库访问和代码/脚本定位；意图明确时直接使用对应子 Skill。
+description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、猪齿鱼查询、故障排查、采购员工作台 bug 排障、寻源/履约 SQL、数据库访问和代码/脚本定位；意图明确时直接使用对应子 Skill。
 ---
 
 # 甄云 SRM 全局路由
@@ -16,6 +16,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 异常、错误码、traceId、日志、接口失败、超时或线上问题 | `java-troubleshoot` |
 | 询价、招标、报价、评分、资格预审、寻源结果相关 SQL | `ssrc-sql-generator` |
 | 订单、收货、发货、送货单、状态机、委外相关 SQL | `spuc-sql-generator` |
+| 采购员工作台/角色工作台待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致 | `srm-workbench-bug-triage` |
 | 查实例/库/表结构/样本，或确认 Archery 环境映射 | `archery` |
 | 只找类、DTO、方法、文件、适配器或独立脚本实现 | `gitlab-code` |
 
@@ -24,6 +25,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 - “查需求”和“开发纯二开需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 读取任务、拉取平台模板并实现。需要标准 Java 改造时不进入该 Skill。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 采购寻源走 `ssrc-sql-generator`；采购订单及下游履约走 `spuc-sql-generator`。
+- 工作台现象（待办/计数、整改模块、卡片字段、超级搜索、单据动态/关注、ES 权限/消费）优先走 `srm-workbench-bug-triage`；仅当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
 - 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接同时考虑适配器与独立脚本。当前 GitLab 搜索禁用，不作为本地无结果时的回退。
 - 意图仍不唯一时，列出具体分歧及其对交付物的影响，再向用户确认；不凭模块名猜。
 
@@ -36,6 +38,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
 | `spuc-sql-generator` | 订单履约域查询/修复 SQL |
+| `srm-workbench-bug-triage` | 采购员工作台（角色工作台）bug 排障：待办/关注/超级搜索/卡片/整改，内置两段式 ES 查询、权限维度模型与库路由 |
 | `archery` | 实例、库、表结构及数据的统一只读访问 |
 | `gitlab-code` | 本地源码、适配器脚本、独立脚本和已知 GitLab 路径的只读定位 |
 
@@ -63,6 +66,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 纯二开需求开发 | `srm-requirement-delivery` 读取需求与平台模板、实现并快速检查 |
 | 任务上下文 + 故障 | 猪齿鱼只读上下文 → `java-troubleshoot` |
 | 故障 + 数据修复 | `java-troubleshoot` 先定位根因 → 对应 SQL Skill 生成修复 SQL |
+| 工作台待办/单据异常 + 要改数据 | `srm-workbench-bug-triage` 先定位根因 → `ssrc/spuc-sql-generator` 生成修复 SQL，交用户执行 |
 | 二开实现位置 | `gitlab-code` 同时核对脚本与本地平台入口 |
 
 跨 Skill 传递任务号、租户、环境、模块、单据、源码引用和已验证限制，避免重复查询。最终结论必须区分事实、推断、未验证项和需要用户授权的写操作。
