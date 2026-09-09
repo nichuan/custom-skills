@@ -1,7 +1,7 @@
 {
   "name": "java-troubleshoot",
   "version": "1.0.0",
-  "description": "Java 微服务故障排查助手：仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用。通过 zhenyun-pangu-mcp 查日志（Loki/SLS 双平台路由）、查数据库（Archery 只读交叉验证）、搜源码（本地 search_repo + GitLab）、查猪齿鱼补业务上下文、查认知层（search_knowledge / search_tables / get_table_relations）。证据驱动排障循环（假设→证据→更新置信度），带 Stop Condition 与调查预算（同类查询连续 3 次未改变假设即停）。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。",
+  "description": "Java 微服务故障排查助手：通过日志、Archery、本地源码、数据库适配器脚本、猪齿鱼和认知层建立证据链。普通源码直接搜索本地 PG_ROOT，GitLab 项目/代码搜索当前禁用；二开、租户定制及外部接口对接必须主动检查脚本。仅查询数据、生成 SQL 或数据修复时不要触发。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -25,6 +25,8 @@
     "stop_condition": "Stop Condition（两类独立证据/一份直接证据/证据饱和即停）+ 调查预算（同类查询连续 3 次未改变假设即停），禁止相同参数原样重调",
     "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
     "knowledge_base": "本地 knowledge/ 目录为精确操作手册（含 SQL 范式与判定约束），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
+    "code_routing": "普通代码只用 search_repo 本地检索；GitLab 搜索禁用，仅允许已知 project/ref/path 的精确读取",
+    "script_first": "二开、租户定制和外部接口场景自动检索适配器脚本，先搜索正文再局部读取，Base64 不离开 MCP",
     "evidence_report": "结构化输出：问题结论/根因分析/证据链（每条标注 source 与 confidence）/Confirmed-Probable-Unknown 分级，禁止把推测写成事实、禁止输出原始日志全文",
     "read_only": "数据库仅只读（archery_query 仅基础 SELECT/EXPLAIN/SHOW CREATE TABLE），严禁写操作；凭据不外泄"
   },
@@ -49,8 +51,10 @@
         "get_table_relations",
         "record_table_usage",
         "search_repo",
-        "gitlab_search_projects",
-        "gitlab_search_code",
+        "search_adapter_scripts",
+        "get_adapter_script_info",
+        "search_adapter_script_source",
+        "get_adapter_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file",
@@ -61,7 +65,7 @@
         "choerodon_list_attachments",
         "choerodon_download_attachment"
       ],
-      "description": "Pangu 统一 MCP：日志（Loki/SLS 双平台路由）+ Archery 只读查数与结构校验 + 认知层（知识/表目录/关联关系）+ 本地与 GitLab 代码检索 + 猪齿鱼业务上下文。java-troubleshoot 是排障调查策略与证据链的行为源；工具真实参数以 MCP 为唯一事实源"
+      "description": "Pangu 统一 MCP：日志、Archery、本地代码、数据库脚本检索/服务端解码、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -76,6 +80,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-08-29"
+    "last_updated": "2026-09-04"
   }
 }

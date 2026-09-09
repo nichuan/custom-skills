@@ -1,0 +1,11 @@
+interface:
+  display_name: "SRM 纯二开需求开发"
+  short_description: "按需求号拉取二开模板、实现并快速检查"
+  default_prompt: "使用 $srm-requirement-delivery 根据这个猪齿鱼需求号完成纯二开脚本开发。"
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "zhenyun-pangu-mcp"
+      description: "读取猪齿鱼、平台脚本、标准源码和必要数据库事实"
+policy:
+  allow_implicit_invocation: true

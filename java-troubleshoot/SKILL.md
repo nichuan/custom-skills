@@ -1,6 +1,6 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述了异常、报错、traceId、日志、接口失败、超时、线上故障，或明确询问操作/配置/升级导致的问题时使用；通过 zhenyun-pangu-mcp 查日志/查数据库/搜源码/查猪齿鱼/查认知层（数据字典 search_tables、join 关系 get_table_relations、排查知识 search_knowledge），gitlab_* 读取 GitLab 仓库完整文件。仅提到 SRM 业务模块、查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述异常、报错、traceId、日志、接口失败、超时、线上故障或操作/配置/升级问题时使用；通过 zhenyun-pangu-mcp 查日志、数据库、本地源码、适配器脚本、猪齿鱼和认知层。普通源码直接查本地 PG_ROOT；GitLab 搜索当前禁用。二开、租户定制和外部接口对接必须主动检查数据库脚本。仅查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
@@ -93,8 +93,9 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 1. **有 traceId** → 直接追全链路（优先于手写日志查询）：国内盘古用 `obs_sls_query(trace_id=..., environment=...)`，AWS 海外用 `obs_log_trace(trace_id, region="aws")`。
 2. **无 trace，有 service + keyword** → 按 `service + keyword + time` 查日志，定位首个失败点。
 3. **日志暴露类名/方法名/错误码** → 仅当源码能验证当前假设时才搜源码（不机械"出现类名就必须查"）。
-4. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
-5. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
+4. **二开/租户定制/外部接口/回调/推送/同步/报文/字段映射** → 主动检索数据库脚本，**适配器脚本与独立脚本两套体系都要查**（路由见 `knowledge/architecture/standard-customization.md`）；本地代码只用于确认平台入口。
+5. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
+6. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
 
 ### 调用链分析要点
 
@@ -117,20 +118,27 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
 - 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
-### 代码（search_repo + gitlab_*）
+### 代码与数据库脚本
 
-- 关键字检索统一用 `search_repo(keyword)`（本地跨仓）；需要精确到 GitLab 仓库/分支/文件的，用 `gitlab_*` 系列：`gitlab_search_projects` / `gitlab_search_code` / `gitlab_list_branches` / `gitlab_get_file` / `gitlab_list_tree`。锁定仓库与分支后用 `gitlab_get_file(project_id, path, ref)` 读完整文件（读完整文件是 GitLab 能力）。
-- 搜索范围必须收敛（详见 `knowledge/architecture/srm-repository-topology.md`）：
-  - 标准库只在 `operation-srm/srm-{模块}`；二开库 `operation-srm-{租户}/srm-{模块}-{租户}`；`op-deliver-*` 等快照仓库忽略。
-  - 分支：标准库用最新 `x-y-z-hotfix`（`gitlab_list_branches` 取 `recommended_ref`），二开库用 `release`。
-  - 仓库名/分支名以 MCP 实时返回为准，**不硬编码**。
-- 报告中必须标注完整 `path_with_namespace@branch:file:line` 并标明标准/二开来源。
-- 标准 vs 二开判定、适配器 JS、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/virtual-table.md`。
+- 普通类名、方法名、配置键和错误文本统一用 `search_repo(keyword)` 检索本地 `PG_ROOT`。当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
+- 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
+- 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）：
+  - **适配器埋点脚本**（挂钩点 BEFORE/AFTER 执行，报文映射、回调、单据前后处理）：
+    `search_adapter_scripts` → `get_adapter_script_info` → `search_adapter_script_source` → `get_adapter_script_source(start_line,end_line)`。
+  - **独立脚本**（Marmot 脚本库：定时任务、打印/PDF 模板、Excel 导入、消息/邮件提醒、外部 API 配置等非挂钩点执行）：
+    `search_standalone_scripts` → `get_standalone_script_info` → `search_standalone_script_source` → `get_standalone_script_source(start_line,end_line)`。
+    独立脚本存于 rel-table 宽表 `spfm_rel_table_record`（`table_code='marmot_script_library'`），**租户过滤用 `tenant` 参数（底层 value2 槽位，tenant_id 恒为 0，勿按 tenant_id 查）**。
+  - **拿不准是哪套时两套都查**（先适配器后独立）；场景信号冲突时以两套命中的实际脚本逻辑为准。
+  - 只有全局分析确有必要时才 `full=true`。
+- 脚本 Tool 已在 MCP 服务端完成 Base64 解码（适配器 UTF-16BE；独立脚本自动探测 UTF-16LE/BE/UTF-8）；禁止通过通用 SQL 把 Base64 正文返回给 Agent。
+- 命中启用脚本时，以脚本实际逻辑为准，标准库只用于解释执行入口和默认行为。本地 Java 无命中不能作为“没有实现”的证据。
+- 本地代码报告路径与行号；数据库脚本报告租户、运行服务、`script_id`、`task_code`、版本和源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
+- 标准 vs 二开判定、适配器 JS、独立脚本、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/standalone-script.md`、`knowledge/srm/virtual-table.md`。
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
 - **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 仅接受单条基础 `SELECT`、`EXPLAIN SELECT` 或 `SHOW CREATE TABLE`，不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、函数/子查询、窗口函数或集合运算；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
-- **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
+- **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；独立脚本宽表按 `table_code + value2`（value2=租户编码，tenant_id 恒为 0）；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
 - **明确 WHERE + LIMIT**（≤100）：禁止 `SELECT *`、无 WHERE、无 LIMIT、全表扫描。
 - **索引意识**：优先命中以 `tenant_id` 打头的联合索引；不在索引列套函数/隐式转换；避免前置 `%` 模糊；大表叠加时间范围。
 - **环境对齐**：site/instance 必须与 InvestigationContext 的环境一致，显式传参（默认实例是 PROD，误查生产会得错误结论）。拿不准先 `archery_list_instances` / `archery_list_databases`。
@@ -189,7 +197,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 返回 | 含义 | 处理 |
 |------|------|------|
 | 401 | 凭据缺失/过期 | 提示配置 MCP `.env`/`env`，不让用户在对话粘贴 Token |
-| 403 | 权限不足 | 提示申请对应项目/资源权限；不可见时用 `gitlab_search_projects` 确认，不断言不存在 |
+| 403 | 权限不足 | 提示申请对应项目/资源权限；记录已知范围，不调用当前禁用的 GitLab 搜索，不断言资源不存在 |
 | 404 | 资源/ID 问题 | 先用列举类工具确认资源是否存在，再决定 |
 | timeout | 范围过大 | 缩小时间范围、补齐标签/租户条件、改走索引字段 |
 | empty | 查询条件 vs 确实无数据 | 判断是条件过严还是真无数据；用户指定时间不擅自扩大 |
@@ -261,7 +269,8 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 天工环境与实例 | `knowledge/environment/tiangong.md` | `search_knowledge("天工环境")` |
 | SRM 代码库拓扑 / 分支规则 | `knowledge/architecture/srm-repository-topology.md` | `search_knowledge("代码库拓扑 二开")` |
 | 标准 vs 二开判定口径 | `knowledge/architecture/standard-customization.md` | `search_knowledge("标准二开判定")` |
-| 适配器 JS 脚本（存库二开） | `knowledge/srm/adapter-js.md` | `search_knowledge("适配器 JS 脚本")` |
+| 适配器 JS 脚本（埋点二开） | `knowledge/srm/adapter-js.md` | `search_knowledge("适配器 JS 脚本")` |
+| 独立脚本（Marmot 脚本库，rel-table 宽表） | `knowledge/srm/standalone-script.md` | `search_knowledge("独立脚本")` |
 | 配置表（虚拟表）机制 | `knowledge/srm/virtual-table.md` | `search_knowledge("虚拟表 配置表")` |
 | 故障信号 → 假设 → 证据 | `rules/diagnostic-rules.yaml` | —（规则，留在 Skill） |
 
