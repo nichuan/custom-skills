@@ -56,15 +56,15 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 
 | 工具 | 用途 | 典型场景 |
 |------|------|----------|
-| `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)` | 检索可复用模板；当前 MCP 返回标题、场景、SQL、风险、状态、关键词、核心表和使用次数，不返回 `execution_flow` / `example_case` | 生成前先按盘古分类/关键词/表名定位已有模板 |
+| `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)` | 检索可复用模板；命中后用 `get_sql_template(id)` 读取完整执行流程、案例和诊断字段 | 生成前先按盘古分类/关键词/表名定位已有模板 |
 | `save_sql_template(title, category, scenario, sql_text, ...)` | 沉淀本次生成的 SQL 为模板；`parameters` 传 JSON 对象字符串，模板只写入库不执行 | 复杂场景完成后询问用户并保存 |
 | `get_sql_template(id)` / `list_sql_templates(...)` | 按 id 获取 / 总览模板库 | 查看某模板或全量浏览 |
 | `update_sql_template(id, ...)` | 更新模板（如补「✅ 已验证」） | 复核后标记验证 |
 | `record_template_usage(id)` | 记录使用一次（使用次数 +1） | 复用模板生成后调用，优化排序 |
 
-> 当前 MCP 的模板工具实际签名以 `server.py` 为准。不要向 `save_sql_template` / `update_sql_template`
-> 传入未声明的 `execution_flow`、`example_case`、`schema_verified`、`problem_description` 等字段；
-> 数据修复的逐步执行轨迹由本 Skill 在当次任务中维护，并按下方铁律执行。
+> 当前 MCP 的模板工具实际签名以 `server.py` 为准，支持 `execution_flow`、
+> `example_case` 及问题描述、症状、根因、前置条件、诊断步骤、校验/回滚 SQL 等字段；
+> 不要传入 `schema_verified` 等未声明字段。
 
 ### 盘古模板检索/沉淀约定（与 ssrc 区分，保证检索准确）
 
@@ -81,7 +81,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 生成任何 SQL 前，按以下顺序执行，**严禁跳步**：
 
 1. **先检索模板库**：调用 `search_sql_templates`，按盘古分类（`category=订单SPUC/物流收货SINV/物流发货SLOD/...`）+ 业务关键词检索已有模板；优先复用 `verified=true`（✅ 已验证）模板。MCP 不可用则跳过本步继续。
-   **⚡ 命中修复模板或任务涉及写 SQL 时，必须进入下方「执行过程驱动模式」：严格按 `[STEP]` 顺序逐个调用 `archery_query` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。当前 MCP 不返回 `execution_flow` 字段，不要假设模板含有该字段。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
+   **⚡ 命中修复模板后先调用 `get_sql_template(id)` 取得完整 `execution_flow`；任务涉及写 SQL 时，必须进入下方「执行过程驱动模式」，严格按 `[STEP]` 顺序逐个调用 `archery_query` 执行 `QUERY`、校验 `ASSERT` 通过后提取真实变量，最后才生成最终修复 SQL。旧模板无执行流程时按本 Skill 补建。禁止跳过前置查询直接输出 UPDATE/DELETE，禁止让用户自行填写主键占位符，禁止猜测/编造任何 ID。**
 2. **确认业务上下文**：按「术语映射表」判断单据体系（订单 sodr / 收货事务 sinv_rcv / 发货工作台 slod / 老送货单 sinv_asn），**特别注意老送货单与发货工作台送货单是两套表**；上下文不足时才向用户澄清。
 3. **确认目标租户**：先 `SELECT tenant_id FROM hpfm_tenant WHERE tenant_num = '<租户编码>'`（或按 tenant_name 模糊）获取真实 `tenant_id`，**绝不硬编码**（历史示例中的 `46997`/`151025` 等仅供参考）；可借助 `archery_query_tenant(tenant="<租户编码>", site="cn", instance=None, db=None)` 辅助反查。
 4. **确认涉及表与字段（分级校验 + 校验门禁）**：
@@ -105,9 +105,9 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 > 目标：让大模型像资深 DBA 一样「按部就班、有据可查」，杜绝跳过前置校验、猜测主键/状态直接生成修复 SQL。
 
 ### 触发条件
-命中修复模板或任务本身涉及写 SQL 时**强制进入本模式**。当前 MCP 模板接口不返回
-`execution_flow` / `example_case` 字段，因此不要假设模板带有它们，也不要将其作为工具参数；
-即使模板没有执行轨迹，也必须按本节规则逐步取真实值。
+命中修复模板或任务本身涉及写 SQL 时**强制进入本模式**。命中后读取模板的
+`execution_flow` / `example_case` 作为流程和脱敏案例参考；即使旧模板没有执行轨迹，
+也必须按本节规则逐步取真实值。
 
 ### 伪代码语法（模板约定）
 ```text
@@ -126,7 +126,7 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
 4. **CONDITION 短路**：条件命中（如「单据已在目标状态」「已被下游占用」）时直接返回结论，不生成修复 SQL。
 5. **生成最终 SQL**：所有前置 QUERY 成功、ASSERT 全部通过后，才将真实值代入 `ACTION` 生成 UPDATE/DELETE/INSERT（仍遵循「SQL 输出格式规范」与盘古规则：`sodr_*` 乐观锁、留痕字段、ES 联动）。
 6. **输出结构化报告**：包含 ① 执行轨迹（每个 STEP 的查询与真实中间结果）② 最终 SQL（带真实值或明确标注的占位符供人工复核）③ 执行后校验 SELECT。
-7. **展示执行轨迹**：当前 MCP 不提供 `example_case`；在当次响应中展示脱敏的输入、各 STEP 中间结果和最终 SQL，不展示隐藏推理。
+7. **展示执行轨迹**：可参考模板的 `example_case` 组织输出，但必须展示本次脱敏输入、各 STEP 中间结果和最终 SQL，不照抄历史值、不展示隐藏推理。
 8. **降级**：`zhenyun-pangu-mcp` 的 Archery 不可用导致 QUERY 无法执行时，**不得**假装执行通过；改为输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
 
 ## 分级校验策略（正确性与效率兼顾）
@@ -183,12 +183,12 @@ description: 基于 SRM 盘古订单履约域（SPUC 订单、SINV 收货事务�
   - `title`：`【盘古-xx】...` 前缀；
   - `category`：`订单SPUC` / `物流收货SINV` / `物流发货SLOD` / `盘古通用查询` / `数据修复-盘古`；
   - `system`：`盘古`；`keywords` 必含 `盘古`；`core_tables` 照实填写；
-  - 数据修复类在当次响应中必须保留 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/CONDITION/ACTION）执行轨迹；当前 MCP 模板接口不提供 `execution_flow` / `example_case` 字段，不要把它们作为参数传入；
+  - 数据修复类必须把 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/EXTRACT/CONDITION/ACTION）写入 `execution_flow`，并把脱敏的输入、中间结果和最终 SQL 摘要写入 `example_case`；
   - `verified`：表/字段已 MCP 校验通过则置 `true`；未校验保持 `false`。
   - `status`：模板状态，默认 `draft`，可用 `draft/verified/trusted/deprecated`。
   - `risk_level`：按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
   - `business_domain`：`盘古订单履约`；`system`：`盘古`；`execution_policy`：写操作执行策略说明；`parameters`：参数 JSON 对象字符串。
-- 当前接口不支持用 `update_sql_template` 补充 `execution_flow` / `example_case`；请在当次结果中保留脱敏执行轨迹，或将必要参数说明写入 `scenario` / `parameters`。
+- 排障类按需补充 `problem_description`、`symptom`、`root_cause`、`preconditions`、`diagnosis_steps`、`verify_sql`；只有确有安全回滚方案时才写 `rollback_sql`。
 - 复用模板生成后调用 `record_template_usage(id)`。
 
 ### 去重

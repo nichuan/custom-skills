@@ -14,7 +14,7 @@ description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生
 
 - **P0 数据库实时事实**：`archery_query` / `describe_table` / `list_columns` 当前返回的结构与数据。
 - **P1 安全规则**：多租户隔离、查询/修改分离、写操作安全、环境确认。
-- **P2 执行过程**：数据修复任务由本 Skill 定义的 `[STEP]` 强制执行顺序与断言（当前 MCP 模板接口不提供 `execution_flow` 字段）。
+- **P2 执行过程**：数据修复任务优先复用模板的 `execution_flow`，并由本 Skill 强制执行 `[STEP]` 顺序与断言。
 - **P3 已验证模板**：MCP 返回 `verified=true` 且经 `describe_table`/`list_columns` 确认存在的表/字段。
 - **P4 本地业务知识**：`references/*.md` 中的业务语义与规则。
 - **P5 模型推断**：仅用于生成候选方案，**禁止作为字段/值存在性的事实依据**。
@@ -112,14 +112,16 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - `get_table_relations("<表名>")`：一跳/二跳关联与 join 字段，写 JOIN 前确认路径。
 
 ### 模板库（zhenyun-pangu-mcp 认知层，Supabase）
-- `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)`：生成前检索复用；当前 MCP 返回标题、场景、SQL、风险、状态、关键词、核心表和使用次数，不暴露 `execution_flow` / `example_case` 参数。
+- `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)`：生成前检索复用；命中后用 `get_sql_template(id)` 获取完整的 `execution_flow`、`example_case` 和诊断字段。
 - `save_sql_template(...)` / `get_sql_template(id)` / `list_sql_templates(...)` / `update_sql_template(id, ...)` / `delete_sql_template(id)` / `record_template_usage(id)`。
 - `diagnose_context(query, system, module)`：组合诊断，自动汇集 知识→模板→表→关系，排障首推。
 
 > 当前 MCP 的模板工具实际签名以 `server.py` 为准：`save_sql_template` 的必填项为
 > `title/category/scenario/sql_text`；可选 `keywords/core_tables/verified/template_no/system/status/risk_level/business_domain/source_type/parameters/execution_policy/created_by`。
-> `parameters` 必须传 JSON 对象字符串。不要向工具传入未列出的
-> `execution_flow`、`example_case`、`schema_verified`、`problem_description` 等字段。
+> `parameters` 必须传 JSON 对象字符串。模板工具同时支持
+> `execution_flow`、`example_case`、`problem_description`、`symptom`、`root_cause`、
+> `preconditions`、`diagnosis_steps`、`verify_sql`、`rollback_sql`；不要传入
+> `schema_verified` 等未声明字段。
 
 ### Archery（zhenyun-pangu-mcp，只读）
 
@@ -131,7 +133,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ## 5. execution_flow（Skill 内部执行过程驱动模式）
 
-> 当前 MCP 模板接口不返回 `execution_flow` 字段，因此不要假设命中模板带有该字段，也不要把它作为 MCP 参数传入。数据修复任务仍按本节规则由 Skill 自己维护执行轨迹：只要任务涉及写 SQL，就强制逐步执行 QUERY/ASSERT/EXTRACT，杜绝跳过前置校验、猜测主键/状态。
+> 命中模板后先调用 `get_sql_template(id)` 读取完整 `execution_flow`。旧模板没有该字段时，由 Skill 根据本节规则补建执行轨迹；只要任务涉及写 SQL，就强制逐步执行 QUERY/ASSERT/EXTRACT，杜绝跳过前置校验、猜测主键/状态。
 
 ### 伪代码语法
 ```text
@@ -154,7 +156,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 7. **输出结构化报告**：① 执行轨迹（每个 STEP 的查询与真实中间结果，即脱敏示例风格的**执行轨迹**而非隐藏推理）② 最终 SQL（真实值或明确占位符）③ 执行后校验 SELECT。
 8. **降级**：Archery 不可用时**不得假装执行通过**；输出带占位符的完整分步方案并标注「未经过数据库验证，需人工按 STEP 顺序执行」。
 
-> 执行轨迹是输入→各 STEP 中间结果→最终 SQL，不是思考链路；模型照轨迹执行，不模仿隐藏推理。当前 MCP 不提供 `example_case` 字段，需在当次结果中展示脱敏轨迹。
+> 执行轨迹是输入→各 STEP 中间结果→最终 SQL，不是思考链路；模型可参考模板中的 `example_case`，但必须以本次实时查询结果重新执行，不得照抄历史值或模仿隐藏推理。
 
 ---
 
@@ -200,6 +202,8 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - `business_domain`：如 `采购寻源`；`system`：`天工`/`盘古`；
 - `execution_policy`：执行策略说明（如 `READ_ONLY`/`REQUIRES_CONFIRMATION`/`FORBIDDEN_AUTOMATIC`）；
 - `parameters`：参数说明 JSON 对象字符串，如 `{"tenant_id":{"type":"bigint","required":true}}`；
+- 数据修复类必须写入 `execution_flow`（`[INPUT]` + `[STEP]` 的 QUERY/ASSERT/EXTRACT/CONDITION/ACTION）和脱敏 `example_case`；
+- 排障类按需写入 `problem_description`、`symptom`、`root_cause`、`preconditions`、`diagnosis_steps`、`verify_sql`；只有确有安全回滚方案时才写 `rollback_sql`；
 - `record_template_usage(id)` 复用后累加。
 > 沉淀前先 `search_sql_templates` 检查重复；当前接口不要假设 `skip_dup_check` 会自动去重。需要覆盖已有模板时用 `update_sql_template`，不要重复插入。
 
