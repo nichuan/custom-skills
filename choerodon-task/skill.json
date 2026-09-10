@@ -1,7 +1,7 @@
 {
   "name": "choerodon-task",
-  "version": "1.1.0",
-  "description": "猪齿鱼（Choerodon）跨项目协作任务只读查询助手：按项目 ID、名称或编码定位可访问项目，再按任务号、经办人、关键词或状态查 issue，并查看评论、状态流转和附件。Marmot 纯二开需求开发由 srm-requirement-delivery 负责。",
+  "version": "1.2.0",
+  "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手：定位项目并查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。Marmot 纯二开需求开发由 srm-requirement-delivery 负责。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -19,7 +19,8 @@
     "query_by_filter": "按关键词/状态/经办人组合列 issue",
     "status_map": "取状态名→加密 id 映射，理解状态流转",
     "attachments": "列附件并取签名下载地址",
-    "read_only": "仅只读查询，不写猪齿鱼、不改业务库",
+    "read_mostly": "默认只读查询；不改任务状态或业务库",
+    "controlled_comment": "仅在用户明确要求、预览并确认内容后调用 choerodon_add_comment",
     "route_on_action": "Marmot 纯二开开发交给 srm-requirement-delivery；排障和 SQL 交给对应专项 Skill"
   },
   "mcp_servers": [
@@ -51,6 +52,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-08"
+    "last_updated": "2026-09-10"
   }
 }

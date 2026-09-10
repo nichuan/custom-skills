@@ -1,0 +1,47 @@
+{
+  "name": "knowledge-governance",
+  "version": "1.0.0",
+  "description": "甄云盘古认知库查询与治理助手：检索、查看、沉淀、修正、归档或删除 knowledge_docs 中的稳定业务知识、系统机制和排障经验；不维护 SQL 模板、表目录或实时生产事实。",
+  "author": "Zhenyun Engineering",
+  "license": "MIT",
+  "keywords": [
+    "knowledge",
+    "governance",
+    "认知库",
+    "知识库",
+    "沉淀",
+    "归档"
+  ],
+  "features": {
+    "knowledge_search": "按关键词、类型、系统、模块、状态检索并读取完整知识",
+    "cross_discovery": "使用 search_pangu / diagnose_context 发现认知层候选上下文",
+    "controlled_write": "新增和更新前展示内容并取得用户确认，未核验内容保持 draft",
+    "safe_retirement": "过时知识优先 deprecated/archived，物理删除前再次读取并明确确认",
+    "fact_boundary": "实时日志、数据、DDL 和服务状态必须交给专项实时工具核验"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "search_knowledge",
+        "get_knowledge",
+        "search_pangu",
+        "diagnose_context",
+        "save_knowledge",
+        "update_knowledge",
+        "delete_knowledge"
+      ],
+      "description": "盘古认知层 knowledge_docs 的检索、详情和受控治理工具；写操作只修改认知层元数据，不修改业务数据库。"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "knowledge",
+    "governance",
+    "development"
+  ],
+  "metadata": {
+    "store": "supabase",
+    "last_updated": "2026-09-10"
+  }
+}

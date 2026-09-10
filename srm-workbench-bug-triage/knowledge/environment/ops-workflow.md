@@ -29,7 +29,7 @@
 | 查认知层（企业事实/排查经验） | `search_knowledge` / `get_knowledge` | 排查前先查，避免重复劳动；知识 id=35~41 为本 skill 同源内容 |
 | 查 ES（待办 / 单据索引） | `zhenyun-pangu-mcp`：`es_search` / `es_count` / `es_get`（带 `env` 参数选 prod/dev/test） | ⛔ **两条铁律**：① 严禁删除/更新/写入 ES，只允许 `_search`/`_count`/单文档读取；② 单次查询最多 100 条（`size` 超出自截断）。**未配置该环境 ES 时降级 Kibana 人工查询**：生成 DSL 让用户在 Kibana Dev Tools 查询后贴回结果（见 SKILL.md §ES 查询降级路径） |
 | 查日志（捞请求 DSL / traceId） | `obs_sls_query` / `obs_log_query`（按环境路由） | 捞 `/card-search/query` 两段 DSL 用日志 |
-| 读源码 | 本地源码优先（路径见下）；本地缺失或需确认线上版本时用 `gitlab_search_code` / `gitlab_get_file`（仓库 `operation-srm/srm-workbench`） | 只读 |
+| 读源码 | 普通搜索用本地 `search_repo`；仅已知真实 `project_id/ref/path` 时用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确读取 | 当前 GitLab 项目/代码搜索禁用，不得构造 `gitlab_search_*` 调用 |
 
 > **ES 链接是唯一额外项**：Archery / 日志 / 代码检索 / 认知层的凭证均与标准 `zhenyun-pangu-mcp` 一致，**只有 ES 链接与凭证需要维护者额外补入 `zhenyun-pangu-mcp/.env`**（按环境维护 prod/dev/test 三套：prod 用 `ES_BASE_URL`/`ES_USERNAME`/`ES_PASSWORD`，dev/test 用 `ES_DEV_*`/`ES_TEST_*`，占位符见 `.env.example` 的「正式环境 ES」段）。**未配置某环境 ES 时不影响排查**：进入 Kibana 人工查询降级模式（生成 DSL 让用户查询后贴回，见 SKILL.md §ES 查询降级路径），仅当用户无 Kibana 时才用库表侧证据推理并标注证据缺失。
 > **凭据纪律**：所有账号密码只存在于 MCP 自身 `.env`，严禁写入本仓库任何文件、示例或对话。

@@ -1,7 +1,7 @@
 # 关键代码定位速查
 
 包名前缀：`org.srm.workbench`。
-⚠️ **源码位置**：用户本地源码在 `D:\devTools\code\srm\srm-workbench`（Java，Spring Boot + Cola 架构）。**排查时优先直接用本地源码**（如 `src/main/java/org/srm/workbench` 下的 `api/app/domain/infra`），无需每次走 `gitlab-code` MCP 远程仓库。如本地无该文件/需确认线上版本，再用 `gitlab-code` MCP 在 GitLab 仓库 `operation-srm/srm-workbench` 浏览（`search_code`/`get_file`/`list_tree`）。
+⚠️ **源码位置**：以 MCP 的 `PG_ROOT` 配置和 `search_repo` 实际返回为准。**排查时优先搜索本地源码**（如 `src/main/java/org/srm/workbench` 下的 `api/app/domain/infra`）。当前 GitLab 项目/代码搜索未启用；只有从用户或可靠证据获得真实 `project_id/ref/path` 后，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确读取。
 
 ## Controller（界面入口）
 - 超级查询：`api/controller/v1/DocDataSearchController`
@@ -57,8 +57,8 @@
 - `assignee` / `businessRoleUuid`：经办人 / 业务角色
 
 ## 排查技巧
-- 搜索消费逻辑：通过 `gitlab-code` MCP 的 `search_code` 搜 `WorkBenchDataProcessConsumer` 或 `@Consumer`（本地源码在 `D:\devTools\code\srm\srm-workbench` 可直接搜）
-- 搜索某单据待办生成：通过 `gitlab-code` MCP 的 `search_code` 搜对应 `todoCode` 或单据类型常量
+- 搜索消费逻辑：用 `search_repo(keyword="WorkBenchDataProcessConsumer", mode="content")` 或搜索 `@Consumer`，并根据返回路径继续局部读取。
+- 搜索某单据待办生成：用 `search_repo` 搜对应 `todoCode` 或单据类型常量。
 - 搜索某字段映射：配置在菜单"单据字段映射"，库表见 db_tables.md
 - **超级搜索"新增可搜字段"完整链路**（纯配置 + 安全刷新，详见 `references/super_search_field_config.md`）：
   1. `swbh_doc_object_rel_field`（`srm_workbench`）：登记业务字段（`bo_field_code`、个性化字段需先在 BO 模型注册、`index_flag=1`、发布）——决定字段**进 ES 存储**

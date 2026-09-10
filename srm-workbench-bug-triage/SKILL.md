@@ -87,7 +87,7 @@ Evidence           → 本次调查实际获得的事实（会话内维护）
 
 ### 3. 再定位代码层
 
-按 `architecture/code-map.md` 的类路径读源码（本地优先，GitLab 兜底），**匹配 `rules/diagnostic-rules.yaml` 的假设与所需证据**，判断是配置/数据问题还是代码缺陷。
+按 `architecture/code-map.md` 的类路径读源码：普通检索统一使用本地 `search_repo`；只有已经掌握真实 `project_id/ref/path` 时，才用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确读取。**匹配 `rules/diagnostic-rules.yaml` 的假设与所需证据**，判断是配置/数据问题还是代码缺陷。
 
 ### 4. 给出结论
 

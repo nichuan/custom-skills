@@ -1,6 +1,6 @@
 {
   "name": "srm-workbench-bug-triage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "srm-workbench（采购员工作台 / 角色工作台）服务 bug 排查助手：仅在用户报告采购员工作台相关问题（待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致）时使用。先查认知层（search_knowledge / get_knowledge），再按「先排除配置与数据、再怀疑代码」的顺序排查：待办定义与维度映射等配置、消费失败记录 swbh_err_record、各环境 ES 待办与单据索引（prod/dev/test，es_search 带 env 参数）、srm-workbench 源码。证据驱动（假设→证据→置信度），带技能专属铁律（两段式 ES 查询、access 块语义、待办与单据分开存储需分页重排、工作流挂起无 binlog 的设计限制）与库路由规则（swbh_*→srm_workbench、业务源表→srm、slod_*→srm_logistics_delivery；Archery 按 environment 选 prod/dev/test 实例）。数据库与 ES 均只读，写操作一律交用户执行。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -48,8 +48,6 @@
         "search_tables",
         "get_table_relations",
         "search_repo",
-        "gitlab_search_projects",
-        "gitlab_search_code",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file",
@@ -73,6 +71,6 @@
     "sql_templates_count": 0,
     "sql_examples_count": 0,
     "knowledge_docs_synced": "35-41",
-    "last_updated": "2026-09-01"
+    "last_updated": "2026-09-10"
   }
 }

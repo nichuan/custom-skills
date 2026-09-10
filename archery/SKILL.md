@@ -45,7 +45,7 @@ description: Archery 数据库查询助手（统一数据访问层）。仅在�
 
 - 默认库 `srm`；跨库查询必须显式传 `db_name`。
 - 可用库以 `archery_list_databases` 实际返回为准，**严禁猜库名**。
-- 拿不准实例/库时先调 `archery_list_instances(site)` / `archery_list_databases(site, instance)`。
+- 拿不准实例时调 `archery_list_instances()` 查看全部站点，或传 `site="cn"|"aws"` 只看目标站点；拿不准库时调 `archery_list_databases(site, instance)`。
 
 ### 铁律 4：查询/修改分离，Agent 不直接写库
 
@@ -101,7 +101,7 @@ default_site = cn, default_db = srm
 | `archery_query(sql, site, instance, db)` | 执行只读 SQL，逐步取租户/主键/状态真实值 | 确认真实数据、验证查询条件 |
 | `archery_list_columns(table, site, instance, db)` | 列字段名清单 | 生成 UPDATE/WHERE 前核对字段拼写 |
 | `archery_describe_table(table, site, instance, db)` | SHOW CREATE TABLE（结构+注释+索引） | 不确定字段/需完整结构时 |
-| `archery_list_instances(site?)` | 列出可用实例与别名映射 | 拿不准实例名时先调 |
+| `archery_list_instances(site?)` | `site` 留空返回全部，传 `cn`/`aws` 只返回该站点 | 拿不准实例名时先调 |
 | `archery_list_databases(site, instance)` | 列出某实例下所有库 | 确认 `srm` / `srm_logistics_delivery` 等库名 |
 | `archery_query_tenant(tenant, site, instance, db)` | 按租户编码/名称反查 `tenant_id` | 生成 SQL 前确认真实租户，禁止硬编码 |
 

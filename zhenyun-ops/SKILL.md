@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、猪齿鱼查询、故障排查、采购员工作台 bug 排障、寻源/履约 SQL、数据库访问和代码/脚本定位；意图明确时直接使用对应子 Skill。
+description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、猪齿鱼查询、故障排查、采购员工作台 bug 排障、寻源/履约 SQL、数据库访问、认知库治理和代码/脚本定位；意图明确时直接使用对应子 Skill。
 ---
 
 # 甄云 SRM 全局路由
@@ -18,6 +18,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 订单、收货、发货、送货单、状态机、委外相关 SQL | `spuc-sql-generator` |
 | 采购员工作台/角色工作台待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致 | `srm-workbench-bug-triage` |
 | 查实例/库/表结构/样本，或确认 Archery 环境映射 | `archery` |
+| 查询、沉淀、修正、归档或删除盘古认知库知识 | `knowledge-governance` |
 | 只找类、DTO、方法、文件、适配器或独立脚本实现 | `gitlab-code` |
 
 ## 判定规则
@@ -26,6 +27,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 采购寻源走 `ssrc-sql-generator`；采购订单及下游履约走 `spuc-sql-generator`。
 - 工作台现象（待办/计数、整改模块、卡片字段、超级搜索、单据动态/关注、ES 权限/消费）优先走 `srm-workbench-bug-triage`；仅当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
+- 明确要求维护 `knowledge_docs` 或查询已沉淀知识时走 `knowledge-governance`；SQL 模板和表目录仍由对应 SQL Skill 管理。
 - 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接同时考虑适配器与独立脚本。当前 GitLab 搜索禁用，不作为本地无结果时的回退。
 - 意图仍不唯一时，列出具体分歧及其对交付物的影响，再向用户确认；不凭模块名猜。
 
@@ -34,12 +36,13 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | Skill | 职责 |
 | --- | --- |
 | `srm-requirement-delivery` | 按需求号拉取并实现 Marmot 纯二开产物，完成逐脚本快速检查 |
-| `choerodon-task` | 猪齿鱼任务、评论、状态和附件的只读查询 |
+| `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；仅在用户明确确认后新增评论 |
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
 | `spuc-sql-generator` | 订单履约域查询/修复 SQL |
 | `srm-workbench-bug-triage` | 采购员工作台（角色工作台）bug 排障：待办/关注/超级搜索/卡片/整改，内置两段式 ES 查询、权限维度模型与库路由 |
 | `archery` | 实例、库、表结构及数据的统一只读访问 |
+| `knowledge-governance` | 盘古认知库的检索、沉淀、修正、归档与受控删除 |
 | `gitlab-code` | 本地源码、适配器脚本、独立脚本和已知 GitLab 路径的只读定位 |
 
 ## MCP 能力边界
@@ -54,7 +57,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 独立脚本/API | `search_standalone_scripts` → info → source | `gitlab-code`；API 挂载、API 发布及公共块开发时由 `srm-requirement-delivery` 调用 |
 | 数据与表结构 | `archery_*`、`search_tables`、`get_table*` | `archery` 和领域 SQL Skill；纯二开编码被具体字段阻塞时可只读核实 |
 | 日志 | `obs_sls_*`、`obs_log_*` | `java-troubleshoot` |
-| 知识与模板 | `search/get_knowledge`、`search/get_sql_template` | 各专项 Skill 按需调用 |
+| 业务知识 | `search/get/save/update/delete_knowledge`、`search_pangu`、`diagnose_context` | `knowledge-governance`；专项 Skill 可只读复用 |
+| SQL 模板 | `search/get/save/update/delete_sql_template`、使用统计 | `ssrc-sql-generator` / `spuc-sql-generator` |
 | GitLab 精确读取 | `gitlab_list_branches`、`gitlab_list_tree`、`gitlab_get_file` | `gitlab-code`；仅 project/ref/path 已知时 |
 
 不把知识库、历史脚本或自动索引当作实时生产事实；字段与数据由目标环境 Archery 证明。认知层写入、猪齿鱼评论、业务库写入、脚本发布或绑定都不是路由 Skill 的默认权限。
