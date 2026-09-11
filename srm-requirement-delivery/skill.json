@@ -1,6 +1,6 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "按猪齿鱼需求号开发 SRM Marmot 纯二开代码：从可配置目录组织交付物，拉取平台空模板，实现埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
@@ -8,20 +8,22 @@
   "features": {
     "issue_driven": "需求号直达猪齿鱼描述、评论和已有技术设计",
     "platform_pull": "按租户和编码读取适配器或独立脚本的现有正文",
-    "artifact_layout": "从 MARMOT_DELIVERY_ROOT 开始按需求、租户和产物类型分类落地",
+    "artifact_layout": "使用用户确认的输出目录，按需求、租户和产物类型分类落地",
     "focused_implementation": "只补当前二开逻辑，未知契约才做定向核实",
-    "portable_validation": "基础检查不依赖 marmot-dev，不创建正式 Gate 或审阅包",
+    "design_gates": "编码前确认字段来源、外部服务契约、日志、空值语义与执行范围",
+    "static_quality_gate": "用每次需求提供的规则检查 Marmot JavaScript 与产物哈希",
+    "portable_validation": "基础检查不依赖 marmot-dev；只维护轻量 design-gates.md，不创建正式审阅包",
     "manual_release": "默认输出可复制代码，不写平台、不挂载、不发布"
   },
   "mcp_servers": [
     {
       "name": "zhenyun-pangu-mcp",
       "tools": [
-        "marmot_get_delivery_config",
         "choerodon_list_projects", "choerodon_list_issue", "choerodon_query_issue", "choerodon_list_comments", "choerodon_list_attachments", "choerodon_download_attachment",
         "search_adapter_scripts", "get_adapter_script_info", "get_adapter_script_source",
         "search_standalone_scripts", "get_standalone_script_info", "get_standalone_script_source",
-        "search_repo", "archery_list_instances", "archery_query_tenant", "archery_describe_table", "archery_list_columns", "archery_query"
+        "search_repo", "archery_list_instances", "archery_query_tenant", "archery_describe_table", "archery_list_columns", "archery_query",
+        "inspect_object_relation", "check_marmot_script_static", "query_script_trace"
       ],
       "description": "只读获取本地交付目录、猪齿鱼需求、平台脚本、标准调用契约和必要数据库事实。"
     }

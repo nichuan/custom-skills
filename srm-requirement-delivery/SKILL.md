@@ -5,7 +5,9 @@ description: 按猪齿鱼需求号或明确业务说明开发甄云 SRM Marmot �
 
 # SRM 纯二开需求开发
 
-本 Skill 只做一件事：把已经确定采用 Marmot 二开的需求快速变成可复制回平台的成品代码。需求中的技术设计是实现依据，不重新进行 `STANDARD / ADAPTOR / MIXED` 判型，也不创建 `requirements/`、Gate、审阅包或完整取证文档。
+本 Skill 只做一件事：把已经确定采用 Marmot 二开的需求变成可复制回平台的成品代码。需求中的技术设计是实现依据，不重新进行 `STANDARD / ADAPTOR / MIXED` 判型。
+
+每次需求编码前都必须完成设计门禁；至少确认输入与输出字段来源，涉及数据库关联、外部服务、状态分支或多产物协同时再补齐对应契约。先阅读 [references/delivery-gates.md](references/delivery-gates.md)，并在需求目录生成 `design-gates.md`；未知事实必须标记为 `TBD`，不得把某次需求的字段、表、状态或服务规则当成公共默认值。
 
 ## 支持的产物
 
@@ -24,16 +26,17 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 不要在 Skill 中写死个人绝对路径，也不要默认依赖 `marmot-dev` 工程。
 
-1. 用户在当前请求中明确指定输出目录时，以该目录为本次覆盖值。
-2. 否则先调用 `marmot_get_delivery_config`，读取 MCP `.env` 中的 `MARMOT_DELIVERY_ROOT`。
-3. 配置缺失或 `valid=false` 时停止创建文件，明确提示用户在 MCP 的 `.env` 中加入 `MARMOT_DELIVERY_ROOT=/绝对路径`。不得静默回退到当前目录、Skill 目录或某个固定工程。
-4. 配置有效后，需求根目录固定为 `<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/`。若目录不在当前 Codex 可写工作区内，先说明目标路径并请求相应文件系统授权。
+1. 用户在当前请求中明确指定输出目录时，直接使用该目录。
+2. 当前对话已经确认过输出目录时沿用，不重复询问。
+3. 否则在创建文件前向用户询问一次输出目录；不得静默回退到当前目录、Skill 目录或某个固定工程。
+4. 确认后需求根目录固定为 `<delivery-root>/<issue>/<tenant>/`。先检查路径是否为目录或可创建、最近已存在父目录是否可写；若不在当前 Codex 可写工作区内，说明目标路径并请求相应文件系统授权。
 
 需求目录结构如下：
 
 ```text
-<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/
+<delivery-root>/<issue>/<tenant>/
   request.md
+  design-gates.md
   artifacts.json
   srm-adaptor/<code>/entry.js
   SCRIPT_LIB/<code>/entry.js
@@ -47,9 +50,10 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 这是默认入口。按下面的最短闭环执行到代码完成，不要先询问用户是否需要开始：
 
-1. 先按“本地产物根目录”规则解析本次输出位置，再用 `choerodon_list_issue(keyword=<需求号>)` 找到唯一任务，随后用真实加密 `issueId` 调用 `choerodon_query_issue` 和 `choerodon_list_comments`。用户指定项目时先解析并始终传同一个真实 `project_id`；未指定时沿用 MCP 默认项目。附件只在需求理解依赖它时读取。
+1. 先按“本地产物根目录”规则确认本次输出位置，再用 `choerodon_list_issue(keyword=<需求号>)` 找到唯一任务，随后用真实加密 `issueId` 调用 `choerodon_query_issue` 和 `choerodon_list_comments`。用户指定项目时先解析并始终传同一个真实 `project_id`；未指定时沿用 MCP 默认项目。附件只在需求理解依赖它时读取。
 2. 从描述和评论提取租户、目标环境、产物角色、脚本编码、挂载接口/埋点、输入输出和业务规则。评论中的后续技术设计优先于较早描述；冲突时明确指出。
 3. 最少需要确定 `tenant + 产物角色 + code`。仅当猪齿鱼内容和平台搜索都无法补齐其中某项时，才向用户问一个聚焦问题。
+4. 先按“设计门禁”产出 `design-gates.md`；字段来源表对所有需求必填，未知字段必须标记为 `TBD` 并通过当前需求、源码、平台脚本或实时结构工具核实。数据库关联可调用 `inspect_object_relation`；其它章节不适用时写 `N/A` 及理由。
 
 推荐但不强制用户在猪齿鱼技术设计中按下列字段书写：
 
@@ -66,6 +70,7 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 ### 给出本地文件
 
 用户已给出明确本地文件和逻辑时，跳过猪齿鱼与平台拉取，直接实现并运行快速检查。不要为了补齐流程反向创建需求记录。
+仍须执行设计门禁；可将输入文件中的已确认事实直接填入 `design-gates.md`。
 
 ## 拉取平台空模板
 
@@ -75,11 +80,21 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 2. 只接受租户和编码精确匹配的唯一结果。存在多个版本或同名项时，结合需求环境、服务、描述和更新时间判断；仍不唯一就停止该产物并请用户选择，不猜 `script_id`。
 3. 先读 `get_*_script_info`，再用 `get_*_script_source(full=true)` 获取完整已解码正文。空模板也要保留原有注释、入口形态和配置线索。
 4. 本地目标不存在时，直接按需求目录结构创建对应目录和文件，再把平台正文写入目标文件；不调用 `marmot-dev` 的建档命令。本地目标已存在时先比较；本地和平台都已有非模板逻辑且内容不一致时，不静默覆盖，保留本地文件并报告冲突。
-5. 在 `<MARMOT_DELIVERY_ROOT>/<issue>/<tenant>/` 维护两个轻量文件：
+5. 在 `<delivery-root>/<issue>/<tenant>/` 维护三个轻量文件：
    - `request.md`：需求标题、目标行为、关键约束和验收点的简要快照。
-   - `artifacts.json`：每个产物的角色、类型、编码、平台 `script_id`、平台更新时间、拉取时源码 SHA-256 和本地文件路径。长整型 ID 以字符串保存。
+   - `design-gates.md`：需求拆分关系图、字段来源/关联表、外部服务契约、关键日志点、空值与异常矩阵、产物差异表、静态检查和 trace 联调状态。
+   - `artifacts.json`：每个产物的角色、类型、编码、平台 `script_id`、平台更新时间、拉取时源码 SHA-256、本地文件路径和最近静态检查 SHA-256。长整型 ID 以字符串保存。
 
-不要为这一流程运行 `req:new`，也不要生成 manifest、decision、workflow、verification、design、rollback 或 bundle。已有正式目录不删除；本次只维护上述轻量记录和实际代码。
+不要为这一流程运行 `req:new`，也不要生成其它正式审阅包中的 manifest、decision、workflow、verification、rollback 或 bundle；本 Skill 明确要求的 `design-gates.md` 除外。已有正式目录不删除；本次只维护上述轻量记录和实际代码。
+
+## 设计门禁（编码前强制）
+
+- 字段来源表区分页面/API 入参、数据库对象字段、平台对象字段、脚本中间变量和外部服务参数；每个目标字段填写来源对象/字段、关联条件、类型和空值语义。没有直接字段时先核实关联路径，不凭字段名猜测。
+- 外部服务契约由当前需求、服务文档或已核实脚本提供，至少确认服务编码、必填/禁止参数、对象参数结构、固定值、返回取值路径、顶层失败策略和空结果策略。公共 Skill 不预设任何具体服务规则。
+- 按实际逻辑选择日志阶段：入口、数据访问、关联补全、请求构建、外部响应、字段映射、持久化、分支结果。默认只记数量、ID、业务 Key 和状态；完整敏感数据或报文只能在联调开关打开时临时输出。
+- ID 的空值判断必须先确认字段类型。已确认是数字型的 ID 不使用 `_.isEmpty`，改用 `value !== null && value !== undefined && value !== ""`；字符串、集合和对象按真实类型选择判断方式。
+- 每个产物明确触发时机、状态适用范围、当前结果/当前页/全量数据范围、分页遍历方式、聚合或头级字段是否需要基于全量重算。具体状态集合和范围只能来自当前需求。
+- 编码后调用 `check_marmot_script_static`，并把本次已确认规则通过 `rules_json` 传入；有 `error` 时停止交付，`warning` 必须在 `design-gates.md` 解释或修正。静态检查器不内置业务规则，也不等价于平台运行。
 
 ## 实现
 
@@ -95,9 +110,11 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 ## 验证与交付
 
-1. 为可本地表达的关键分支补少量 `fixtures/*.json`；依赖真实 Java、事务、权限或远程系统的行为明确保留为未验证。
-2. JavaScript 至少执行 `node --check <entry.js>`，并检查只有一个同步全局 `function process(input)` 入口、没有 ESM/CommonJS 导出以及 Node/浏览器专属全局误用。QueryBlock 检查非空、占位符闭合及只读/写入意图是否符合需求。当前工作区若另有兼容的增强检查器，可作为附加验证，但不得把它变成使用本 Skill 的前置依赖。
-3. 最终按产物列出：角色与编码、本地可点击文件、实现摘要、检查结果、仍需平台联调的假设。代码文件就是用户复制回平台的交付物，不额外生成审阅包。
+1. 为可本地表达的关键分支补少量 `fixtures/*.json`；依赖真实 Java、事务、权限、数据库或远程服务的行为明确保留为未验证。当前无法提供 Marmot 运行时的本地模拟执行器时，不得用 Node 模拟结果冒充联调。
+2. JavaScript 至少执行 `node --check <entry.js>`，并检查只有一个同步全局 `function process(input)` 入口、没有 ESM/CommonJS 导出以及 Node/浏览器专属全局误用。外部服务契约在 `design-gates.md` 中人工核对；所有 JavaScript 调用 `check_marmot_script_static`。QueryBlock 检查非空、占位符闭合及只读/写入意图是否符合需求。
+3. `artifacts.json` 中每个源码哈希必须在静态检查后更新；哈希不一致视为门禁失败。
+4. 有真实 trace 时调用 `query_script_trace(trace_id, from_time, to_time, script_code)`，验证 `design-gates.md` 中声明适用的日志阶段；只给 traceId 没有时间范围时，记录为“待补时间范围”，不得结论化为“没有日志”。没有真实 trace 时明确标记未联调。
+5. 最终交付必须列出：需求拆分关系图、字段来源和关联关系表、适用的外部服务契约、关键日志点、正常空值与异常场景、产物差异、本地静态检查结果、真实 trace 联调结果或未验证原因。代码文件和门禁记录就是用户复制回平台的交付物。
 
 ## 外部写入边界
 
