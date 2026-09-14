@@ -11,7 +11,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | 用户目标 | Skill |
 | --- | --- |
-| 按猪齿鱼需求号开发埋点、API 挂载/API 发布、CodeBlock 或 QueryBlock 等纯二开代码 | `srm-requirement-delivery` |
+| 修改已有 Marmot JS/SQL 的字段取值、常量、表达式或局部逻辑 | `srm-requirement-delivery` 快速修改 |
+| 按猪齿鱼需求号开发新的埋点、API 挂载/API 发布、CodeBlock 或 QueryBlock | `srm-requirement-delivery` 完整需求 |
 | 只查询猪齿鱼任务、评论、状态或附件 | `choerodon-task` |
 | 异常、错误码、traceId、日志、接口失败、超时或线上问题 | `java-troubleshoot` |
 | 询价、招标、报价、评分、资格预审、寻源结果相关 SQL | `ssrc-sql-generator` |
@@ -23,7 +24,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 ## 判定规则
 
-- “查需求”和“开发纯二开需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 读取任务、拉取平台模板并实现。需要标准 Java 改造时不进入该 Skill。
+- “查需求”和“开发纯二开需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。只有新需求实现或用户明确要求重新取证时，才读取任务和平台模板。需要标准 Java 改造时不进入该 Skill。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 采购寻源走 `ssrc-sql-generator`；采购订单及下游履约走 `spuc-sql-generator`。
 - 工作台现象（待办/计数、整改模块、卡片字段、超级搜索、单据动态/关注、ES 权限/消费）优先走 `srm-workbench-bug-triage`；仅当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
@@ -35,7 +36,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | Skill | 职责 |
 | --- | --- |
-| `srm-requirement-delivery` | 按需求号拉取并实现 Marmot 纯二开产物，完成逐脚本快速检查 |
+| `srm-requirement-delivery` | 最小修改已有 Marmot 脚本，或按需求号拉取并实现新的纯二开产物 |
 | `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；仅在用户明确确认后新增评论 |
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
@@ -67,7 +68,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | 场景 | 顺序 |
 | --- | --- |
-| 纯二开需求开发 | `srm-requirement-delivery` 读取需求与平台模板、实现并快速检查 |
+| 已有纯二开脚本小改 | `srm-requirement-delivery` 只读目标文件、最小修改并定向检查 |
+| 新纯二开需求开发 | `srm-requirement-delivery` 读取需求与平台模板、实现并快速检查 |
 | 任务上下文 + 故障 | 猪齿鱼只读上下文 → `java-troubleshoot` |
 | 故障 + 数据修复 | `java-troubleshoot` 先定位根因 → 对应 SQL Skill 生成修复 SQL |
 | 工作台待办/单据异常 + 要改数据 | `srm-workbench-bug-triage` 先定位根因 → `ssrc/spuc-sql-generator` 生成修复 SQL，交用户执行 |

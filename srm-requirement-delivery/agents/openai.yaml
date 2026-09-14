@@ -1,7 +1,7 @@
 interface:
   display_name: "SRM 纯二开需求开发"
-  short_description: "按需求号拉取二开模板、实现并快速检查"
-  default_prompt: "使用 $srm-requirement-delivery 根据这个猪齿鱼需求号完成纯二开脚本开发。"
+  short_description: "快速修改已有脚本或按需求号实现新二开"
+  default_prompt: "使用 $srm-requirement-delivery 修改已有 Marmot 脚本；仅在实现新需求时按需求号读取猪齿鱼和平台模板。"
 dependencies:
   tools:
     - type: "mcp"

@@ -1,12 +1,13 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "1.3.0",
-  "description": "按猪齿鱼需求号开发 SRM Marmot 纯二开代码：从可配置目录组织交付物，拉取平台空模板，实现埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。",
+  "version": "1.4.0",
+  "description": "开发或修改 SRM Marmot 纯二开代码；已有脚本的明确字段、常量和局部逻辑改动走最小修改与定向检查，新需求才读取猪齿鱼与平台模板。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": ["srm", "marmot", "choerodon", "二开", "埋点", "api挂载", "api发布"],
   "features": {
-    "issue_driven": "需求号直达猪齿鱼描述、评论和已有技术设计",
+    "fast_patch": "已有脚本的明确局部改动不查询猪齿鱼、平台、数据库或完整调用链",
+    "issue_driven": "仅在实现新需求或用户明确要求时读取猪齿鱼描述、评论和技术设计",
     "platform_pull": "按租户和编码读取适配器或独立脚本的现有正文",
     "artifact_layout": "使用用户确认的输出目录，按需求、租户和产物类型分类落地",
     "focused_implementation": "只补当前二开逻辑，未知契约才做定向核实",
@@ -30,5 +31,5 @@
   ],
   "entry_point": "SKILL.md",
   "categories": ["development", "delivery"],
-  "metadata": { "last_updated": "2026-09-08", "scope": "marmot-custom-only", "release_integration": "not-integrated" }
+  "metadata": { "last_updated": "2026-09-14", "scope": "marmot-custom-only", "release_integration": "not-integrated" }
 }
