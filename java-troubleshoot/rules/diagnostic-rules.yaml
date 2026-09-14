@@ -8,6 +8,8 @@
 #
 # 排障 Agent 在 InvestigationContext 中匹配 signals，提出 hypothesis，
 # 然后按 evidence 去获取事实，满足 conclusion_requires 后才可定论。
+# evidence 中的 source code 必须服从 SKILL.md 的实现载体分流：二开先读实际脚本，
+# 标准仓库只在标准链路已确认或二开契约确需核实时定向检索。
 
 - id: npe
   signals:

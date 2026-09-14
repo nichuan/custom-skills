@@ -1,6 +1,6 @@
 ---
 name: java-troubleshoot
-description: Java 微服务故障排查助手。仅在用户描述异常、报错、traceId、日志、接口失败、超时、线上故障或操作/配置/升级问题时使用；通过 zhenyun-pangu-mcp 查日志、数据库、本地源码、适配器脚本、猪齿鱼和认知层。普通源码直接查本地 PG_ROOT；GitLab 搜索当前禁用。二开、租户定制和外部接口对接必须主动检查数据库脚本。仅查询数据、生成 SQL 或数据修复时不要触发。
+description: Java 微服务故障排查助手。仅在用户描述异常、报错、traceId、日志、接口失败、超时、线上故障或操作/配置/升级问题时使用。按执行链区分标准与二开：二开优先限定 srm-script-container 查 traceId/明确关键字，无可靠关键字时先读适配器或独立脚本；确认无适配器/API 前后置挂载后才默认查标准仓库。仅查询数据、生成 SQL 或数据修复时不要触发。
 ---
 
 # Java 微服务智能排障助手
@@ -57,6 +57,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | `keyword` | 错误关键词/异常信息 |
 | `interface` | 接口地址（如有） |
 | `time_range` | 时间范围（用户指定则严格使用，未指定默认最近 2h） |
+| `implementation_type` | `custom` / `standard` / `unknown`，必须由用户描述或执行链证据判定 |
 | `hypothesis` | 当前假设列表（随证据更新） |
 | `evidence[]` | 已获取证据（每条含 source/observation/confidence） |
 | `confidence` | 当前整体置信度 |
@@ -88,14 +89,31 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
    └─ 否 → 回到"选择最有价值的下一项证据"
 ```
 
-### 证据选择的优先级启发
+### 先判实现载体
 
-1. **有 traceId** → 直接追全链路（优先于手写日志查询）：国内盘古用 `obs_sls_query(trace_id=..., environment=...)`，AWS 海外用 `obs_log_trace(trace_id, region="aws")`。
-2. **无 trace，有 service + keyword** → 按 `service + keyword + time` 查日志，定位首个失败点。
-3. **日志暴露类名/方法名/错误码** → 仅当源码能验证当前假设时才搜源码（不机械"出现类名就必须查"）。
-4. **二开/租户定制/外部接口/回调/推送/同步/报文/字段映射** → 主动检索数据库脚本，**适配器脚本与独立脚本两套体系都要查**（路由见 `knowledge/architecture/standard-customization.md`）；本地代码只用于确认平台入口。
-5. **问题涉及数据状态** → 用 Archery 做只读交叉验证。
-6. **关联到需求/缺陷** → 用猪齿鱼工具补业务上下文。
+不得因为用户只说“有一个 bug”就默认检索标准仓库。先把问题标为以下三类之一：
+
+- `custom`：用户明确提到独立脚本、适配器脚本、API 前/后置挂载、租户定制或外部接口对接，或者执行链证据出现这些调用。
+- `standard`：已有执行链证据覆盖故障区段，并确认没有适配器或 API 前/后置挂载调用。仅“脚本搜索未命中”不足以证明是标准逻辑。
+- `unknown`：尚无足够执行链或脚本定位信息。此时按下面的二开入口顺序取证或追问，**不得先搜标准仓库碰碰运气**。
+
+具体判定口径见 `knowledge/architecture/standard-customization.md`。
+
+### 二开类 Bug 的强制优先级
+
+独立脚本、适配器脚本、API 挂载或外部接口对接问题，必须按下列顺序选择**第一个可执行动作**；证据足够即停，不是要求把每一步全部执行一遍：
+
+1. **有明确 traceId**：先查脚本容器日志。国内 SLS 调 `obs_sls_query(trace_id=..., container_name="srm-script-container", environment=...)`；AWS 海外用 `obs_log_query`，以已验证的服务标签构造 `{app="srm-script-container"} |= "<traceId>"`，不得用不限服务的 `obs_log_trace`。不得先拉其它服务的全链路日志。
+2. **无 traceId，但用户给了明确日志关键字**：按该关键字查 `srm-script-container`；国内 SLS 调 `obs_sls_query(keyword=<精确关键字>, container_name="srm-script-container", level="", environment=...)`，AWS 海外同样用带 `srm-script-container` 服务标签的 `obs_log_query`。只用用户给出的关键字，不自行改写或轮番猜近义词。
+3. **traceId 和可靠关键字都没有，但能定位脚本**：先按脚本编码、租户、运行服务或接口信息获取适配器/独立脚本，再从源码中提取实际打印的稳定日志字面量，用该字面量查询 `srm-script-container`。不得先猜日志关键字。
+4. **traceId、关键字、脚本编码/租户/接口定位信息均不足**：停止工具尝试，向用户索取最小必要信息，优先询问 traceId 或脚本编码，并按需补环境与发生时间。不得无休止地宽泛查日志或本地代码。
+5. **标准仓库最后查**：只有脚本的入参、返回结构、平台默认行为等必须由标准实现核实时，或用户明确要求检索标准代码，才用从脚本/日志得到的接口、类或方法做定向搜索。二开排障不得一开始就扫描标准仓库。
+
+### 标准类 Bug 的默认路径
+
+- `implementation_type=standard` 后，才默认用堆栈、错误文本、接口或类/方法定向检索本地标准仓库。
+- 如果执行链尚不能排除适配器或 API 前/后置挂载，保持 `unknown`，不要把“看起来像标准问题”当成分类证据。
+- 日志暴露类名/方法名/错误码后，仅当源码能验证当前假设时搜索；问题涉及数据状态时用 Archery 做只读交叉验证，关联需求/缺陷时再用猪齿鱼补上下文。
 
 ### 调用链分析要点
 
@@ -114,13 +132,16 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 路由原则速记：**国内公有云盘古 prod + 非生产 dev/test → 阿里云 SLS（`obs_sls_query`）；AWS 海外全部环境 → Loki（`obs_log_query`/`obs_log_trace`）**。默认 cn/盘古、默认非 aws。
 - ⚠️ 盘古非生产已迁回阿里云 SLS：`obs_log_*` 不再接受 `region="cn"`，查国内盘古非生产必须用 `obs_sls_query(environment="dev"/"test")`。
 - 不确定 environment → `obs_sls_targets()`；不确定 Loki 的 env → `obs_log_datasources(region="aws")`，不要瞎猜。
+- 二开日志查询必须限定 `srm-script-container`。SLS 用 `container_name="srm-script-container"`；Loki 用 `obs_log_query` 加已验证的服务标签（通常为 `{app="srm-script-container"}`），不得退化成不限服务的 `obs_log_trace` 或全量扫描。
+- 无 traceId 时，日志关键字只能来自用户明确提供的文本或目标脚本中的真实日志字面量；禁止猜测异常文案、类名或近义词后连续试搜。
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
 - 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
 ### 代码与数据库脚本
 
-- 普通类名、方法名、配置键和错误文本统一用 `search_repo(keyword)` 检索本地 `PG_ROOT`。当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
+- 标准类 Bug 才默认用 `search_repo(keyword)` 检索本地 `PG_ROOT`。二开类 Bug 只有在核实脚本入参/返回/平台默认行为或用户明确要求时才定向检索；`unknown` 状态不得宽泛扫描本地仓库。
+- 当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
 - 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
 - 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）：
   - **适配器埋点脚本**（挂钩点 BEFORE/AFTER 执行，报文映射、回调、单据前后处理）：
@@ -128,10 +149,11 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
   - **独立脚本**（Marmot 脚本库：定时任务、打印/PDF 模板、Excel 导入、消息/邮件提醒、外部 API 配置等非挂钩点执行）：
     `search_standalone_scripts` → `get_standalone_script_info` → `search_standalone_script_source` → `get_standalone_script_source(start_line,end_line)`。
     独立脚本存于 rel-table 宽表 `spfm_rel_table_record`（`table_code='marmot_script_library'`），**租户过滤用 `tenant` 参数（底层 value2 槽位，tenant_id 恒为 0，勿按 tenant_id 查）**。
-  - **拿不准是哪套时两套都查**（先适配器后独立）；场景信号冲突时以两套命中的实际脚本逻辑为准。
+  - 有明确载体信号时只走对应工具链；拿不准但租户/服务/接口信息足以定位时，先按最强信号查一套，未命中或信号冲突再查另一套。不要机械地读取两套全部源码。
   - 只有全局分析确有必要时才 `full=true`。
+- 先查脚本元信息，再搜索源码并读取局部行号。为了获得日志关键字时，只提取代码里真实的稳定日志字面量，不要把变量值或推测文案当关键字。
 - 脚本 Tool 已在 MCP 服务端完成 Base64 解码（适配器 UTF-16BE；独立脚本自动探测 UTF-16LE/BE/UTF-8）；禁止通过通用 SQL 把 Base64 正文返回给 Agent。
-- 命中启用脚本时，以脚本实际逻辑为准，标准库只用于解释执行入口和默认行为。本地 Java 无命中不能作为“没有实现”的证据。
+- 命中启用脚本时，以脚本实际逻辑为准。标准库只在验证入参、返回结构、执行入口或默认行为确有必要时作为对照；本地 Java 无命中不能作为“没有实现”的证据。
 - 本地代码报告路径与行号；数据库脚本报告租户、运行服务、`script_id`、`task_code`、版本和源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
 - 标准 vs 二开判定、适配器 JS、独立脚本、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/standalone-script.md`、`knowledge/srm/virtual-table.md`。
 
@@ -163,7 +185,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 ## 追问机制（只问阻塞下一步的信息）
 
 - **已从用户输入获得的信息，绝不重复询问。** 例：用户给 traceId+服务，直接查 trace，不要问"请选择系统/环境/问题类型"。
-- 仅在**当前假设无法确定、且缺少的信息会阻塞下一步证据获取**时才追问，比如：既没有traceId，有没有提供单号、发生问题的现象等信息。
+- 二开问题同时缺少 traceId、明确日志关键字以及可定位脚本的编码/租户/接口信息时，追问而不是继续试搜。优先索取 traceId 或脚本编码；查询仍需定位时再补环境、租户和发生时间。
 - 不要一次性抛出所有问题；每次只问真正缺的那一项，让用户选择而非手填技术参数（namespace/Project/Logstore 等由 MCP 自动映射）。
 - 用户一句话含多信息时，自动提取到 InvestigationContext，只问缺的。
 
@@ -219,7 +241,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ```
 ## 问题结论
-[问题类型：配置/代码/数据/依赖]
+[实现载体：custom/standard/unknown；问题类型：配置/代码/数据/依赖]
 
 ## 根因分析
 [引用关键证据，说明推理]

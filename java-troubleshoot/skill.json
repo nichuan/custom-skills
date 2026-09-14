@@ -1,7 +1,7 @@
 {
   "name": "java-troubleshoot",
-  "version": "1.0.0",
-  "description": "Java 微服务故障排查助手：通过日志、Archery、本地源码、数据库适配器脚本、猪齿鱼和认知层建立证据链。普通源码直接搜索本地 PG_ROOT，GitLab 项目/代码搜索当前禁用；二开、租户定制及外部接口对接必须主动检查脚本。仅查询数据、生成 SQL 或数据修复时不要触发。",
+  "version": "1.1.0",
+  "description": "Java 微服务故障排查助手：按执行链区分标准与二开。二开优先限定 srm-script-container 查 traceId/明确关键字，无可靠关键字时先读脚本提取真实日志字面量；标准仓库仅在标准链路确认后或二开契约核实时检索。仅查询数据、生成 SQL 或数据修复时不要触发。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -26,7 +26,8 @@
     "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
     "knowledge_base": "本地 knowledge/ 目录为精确操作手册（含 SQL 范式与判定约束），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
     "code_routing": "普通代码只用 search_repo 本地检索；GitLab 搜索禁用，仅允许已知 project/ref/path 的精确读取",
-    "script_first": "二开、租户定制和外部接口场景自动检索适配器脚本，先搜索正文再局部读取，Base64 不离开 MCP",
+    "implementation_routing": "执行链无适配器/API 前后置挂载才判为标准 Bug；载体未知时不默认扫描标准仓库",
+    "script_first": "二开优先限定 srm-script-container 查 traceId/明确关键字；无可靠关键字时先检索适配器或独立脚本，从源码真实日志字面量反查日志",
     "evidence_report": "结构化输出：问题结论/根因分析/证据链（每条标注 source 与 confidence）/Confirmed-Probable-Unknown 分级，禁止把推测写成事实、禁止输出原始日志全文",
     "read_only": "数据库仅只读（archery_query 仅基础 SELECT/EXPLAIN/SHOW CREATE TABLE），严禁写操作；凭据不外泄"
   },
@@ -55,6 +56,10 @@
         "get_adapter_script_info",
         "search_adapter_script_source",
         "get_adapter_script_source",
+        "search_standalone_scripts",
+        "get_standalone_script_info",
+        "search_standalone_script_source",
+        "get_standalone_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file",
@@ -80,6 +85,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-04"
+    "last_updated": "2026-09-14"
   }
 }

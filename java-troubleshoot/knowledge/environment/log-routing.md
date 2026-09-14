@@ -32,8 +32,10 @@
 
 ## 排障常用参数
 
-- 有 traceId → `obs_sls_query(trace_id=..., environment=...)` 走「ERROR/WARN + 全链路」两阶段查询；
-  AWS 侧用 `obs_log_trace(trace_id, region="aws")`。
+- 标准链路有 traceId → `obs_sls_query(trace_id=..., environment=...)` 走「ERROR/WARN + 全链路」两阶段查询；
+  AWS 侧可用 `obs_log_trace(trace_id, region="aws")`。
+- 二开 Bug（独立脚本、适配器、API 前/后置挂载、外部接口对接）→ SLS 查询固定增加
+  `container_name="srm-script-container"`；AWS 使用 `obs_log_query` 加已验证的服务标签（通常为 `{app="srm-script-container"}`），不得用不限服务的 `obs_log_trace`。无 traceId 时只使用用户明确给出的关键字，或先读取目标脚本并提取其中真实日志字面量；不得猜关键字试搜。
 - `level` 默认 `ERROR`，传 `""` 表示不过滤级别；`limit` 首次给 100~200。
 - 时间：`time_range` 支持 `最近30分钟`/`最近2小时`/`最近3天`、`今天`/`昨天`/`本周`/`上月`、`2h`/`1d`，
   或 `YYYY-MM-DD HH:mm~HH:mm`（北京时间）。

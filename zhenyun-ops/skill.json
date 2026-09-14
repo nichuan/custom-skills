@@ -1,6 +1,6 @@
 {
   "name": "zhenyun-ops",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "甄云 SRM 全局路由中心：在意图跨域或不明确时，路由需求开发、猪齿鱼查询、故障排查、工作台排障、寻源/履约 SQL、数据库访问、认知库治理及代码/脚本定位。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "workbench_routing": "采购员工作台待办、卡片、超级搜索、关注与 ES 问题路由到 srm-workbench-bug-triage",
     "knowledge_routing": "knowledge_docs 查询与治理路由到 knowledge-governance，SQL 模板和表目录保留给领域 SQL Skill",
     "real_tool_boundary": "不构造不存在的动态 Skill 工具，MCP 选择以现有服务能力为准",
-    "implementation_routing": "标准 Java 与纯二开分流；纯二开按产物检查适配器或独立脚本",
+    "implementation_routing": "执行链无适配器/API 前后置挂载才判为标准 Bug；二开先查脚本容器日志或实际脚本，标准仓库最后定向核实",
     "multi_skill_coordination": "跨域任务共享已查上下文并按依赖串行推进"
   },
   "mcp_servers": [
@@ -29,6 +29,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-10"
+    "last_updated": "2026-09-14"
   }
 }

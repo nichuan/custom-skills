@@ -26,10 +26,12 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 - “查需求”和“开发纯二开需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。只有新需求实现或用户明确要求重新取证时，才读取任务和平台模板。需要标准 Java 改造时不进入该 Skill。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
+- 普通 Bug 不能直接假定为标准 Bug：只有执行链覆盖故障区段且没有适配器或 API 前/后置挂载调用，才默认检索标准仓库。载体未知时由 `java-troubleshoot` 先按 traceId、明确日志关键字或脚本定位信息取证；信息均不足则追问，不宽泛搜索日志或代码。
+- 独立脚本、适配器、API 挂载、租户定制及外部接口对接 Bug 走 `java-troubleshoot` 的脚本优先路径：日志固定限定 `srm-script-container`；无可靠日志关键字时先取脚本并使用源码中的真实日志字面量；标准仓库只在核实脚本契约/平台行为确有必要或用户明确要求时最后定向检索。
 - 采购寻源走 `ssrc-sql-generator`；采购订单及下游履约走 `spuc-sql-generator`。
 - 工作台现象（待办/计数、整改模块、卡片字段、超级搜索、单据动态/关注、ES 权限/消费）优先走 `srm-workbench-bug-triage`；仅当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
 - 明确要求维护 `knowledge_docs` 或查询已沉淀知识时走 `knowledge-governance`；SQL 模板和表目录仍由对应 SQL Skill 管理。
-- 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接同时考虑适配器与独立脚本。当前 GitLab 搜索禁用，不作为本地无结果时的回退。
+- 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接按执行链、task_code 与场景信号选择适配器或独立脚本，第一候选未命中或信号冲突时再扩大。当前 GitLab 搜索禁用，不作为本地无结果时的回退。
 - 意图仍不唯一时，列出具体分歧及其对交付物的影响，再向用户确认；不凭模块名猜。
 
 ## 子 Skill 清单
@@ -73,7 +75,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 任务上下文 + 故障 | 猪齿鱼只读上下文 → `java-troubleshoot` |
 | 故障 + 数据修复 | `java-troubleshoot` 先定位根因 → 对应 SQL Skill 生成修复 SQL |
 | 工作台待办/单据异常 + 要改数据 | `srm-workbench-bug-triage` 先定位根因 → `ssrc/spuc-sql-generator` 生成修复 SQL，交用户执行 |
-| 二开实现位置 | `gitlab-code` 同时核对脚本与本地平台入口 |
+| 二开实现位置 | `gitlab-code` 先定位实际脚本；确需核实契约时再定向读取本地平台入口 |
 
 跨 Skill 传递任务号、租户、环境、模块、单据、源码引用和已验证限制，避免重复查询。最终结论必须区分事实、推断、未验证项和需要用户授权的写操作。
 
