@@ -1,7 +1,7 @@
 {
   "name": "ssrc-sql-generator",
-  "version": "1.7.0",
-  "description": "基于SRM采购寻源系统的SQL生成助手，支持快速生成业务查询SQL、调整现有SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 的 Archery 工具对接真实数据库：表结构/字段由 archery_describe_table / archery_list_columns 实时获取，逐步执行只读查询获取真实值（租户->单据->业务）后生成可执行SQL，MCP 异常时回退占位符，严禁编造。采用「本地仅沉淀业务语义、结构事实走 MCP」分层 + 分级校验（schema 已验证模板免校验、不明确必校验），兼顾正确性与效率；并接入 DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）实现「生成前 search_sql_templates 检索复用、生成后 save_sql_template 沉淀」的闭环。核心铁律：MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行；查询默认 prod，修改类必须确认环境+租户+影响范围。专门针对询价单(含招标单)、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。",
+  "version": "1.8.0",
+  "description": "生成或核实 SRM 采购寻源域的查询与数据修复 SQL；只验证必要的表、字段和真实值，不直接执行写 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -24,7 +24,7 @@
     "graded_validation": "分级校验：已验证模板/语义层明确项免 MCP 校验提效，表名/字段名不明确必校验",
     "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射",
     "mcp_validation": "通过 zhenyun-pangu-mcp 校验表/字段真实存在，禁止编造",
-    "stepwise_execution": "逐步执行只读查询获取真实值（租户->单据->业务），异常回退占位符"
+    "stepwise_execution": "按真实数据依赖执行只读查询；无依赖项并行或合并为有界 JOIN，异常回退占位符"
   },
   "mcp_servers": [
     {

@@ -1,6 +1,6 @@
 {
   "name": "java-troubleshoot",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Java 微服务故障排查助手：按执行链区分标准与二开。二开优先限定 srm-script-container 查 traceId/明确关键字，无可靠关键字时先读脚本提取真实日志字面量；标准仓库仅在标准链路确认后或二开契约核实时检索。仅查询数据、生成 SQL 或数据修复时不要触发。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -20,11 +20,12 @@
   ],
   "features": {
     "evidence_driven": "证据驱动排障循环（提出假设→获取最有价值证据→更新假设与 confidence→满足 Stop Condition 即停），非固定 SOP",
+    "selective_delegation": "仅当日志、源码、数据库存在多条独立且多轮的只读取证线时委派子代理",
     "investigation_context": "InvestigationContext 上下文模型（system/environment/region/service/tenant/trace_id/evidence[]/confidence），已从用户输入获得的信息不重复询问",
     "log_routing": "日志平台路由由 MCP 自动完成：cn 盘古全部环境(prod/dev/test) → 阿里云 SLS(obs_sls_query)；AWS 海外(jp-saas-1) → Loki(obs_log_*)；不确定先 obs_sls_targets / obs_log_datasources 探底",
     "stop_condition": "Stop Condition（两类独立证据/一份直接证据/证据饱和即停）+ 调查预算（同类查询连续 3 次未改变假设即停），禁止相同参数原样重调",
     "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
-    "knowledge_base": "本地 knowledge/ 目录为精确操作手册（含 SQL 范式与判定约束），已同步 knowledge_docs，可用 search_knowledge 兜底检索",
+    "knowledge_base": "优先按场景读取一份本地精确手册；本地未覆盖时才用 search_knowledge 跨案例检索",
     "code_routing": "普通代码只用 search_repo 本地检索；GitLab 搜索禁用，仅允许已知 project/ref/path 的精确读取",
     "implementation_routing": "执行链无适配器/API 前后置挂载才判为标准 Bug；载体未知时不默认扫描标准仓库",
     "script_first": "二开优先限定 srm-script-container 查 traceId/明确关键字；无可靠关键字时先检索适配器或独立脚本，从源码真实日志字面量反查日志",

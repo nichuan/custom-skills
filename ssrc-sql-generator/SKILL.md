@@ -1,6 +1,6 @@
 ---
 name: ssrc-sql-generator
-description: 基于 SRM 采购寻源系统的 SQL 生成助手，支持快速生成业务查询 SQL、调整现有 SQL、查询表结构及关联关系。通过 zhenyun-pangu-mcp 对接真实数据库与认知层：字段/结构一律实时获取（archery_describe_table / archery_list_columns），逐步执行只读查询获取真实值（先租户、再单据、再业务）后生成可执行 SQL，MCP 异常时回退占位符，严禁编造。复用提效采用「DB 模板库（zhenyun-pangu-mcp 认知层，Supabase）+ 分级校验」：生成前先 search_sql_templates 检索复用（schema 已验证模板免 MCP 校验），生成后询问用户沉淀结果，模板库越用越强。专门针对租户的询价单（招标单）、报价单、评分、资格预审、寻源结果、征询单等核心业务场景。MCP 数据库操作默认只读，Agent 不直接执行 INSERT/UPDATE/DELETE，写 SQL 一律生成后交用户人工确认执行。
+description: 生成或核实 SRM 采购寻源域（询价、招标、报价、评分、资格预审、寻源结果、征询单）的查询与数据修复 SQL。使用只读 MCP 验证必要的表、字段和真实值；不直接执行写 SQL。
 ---
 
 # SRM 采购寻源 SQL 生成助手
@@ -57,42 +57,28 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
 
-**数据库访问统一由 `archery` Skill 管辖**（实例别名映射、各环境库清单、双站点 site/instance 规范、查询/修改分离、安全降级）。本 Skill 只生成 SQL 内容，**不重复定义落库规则**，调用 Archery 工具前先 `use_skill("archery")`。
+数据库访问遵守 `archery` Skill 的 site/instance/db、只读和安全降级规则。本 Skill 只生成 SQL 内容，直接使用运行时提供的 Archery 工具。
 
 要点速记：查询类不提环境默认 `cn`/`prod`；修改类（含数据修复）必须显式确认环境+租户+影响范围；`instance` 一律用别名（`prod`/`prod-ro`/`aws`/`dev`/`test`），严禁直传真实实例名。
 
 ---
 
-## 3. 标准执行流程（决策树）
+## 3. 最短执行流程（依赖图）
 
 ```text
-用户请求
-  ↓
-① 任务分类：查询 / SQL生成 / 数据修复
-  ↓
-② 检索模板（search_sql_templates）
-  │  命中修复模板或任务本身涉及写 SQL → 进入 §5 执行过程驱动模式
-  ↓
-③ 确认业务上下文（§7 术语，仅不明确时澄清）
-  ↓
-④ 确认环境（§2.5）
-  ↓
-⑤ 确认租户（archery_query_tenant → 真实 tenant_id，禁止硬编码）
-  ↓
-⑥ 找表：不知表名 → search_tables（§4）
-  ↓
-⑦ 确认字段：分级校验（§4 + §9 规则）
-  ↓
-⑧ 查询真实值：先租户 → 再单据 → 再业务（archery_query）
-  ↓
-⑨ 生成 SQL（查询直接给；写 SQL 走 §6）
-  ↓
-⑩ 安全检查（§2 逐条核对）
-  ↓
-⑪ 输出 + 询问是否沉淀模板（§8）
+用户请求 → 分类：查询 / SQL 生成 / 数据修复
+  ├─ 已给 SQL，只调整语法/条件 → 直接最小修改；只核实不确定字段
+  ├─ 简单查询且表字段已确认 → 直接生成或执行一次有界 SELECT
+  └─ 数据修复/复杂查询
+       ├─ 同一轮：关键词模板检索 + 租户解析 + 未知表发现（互不依赖时并行）
+       ├─ 读取唯一命中模板；只补齐仍未知的表、字段和关联
+       ├─ 用尽量少的有界 SELECT/JOIN 获取真实值并执行断言
+       └─ 生成 SQL → 安全检查 → 输出
 ```
 
-**数据修复任务**额外强制进入 §5 `execution_flow`：逐 STEP 取真实值、校验 ASSERT 通过后才生成修复 SQL。
+默认先用 `search_sql_templates(..., use_semantic=false, verified_only=true, limit=3)` 做快速关键词检索；只有关键词未命中且任务复杂、历史方案明显有价值时才启用语义检索。数据修复任务进入 §5 `execution_flow`，但相邻步骤若无数据依赖，可合并为一条只读 JOIN 或并行查询，同时保留各项 ASSERT。
+
+每轮结果已足够回答核心请求时立即停止；不要为了走完整流程重复查询同一事实。只有新颖、已验证且可复用的方案才在交付后询问是否沉淀模板。
 
 ---
 
@@ -106,28 +92,11 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 > **找表 → search_tables；确认字段 → Archery；确认真实值 → Archery query；复现历史解法 → search_sql_templates。**
 > catalog 命中「业务大概率对应 ssrc_xxx」≠「ssrc_xxx.field 一定存在」；字段存在性必须由 Archery 证明。
 
-### 表目录（zhenyun-pangu-mcp 认知层）
-- `search_tables("<业务描述>", domain?)`：语义检索候选表（域前缀 `ssrc` 寻源 / `sslm` 供应商 / `hpfm` 平台基础 / `smdm` 主数据）。不知表名时第一步调用。
-- `get_table("<表名>")`：单表元数据详情（注释/描述/关键字段/入口字段）。
-- `get_table_relations("<表名>")`：一跳/二跳关联与 join 字段，写 JOIN 前确认路径。
+### 工具选择
 
-### 模板库（zhenyun-pangu-mcp 认知层，Supabase）
-- `search_sql_templates(keyword, category, system, business_domain, verified_only, limit)`：生成前检索复用；命中后用 `get_sql_template(id)` 获取完整的 `execution_flow`、`example_case` 和诊断字段。
-- `save_sql_template(...)` / `get_sql_template(id)` / `list_sql_templates(...)` / `update_sql_template(id, ...)` / `delete_sql_template(id)` / `record_template_usage(id)`。
-- `diagnose_context(query, system, module)`：组合诊断，自动汇集 知识→模板→表→关系，排障首推。
-
-> 当前 MCP 的模板工具实际签名以 `server.py` 为准：`save_sql_template` 的必填项为
-> `title/category/scenario/sql_text`；可选 `keywords/core_tables/verified/template_no/system/status/risk_level/business_domain/source_type/parameters/execution_policy/created_by`。
-> `parameters` 必须传 JSON 对象字符串。模板工具同时支持
-> `execution_flow`、`example_case`、`problem_description`、`symptom`、`root_cause`、
-> `preconditions`、`diagnosis_steps`、`verify_sql`、`rollback_sql`；不要传入
-> `schema_verified` 等未声明字段。
-
-### Archery（zhenyun-pangu-mcp，只读）
-
-> `archery_query` / `archery_list_columns` / `archery_describe_table` / `archery_list_instances` / `archery_list_databases` / `archery_query_tenant` 的统一调用规范、实例别名映射、各环境库清单、双站点 site/instance 规则、安全降级，全部由 **`archery` Skill** 管辖。调用前先 `use_skill("archery")`。本 Skill 仅生成 SQL 内容，落库细节不重复定义。
-
-> **MCP 异常降级**：认知层 / Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注、完成后提示对应能力缺失（以 `archery` Skill 的降级策略为准）。
+- 不知表名才用 `search_tables`；已知表但关联不明才用 `get_table_relations`；字段存在性由 Archery 证明。
+- 复杂或重复场景才检索模板；命中后用 `get_sql_template` 读取执行流程。工具参数以 MCP Schema 为准，不在 Skill 中重复。
+- 认知层或 Archery 不可用时跳过失败步骤，用占位符标注缺失事实并继续完成可交付方案，不得假装已验证。
 
 ---
 
@@ -148,7 +117,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ### 执行规则（逐条强制）
 1. **解析模板**：识别全部 `[STEP]` 的 `QUERY`/`ASSERT`/`EXTRACT`/`CONDITION`/`ACTION`。
-2. **逐步执行 QUERY**：按 STEP 顺序逐个 `archery_query`，把真实结果（如 `tenant_id=155357`）填入 `{变量}`。
+2. **按依赖执行 QUERY**：后一步使用前一步提取值时保持串行；互不依赖的 QUERY 并行执行，或在不降低租户隔离、索引使用和断言清晰度时合并成一条有界 JOIN。把真实结果（如 `tenant_id=155357`）填入 `{变量}`。
 3. **校验 ASSERT**：每步执行后立即核对（如「必须返回 1 行」）；不满足（0 行/多行/状态不符）**立即报告并停止**，绝不盲目继续。
 4. **EXTRACT 显式提取**：每步从结果中用 `EXTRACT` 明确写出变量绑定（如 `tenant_id -> {tenant_id}`），**不要从 ASSERT 里猜变量**。
 5. **CONDITION 短路**：条件命中（如「单据已在目标状态」）直接返回结论，不生成修复 SQL。

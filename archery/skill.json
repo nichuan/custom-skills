@@ -1,7 +1,7 @@
 {
   "name": "archery",
-  "version": "1.1.0",
-  "description": "Archery 数据库查询助手（统一数据访问层）：集中管理双站点实例别名与真实名映射、各环境/实例下有哪些库（如 SAAS-SRM-PROD 的 srm / srm_logistics_delivery 等）、什么场景用哪个 site+instance、archery_query/describe/list_columns/list_databases/list_instances/query_tenant 的调用规范与安全降级。各 SQL 技能（ssrc / spuc）只生成 SQL 内容，查询落到哪里、怎么查一律交给本 Skill。只读取数；写 SQL 由各 SQL 技能生成后交用户人工确认执行。",
+  "version": "1.2.0",
+  "description": "只读访问 Archery，负责选择 site/instance/db、查询真实数据与表结构并安全降级。数据修复只生成写 SQL 交用户确认，不直接写库。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -35,6 +35,9 @@
     }
   ],
   "entry_point": "SKILL.md",
+  "references": [
+    "references/environment-routing.md"
+  ],
   "categories": [
     "database",
     "query",

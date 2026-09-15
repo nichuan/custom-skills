@@ -1,6 +1,6 @@
 ---
 name: srm-workbench-bug-triage
-description: srm-workbench（采购员工作台 / 角色工作台）服务 bug 排查助手。仅在用户报告采购员工作台相关问题（待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致）时使用；结合 srm-workbench 源码、srm_workbench / srm 库与各环境 ES（prod/dev/test，es_search 带 env 参数）定位根因并给出修复方向。ES 链接未配置时生成 DSL 引导用户在 Kibana Dev Tools 人工查询后贴回结果，不中断排查。仅查询数据或生成 SQL 的寻源/订单履约需求请走 ssrc-sql-generator / spuc-sql-generator；与工作台无关的服务报错请走 java-troubleshoot。
+description: 排查 srm-workbench 的待办、卡片、超级搜索、关注、整改和 ES 权限/消费问题，使用本地手册及只读数据库、ES、日志和源码证据定位根因。SQL-only 任务或其它服务异常不使用。
 ---
 
 # srm-workbench（采购员工作台）Bug 排查助手
@@ -64,15 +64,19 @@ Evidence           → 本次调查实际获得的事实（会话内维护）
 
 ## 排查工作流
 
-### 0. 先查认知层（每次必做）
+### 0. 选择最短知识入口
 
-`search_knowledge` 检索是否已有企业事实与排查经验（本 skill 的 knowledge/ 内容已同步知识库，id=35~41）。命中后用 `get_knowledge(id)` 读全文，避免重复劳动。
+现象能命中下方“优先查”表时，直接读取对应的一份本地 `knowledge/` 手册；不要固定调用 `search_knowledge → get_knowledge`。只有本地手册不覆盖、关键词无法判断场景或需要跨案例发现时才搜索认知层；搜索结果摘要已足够时不再读取全文。
 
 ### 1. 明确问题面
 
 环境、租户、现象（缺失/多/错/慢）、单据类型或模块。信息不全时一次性问齐，不要分批追问。
 
 ### 2. 先排除配置 / 数据问题（优先级最高）
+
+运行时支持并行调用时，把互不依赖的配置表、错误记录和 ES 只读检查放在同一轮；两段式 ES 查询仅在第二段依赖第一段命中的单据 id 时保持串行。每轮证据已经能区分配置、数据与代码问题时立即停止，不继续跑完整清单。
+
+只有数据库、ES、源码中至少两条证据线相互独立且各自需要多次工具调用时，才按证据线委派只读子代理；共享的 tenant/user/document/todo 标识先由主代理确认并传递，最终根因由主代理合并判断。
 
 | 现象 | 优先查 | 知识文件 |
 |---|---|---|
@@ -175,7 +179,7 @@ Evidence           → 本次调查实际获得的事实（会话内维护）
 | `knowledge/srm/case-search-rcv-not-found.md` | 案例：超级搜索查不到收货单（维度映射字段名不匹配） | 搜索查不到单据 |
 | `knowledge/srm/rectify-module.md` | 整改模块 todoCode、ES 待办核查 DSL、初始化清单 | 整改模块异常 |
 | `knowledge/srm/super-search-field-config.md` | 三张配置表职责分离、doc-publish vs reindex、updateByQuery 安全刷新 | 新增可搜字段 / 字段搜不到 |
-| `knowledge/environment/ops-workflow.md` | 库路由、工具选型与安全红线、源码路径、排查 SOP | 每次排查动手前 |
+| `knowledge/environment/ops-workflow.md` | 库路由、工具选型与安全红线、源码路径、排查 SOP | 环境、库或工具路由不明确时 |
 
 ---
 

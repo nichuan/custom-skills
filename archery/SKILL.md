@@ -1,6 +1,6 @@
 ---
 name: archery
-description: Archery 数据库查询助手（统一数据访问层）。仅在用户要「查数据库 / 确认实例与库 / 确认环境 / 用 Archery 取数或看表结构」时使用。集中管理：双站点实例别名与真实名映射、每个环境/实例下有哪些库（如 SAAS-SRM-PROD 的 srm / srm_logistics_delivery 等）、什么场景用哪个 site+instance、archery_query/describe/list_columns/list_databases/list_instances/query_tenant 的调用规范与安全降级。各 SQL 技能（ssrc / spuc）只关心「生成什么 SQL」，查询落到哪里、怎么查一律交给本 Skill。只读取数；写 SQL 由各 SQL 技能生成后交用户人工确认执行。
+description: 只读访问 Archery，负责选择 site/instance/db、查询真实数据与表结构并安全降级。数据修复只生成写 SQL交用户确认，不直接写库。
 ---
 
 # Archery 数据库查询助手（统一数据访问层）
@@ -16,6 +16,13 @@ description: Archery 数据库查询助手（统一数据访问层）。仅在�
 它**不生成业务 SQL**（交给 `ssrc-sql-generator` / `spuc-sql-generator`），**不做故障根因分析**（交给 `java-troubleshoot`）。本 Skill 只描述"怎么查、往哪查"。
 
 工具的**真实参数 Schema 以 MCP 运行时为唯一事实源**，严禁在本文件猜测/重复定义。
+
+## 执行效率
+
+- 用户已经明确环境、库和表时直接查询，不先调用 `list_instances`、`list_databases` 或目录发现工具；这些工具只用于真实不确定或返回路由错误时。
+- 已被可信模板、表目录或本次会话 DDL 证明的表/字段不重复 describe。多个互不依赖的表结构检查可并行。
+- 能用一条有界、索引友好的 JOIN 同时确认租户、单据和状态时，不拆成多次查询；只有后续 SQL 必须依赖前一步返回值时才串行。
+- 相同 `site/instance/db`、`tenant_id`、表结构和已验证结果在本次任务内复用。
 
 ---
 
@@ -44,7 +51,7 @@ description: Archery 数据库查询助手（统一数据访问层）。仅在�
 ### 铁律 3：库名以实测为准，默认 `srm`，跨库显式带库名
 
 - 默认库 `srm`；跨库查询必须显式传 `db_name`。
-- 可用库以 `archery_list_databases` 实际返回为准，**严禁猜库名**。
+- 库名来自用户、可信目录或既有映射时可直接使用；来源不明时以 `archery_list_databases` 实际返回为准，**严禁猜库名**。
 - 拿不准实例时调 `archery_list_instances()` 查看全部站点，或传 `site="cn"|"aws"` 只看目标站点；拿不准库时调 `archery_list_databases(site, instance)`。
 
 ### 铁律 4：查询/修改分离，Agent 不直接写库
@@ -56,41 +63,11 @@ description: Archery 数据库查询助手（统一数据访问层）。仅在�
 
 ---
 
-## 实例与库清单（实测，作为事实基础）
+## 环境与库参考
 
-### 实例别名映射（来自 `archery_list_instances`，实时为准）
+常用别名为 `cn/prod`、`cn/prod-ro`、`cn/dev`、`cn/test` 与 `aws/aws`，默认库为 `srm`。只有用户询问完整映射、库清单，或当前任务无法确定路由时，才阅读 [references/environment-routing.md](references/environment-routing.md)；实时结果仍以 `archery_list_instances` / `archery_list_databases` 为准。
 
-```
-cn:
-  prod      -> SAAS-SRM-PROD数据库
-  prod-ro   -> SAAS-SRM-PROD只读数据库
-  dev       -> SAAS-SRM-DEV数据库
-  test      -> SAAS-SRM-TEST数据库
-aws:
-  aws / aws-prod -> JP-SaaS-1-Prod-RW-8.0
-default_site = cn, default_db = srm
-```
-
-### 各环境有哪些库（以 `archery_list_databases` 实测为准）
-
-**SAAS-SRM-PROD（cn / prod）实测库列表**：
-
-| 库名 | 用途 / 备注 |
-|------|------------|
-| `srm` | 主业务库（寻源 ssrc_*、履约 spfm_/sodr_、平台 hpfm_、主数据 smdm_、状态机 siec_ 等） |
-| `srm_logistics_delivery` | 发货工作台域（`slod_*` 表，如 `slod_asn_header` 送货/计划/标签） |
-| `srm_budget` | 预算相关 |
-| `srm_data_application` | 数据应用 |
-| `srm_open_platform` | 开放平台 |
-| `srm_requisition_plan` | 申购计划 |
-| `srm_workbench` | 工作台 |
-| `scavenger_prod` | 业务库（具体用途以实际为准） |
-
-> 系统/内部库（一般不查）：`mysql` / `information_schema` / `performance_schema` / `sys` / `apolloconfigdb` / `apolloportaldb` / `test`。
-
-**跨库原则**：当参与 JOIN 的表 `db_name` 不同，必须写成跨库查询（带库前缀，如 `srm_logistics_delivery.slod_asn_header`），不可省略库名。
-
-> 其他环境（dev / test / aws）的库清单**不在此硬编码**，用 `archery_list_databases(site, instance)` 实时获取。
+跨库 JOIN 必须显式写库名前缀；例如 `slod_*` 位于 `srm_logistics_delivery`。
 
 ---
 
@@ -112,14 +89,13 @@ default_site = cn, default_db = srm
 
 ---
 
-## 取数顺序（真实值逐步获取）
+## 取数依赖
 
 ```
 ① 确认环境（铁律 2）→ site + instance（aws 必带 site）
-② 确认租户：archery_query_tenant → 真实 tenant_id（禁止硬编码）
-③ 确认库：库非默认 srm 时显式 db_name；拿不准先 archery_list_databases
-④ 确认字段：archery_describe_table / archery_list_columns（生成写 SQL 前必做）
-⑤ 查询真实值：archery_query —— 先租户 → 再单据 → 再业务
+② 只补齐未知事实：未知租户才 query_tenant，未知库才 list_databases，未知字段才 describe/list_columns
+③ 查询真实值：优先用一条有界 SELECT/JOIN 同时返回租户、单据与业务状态；确有数据依赖时再拆步
+④ 生成写 SQL 前，租户过滤、目标主键、字段存在性和当前值必须已有真实证据
 ```
 
 ---
