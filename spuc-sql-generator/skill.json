@@ -1,6 +1,6 @@
 {
   "name": "spuc-sql-generator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "生成或核实 SRM 订单履约域的查询与数据修复 SQL；只验证必要的表、字段和真实值，不直接执行写 SQL。采购寻源使用 ssrc-sql-generator。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -46,7 +46,8 @@
         "list_sql_templates",
         "save_sql_template",
         "update_sql_template",
-        "record_template_usage"
+        "record_template_usage",
+        "get_workflow_guide"
       ],
       "description": "Pangu 统一 MCP：Archery 只读查数与表/字段结构校验（实例名由别名自动解析）+ 表目录/关联关系检索与沉淀 + SQL 模板库（盘古专属分类检索/沉淀）。spuc 是订单履约域 SQL 内容的行为源，落库规范与实例/库映射由 archery Skill 管辖，模板/表能力沉淀于 Supabase 认知层"
     }
@@ -66,6 +67,6 @@
     "template_store": "supabase",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-08-29"
+    "last_updated": "2026-09-16"
   }
 }

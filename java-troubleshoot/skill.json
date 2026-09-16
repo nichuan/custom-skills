@@ -1,6 +1,6 @@
 {
   "name": "java-troubleshoot",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Java 微服务故障排查助手：按执行链区分标准与二开。二开优先限定 srm-script-container 查 traceId/明确关键字，无可靠关键字时先读脚本提取真实日志字面量；标准仓库仅在标准链路确认后或二开契约核实时检索。仅查询数据、生成 SQL 或数据修复时不要触发。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -69,7 +69,8 @@
         "choerodon_search_users",
         "choerodon_search_tasks_by_person",
         "choerodon_list_attachments",
-        "choerodon_download_attachment"
+        "choerodon_download_attachment",
+        "get_workflow_guide"
       ],
       "description": "Pangu 统一 MCP：日志、Archery、本地代码、数据库脚本检索/服务端解码、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
     }
@@ -86,6 +87,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-14"
+    "last_updated": "2026-09-16"
   }
 }

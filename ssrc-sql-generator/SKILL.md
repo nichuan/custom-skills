@@ -5,6 +5,10 @@ description: 生成或核实 SRM 采购寻源域（询价、招标、报价、�
 
 # SRM 采购寻源 SQL 生成助手
 
+## 跨流程协作（按需）
+
+单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+
 > 本助手专门用于 **SRM（供应商关系管理）采购寻源系统** 的数据库 SQL 生成与调整。
 > 核心业务：**询价单、招标单、报价单、评分/评标、资格预审、寻源结果、征询单**。
 
@@ -12,8 +16,8 @@ description: 生成或核实 SRM 采购寻源域（询价、招标、报价、�
 
 当本文件、模板库、业务知识、模型推断之间出现冲突，按以下优先级执行：
 
-- **P0 数据库实时事实**：`archery_query` / `describe_table` / `list_columns` 当前返回的结构与数据。
-- **P1 安全规则**：多租户隔离、查询/修改分离、写操作安全、环境确认。
+- **P0 安全规则**：多租户隔离、查询/修改分离、写操作安全、环境确认；实时数据不能改变授权边界。
+- **P1 数据库实时事实**：`archery_query` / `describe_table` / `list_columns` 当前返回的结构与数据。
 - **P2 执行过程**：数据修复任务优先复用模板的 `execution_flow`，并由本 Skill 强制执行 `[STEP]` 顺序与断言。
 - **P3 已验证模板**：MCP 返回 `verified=true` 且经 `describe_table`/`list_columns` 确认存在的表/字段。
 - **P4 本地业务知识**：`references/*.md` 中的业务语义与规则。
@@ -52,7 +56,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ### 2.4 写操作安全
 - UPDATE/DELETE 必须用主键或唯一业务键（如 `rfx_header_id`）定位，**严禁无 WHERE 或仅凭名称更新**。
-- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足（如不要自添 `last_update_date`/`last_update_by`），WHERE 仅需 `tenant_id` + 主键。
+- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足（如不要自添 `last_update_date`/`last_update_by`），WHERE 使用 `tenant_id` + 主键，并补已核实的旧状态/版本条件以防覆盖并发修改。
 - 输出用 `<...>` 占位符，附「替换为真实值的方法」。
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
@@ -131,10 +135,12 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ## 6. SQL 输出规范
 
+修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。UPDATE/DELETE 的核查 SELECT 与写 SQL 保持相同 WHERE，并使用已读取的旧状态/版本；执行前重新核查，数据变化则重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
+
 > 仅适用于含 INSERT / UPDATE / DELETE 的输出。**纯查询类 SQL 不受此约束。**
 
 - **原始数据核查 SELECT（必须）**：每条 UPDATE/DELETE 之前，保留一段 WHERE 条件完全一致的 `SELECT`，标注「预期影响 N 行」，供人工提交前确认。`archery_query` 取数过程中用到的核查 SELECT 应原样保留。
-- **执行后校验 SELECT（推荐）**：更新/删除后附 `SELECT` 校验（如「预期 0 行」「预期状态=目标值」）。
+- **执行后校验 SELECT（必须）**：更新/删除后附 `SELECT` 校验（如「预期 0 行」「预期状态=目标值」）。
 - **禁止包含**：执行前备份（`CREATE TABLE bak_xxx AS SELECT`）、回滚方案（`INSERT INTO ... SELECT * FROM bak_xxx`）。生产修复以「先 SELECT 核查 → 人工确认 → 事务/可控提交」为准。
 
 ---
@@ -162,10 +168,10 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 > 字段级结构（字段名/类型/注释/索引）一律走 Archery 实时获取，不在此列文件内。模板库已迁移 DB（zhenyun-pangu-mcp 认知层）。
 
 ### 模板沉淀（生成后）
-完成复杂场景 / 数据修复后，**主动询问用户是否沉淀**，确认后 `save_sql_template`：
+仅对新颖、已验证且可复用的方案准备沉淀内容；未获相应授权时再询问，授权后 `save_sql_template`：
 - `title`/`category`/`scenario`/`sql_text`（保留 `<...>`/`{...}` 占位符原样）；
 - `keywords`/`core_tables` 便于检索；`system` 标注所属系统（天工/盘古）；
-- `verified`：表/字段已 MCP 校验通过后置 `true`，否则保持 `false`；
+- `verified`：结构、适用前提和方案效果均有验证证据才置 `true`；仅验证字段或仅生成写 SQL 时保持 `false`，在说明中记录部分验证；
 - `status`：默认 `draft`，可用 `draft/verified/trusted/deprecated`；
 - `risk_level`：只读查询=`LOW`、单条修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`；
 - `business_domain`：如 `采购寻源`；`system`：`天工`/`盘古`；
@@ -190,7 +196,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ## 10. 扩展指南（未覆盖表/业务）
 
-1. 先 `archery_describe_table` 取真实结构；2. 业务语义补到 `references/*.md`；3. 复杂场景完成后询问并 `save_sql_template`（校验通过置 `verified=true`）；4. 新概念补到 §7；5. 禁止创建本地表结构文件。
+1. 先 `archery_describe_table` 取真实结构；2. 业务语义补到 `references/*.md`；3. 复杂场景完成后询问并 `save_sql_template`（按实际验证程度设置 `verified`，仅校验字段不算效果验证）；4. 新概念补到 §7；5. 禁止创建本地表结构文件。
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "choerodon-task",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手：定位项目并查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。Marmot 纯二开需求开发由 srm-requirement-delivery 负责。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -36,7 +36,8 @@
         "choerodon_list_comments",
         "choerodon_list_attachments",
         "choerodon_download_attachment",
-        "choerodon_add_comment"
+        "choerodon_add_comment",
+        "get_workflow_guide"
       ],
       "description": "猪齿鱼协作平台：可访问项目发现、跨项目任务/issue 查询、成员搜索、状态映射、评论与附件读取；Token 由 .env 凭据登录获取，带缓存与失效重登。注意：choerodon_add_comment 是唯一写操作（写评论区，需先向用户确认内容，comment 必须为规范 Markdown），其余均为只读查询"
     }
@@ -52,6 +53,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-10"
+    "last_updated": "2026-09-16"
   }
 }

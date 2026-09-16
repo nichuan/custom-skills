@@ -1,6 +1,6 @@
 {
   "name": "srm-workbench-bug-triage",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "排查 srm-workbench 的待办、卡片、超级搜索、关注、整改和 ES 权限/消费问题；使用本地手册及只读数据库、ES、日志和源码证据定位根因。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -54,7 +54,8 @@
         "gitlab_get_file",
         "es_search",
         "es_count",
-        "es_get"
+        "es_get",
+        "get_workflow_guide"
       ],
       "description": "Pangu 统一 MCP：认知层（知识检索）+ Archery 只读查数与表结构校验（库路由判定）+ 日志（捞 /card-search/query 两段 DSL）+ 代码检索 + 各环境 ES 只读查询（es_search/es_count/es_get，带 env 参数选 prod/dev/test）。凭证全部统一维护在 zhenyun-pangu-mcp/.env：Archery/日志/代码/认知层与标准一致，仅 ES 链接与凭证为维护者需额外补入的唯一一项（按环境维护 prod/dev/test 三套，占位符见 zhenyun-pangu-mcp/.env.example 的「正式环境 ES」段：prod 用 ES_BASE_URL/ES_USERNAME/ES_PASSWORD，dev/test 用 ES_DEV_*/ES_TEST_*）。未配置某环境 ES 时工具返回 es_unconfigured，skill 降级为 Kibana 人工查询（生成 DSL 让用户查询后贴回），不影响排查。工具真实参数以 MCP 为唯一事实源"
     }
@@ -72,6 +73,6 @@
     "sql_templates_count": 0,
     "sql_examples_count": 0,
     "knowledge_docs_synced": "35-41",
-    "last_updated": "2026-09-10"
+    "last_updated": "2026-09-16"
   }
 }

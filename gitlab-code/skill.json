@@ -1,6 +1,6 @@
 {
   "name": "gitlab-code",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "甄云代码与数据库脚本定位助手：普通代码使用 PG_ROOT/search_repo；二开与外部对接先定位适配器或独立脚本，只有契约核实或用户明确要求时才定向读取标准代码。GitLab 仅在 project/ref/path 已知时精确读取。只读定位，不排障、不生成 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -37,7 +37,8 @@
         "get_standalone_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
-        "gitlab_get_file"
+        "gitlab_get_file",
+        "get_workflow_guide"
       ],
       "description": "Pangu 统一 MCP：本地代码检索、数据库适配器与独立脚本检索/解码/局部读取，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
     }
@@ -53,6 +54,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-14"
+    "last_updated": "2026-09-16"
   }
 }

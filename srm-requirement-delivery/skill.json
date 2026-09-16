@@ -1,10 +1,18 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "开发或修改 SRM Marmot 纯二开代码；已有脚本的明确字段、常量和局部逻辑改动走最小修改与定向检查，新需求才读取猪齿鱼与平台模板。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
-  "keywords": ["srm", "marmot", "choerodon", "二开", "埋点", "api挂载", "api发布"],
+  "keywords": [
+    "srm",
+    "marmot",
+    "choerodon",
+    "二开",
+    "埋点",
+    "api挂载",
+    "api发布"
+  ],
   "features": {
     "fast_patch": "已有脚本的明确局部改动不查询猪齿鱼、平台、数据库或完整调用链",
     "issue_driven": "仅在实现新需求或用户明确要求时读取猪齿鱼；详情与评论并行获取，目录只在首次写入前确认",
@@ -21,16 +29,40 @@
     {
       "name": "zhenyun-pangu-mcp",
       "tools": [
-        "choerodon_list_projects", "choerodon_list_issue", "choerodon_query_issue", "choerodon_list_comments", "choerodon_list_attachments", "choerodon_download_attachment",
-        "search_adapter_scripts", "get_adapter_script_info", "get_adapter_script_source",
-        "search_standalone_scripts", "get_standalone_script_info", "get_standalone_script_source",
-        "search_repo", "archery_list_instances", "archery_query_tenant", "archery_describe_table", "archery_list_columns", "archery_query",
-        "inspect_object_relation", "check_marmot_script_static", "query_script_trace"
+        "choerodon_list_projects",
+        "choerodon_list_issue",
+        "choerodon_query_issue",
+        "choerodon_list_comments",
+        "choerodon_list_attachments",
+        "choerodon_download_attachment",
+        "search_adapter_scripts",
+        "get_adapter_script_info",
+        "get_adapter_script_source",
+        "search_standalone_scripts",
+        "get_standalone_script_info",
+        "get_standalone_script_source",
+        "search_repo",
+        "archery_list_instances",
+        "archery_query_tenant",
+        "archery_describe_table",
+        "archery_list_columns",
+        "archery_query",
+        "inspect_object_relation",
+        "check_marmot_script_static",
+        "query_script_trace",
+        "get_workflow_guide"
       ],
       "description": "只读获取本地交付目录、猪齿鱼需求、平台脚本、标准调用契约和必要数据库事实。"
     }
   ],
   "entry_point": "SKILL.md",
-  "categories": ["development", "delivery"],
-  "metadata": { "last_updated": "2026-09-14", "scope": "marmot-custom-only", "release_integration": "not-integrated" }
+  "categories": [
+    "development",
+    "delivery"
+  ],
+  "metadata": {
+    "last_updated": "2026-09-16",
+    "scope": "marmot-custom-only",
+    "release_integration": "not-integrated"
+  }
 }

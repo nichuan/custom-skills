@@ -1,6 +1,6 @@
 {
   "name": "archery",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "只读访问 Archery，负责选择 site/instance/db、查询真实数据与表结构并安全降级。数据修复只生成写 SQL 交用户确认，不直接写库。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -29,7 +29,8 @@
         "archery_describe_table",
         "archery_list_databases",
         "archery_list_instances",
-        "archery_query_tenant"
+        "archery_query_tenant",
+        "get_workflow_guide"
       ],
       "description": "Pangu 统一 MCP：Archery 只读查询与表/字段结构校验（实例名由别名自动解析）。archery 是这些工具的统一调用规范与实例/库映射源"
     }
@@ -48,6 +49,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-10"
+    "last_updated": "2026-09-16"
   }
 }

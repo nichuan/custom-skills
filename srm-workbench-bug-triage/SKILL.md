@@ -5,6 +5,10 @@ description: 排查 srm-workbench 的待办、卡片、超级搜索、关注、�
 
 # srm-workbench（采购员工作台）Bug 排查助手
 
+## 跨流程协作（按需）
+
+单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+
 ## 职责边界（分层，Skill 内不重复定义知识）
 
 ```text

@@ -5,6 +5,10 @@ description: 甄云盘古认知库查询与治理助手。用于检索、查看�
 
 # 盘古认知库治理
 
+## 跨流程协作（按需）
+
+单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+
 ## 职责边界
 
 本 Skill 管理 `knowledge_docs` 中可复用、相对稳定的知识：业务规则、系统机制、配置模型、数据模型和已经核验的排障经验。
@@ -29,7 +33,7 @@ description: 甄云盘古认知库查询与治理助手。用于检索、查看�
 
 1. 写入前先 `search_knowledge` 查重；需要全文时用真实 `doc_id` 调 `get_knowledge`。
 2. 区分稳定知识与本次即时证据。未经实时工具或可靠资料核验的结论只能保持 `draft`，不得标为 `verified`。
-3. `save_knowledge` / `update_knowledge` 前向用户展示准备写入或修改的内容并取得明确确认。只传本次需要变更的字段。
+3. `save_knowledge` / `update_knowledge` 前准备可审阅内容并核对授权；用户已经明确批准相同目标和内容时直接继续，否则展示内容后确认。只传本次需要变更的字段。
 4. 内容过时但仍有参考价值时，优先 `update_knowledge(status="deprecated"|"archived")`；仅在用户明确要求物理删除后调用 `delete_knowledge`，删除前必须再次 `get_knowledge` 核对目标。
 5. 写入后报告 `doc_id`、状态和实际变更，不把 MCP 返回成功等同于业务事实已被核验。
 

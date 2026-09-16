@@ -1,12 +1,20 @@
 {
   "name": "zhenyun-ops",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "甄云 SRM 全局路由中心：在意图跨域或不明确时，路由需求开发、猪齿鱼查询、故障排查、工作台排障、寻源/履约 SQL、数据库访问、认知库治理及代码/脚本定位。",
   "author": "WorkBuddy",
   "license": "MIT",
-  "keywords": ["router", "orchestration", "srm", "甄云", "路由", "需求开发", "多技能协作"],
+  "keywords": [
+    "router",
+    "orchestration",
+    "srm",
+    "甄云",
+    "路由",
+    "需求开发",
+    "多技能协作"
+  ],
   "features": {
-    "router_only": "只判断意图和协作顺序，不直接调用 MCP 或复制专项流程",
+    "router_only": "只做路由与共享上下文，可读取本地协作指引，不执行业务查询或写入",
     "direct_hit_first": "明确请求直接进入目标 Skill",
     "requirement_delivery": "Marmot 纯二开需求开发路由到 srm-requirement-delivery",
     "workbench_routing": "采购员工作台待办、卡片、超级搜索、关注与 ES 问题路由到 srm-workbench-bug-triage",
@@ -18,17 +26,22 @@
   "mcp_servers": [
     {
       "name": "zhenyun-pangu-mcp",
-      "tools": [],
-      "description": "纯路由层不直接调用 MCP；工具由目标专项 Skill 使用。"
+      "tools": [
+        "get_workflow_guide"
+      ],
+      "description": "路由层仅可读取协作协议；业务工具由专项 Skill 使用。"
     }
   ],
   "entry_point": "SKILL.md",
-  "categories": ["orchestration", "routing"],
+  "categories": [
+    "orchestration",
+    "routing"
+  ],
   "metadata": {
     "tables_count": 0,
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-14"
+    "last_updated": "2026-09-16"
   }
 }

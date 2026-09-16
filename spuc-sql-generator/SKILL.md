@@ -5,6 +5,10 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 
 # SRM 盘古订单履约 SQL 生成助手
 
+## 跨流程协作（按需）
+
+单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+
 > 本助手专门用于 **SRM 盘古（订单履约域）** 的数据库 SQL 生成与调整。
 > 涉及的核心业务包括：**采购订单（SODR）、收货工作台事务（SINV_RCV）、发货工作台（SLOD：送货/计划/标签）、老送货单（SINV_ASN）、状态机（SIEC）、委外（SINV_OUTSOURCE）** 等。
 > ⚠️ **与 ssrc-sql-generator 的分工**：询价单/招标单/报价/评分/寻源结果等 **采购寻源** 场景请使用 `ssrc-sql-generator`；本技能只负责 **订单及其下游履约（收发货、结算导出）**。
@@ -12,7 +16,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 ## 重要提示（必读）
 
 1. **多租户隔离**：几乎所有业务表都含 `tenant_id` 字段。**生成的 SQL 必须包含 `tenant_id` 条件**（除非明确说明是跨租户巡检/监控查询），否则会误改/误查其他租户的数据。
-2. **生产环境安全**：所有 SQL 默认针对 **生产数据库**（Archery 默认实例 `prod`=`SAAS-SRM-PROD`、库 `srm`，统一通过 `zhenyun-pangu-mcp` 调用）。执行任何写入前必须先 `SELECT` 确认影响范围，优先使用占位符（如 `<tenant_id>`、`<po_header_id>`）而非真实值。
+2. **环境与范围**：只有未指定环境的只读查询可默认 `cn/prod`；修复必须明确环境、租户和影响范围，已有明确上下文直接复用。写 SQL 只生成交人工执行，先用 `SELECT` 核查；未知值使用占位符并标注未验证。
 3. **跨库注意**：发货工作台表在 **`srm_logistics_delivery`** 库（`slod_*`），其余（订单/收货/老送货/主数据）在 **`srm`** 库。跨库 JOIN 时表名必须带库名前缀（如 `srm_logistics_delivery.slod_asn_line`、`srm.sinv_rcv_trx_line`）。
 4. **结构事实走 MCP**：表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 `zhenyun-pangu-mcp` 的 `archery_describe_table` / `archery_list_columns` 实时获取；本地文件只沉淀数据库拿不到或高频易错的**业务语义**（见「参考文件指引」）。
 5. **禁止编造**：不确定的表名、字段名、状态值、枚举值，必须调 MCP 验证或查询真实数据，**绝不凭记忆臆造**。
@@ -47,16 +51,15 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 3. **确认业务上下文**：判断订单 sodr / 收货事务 sinv_rcv / 发货工作台 slod / 老送货单 sinv_asn，特别注意后两者是两套表；上下文不足时才向用户澄清。
 4. **只补未知的表与字段（分级校验 + 校验门禁）**：
    - **找表（禁止猜表名）**：若用户只给了业务语义、你不知道对应表名（尤其跨 SPUC/SODR/主数据/物流发货等多个域时），**必须先用 `search_tables("<业务描述>", domain?)` 检索候选表**，再用 `get_table_relations` 确认 join 路径。
-   - **🚦 可信来源即视为「已确认」**：`search_tables` 返回的候选表、`get_table_relations` 返回的关联表、以及 `search_sql_templates` 命中的 `verified=true` 模板的 `core_tables`，都是可信来源，可直接用于 `archery_query`（跨库表写成 `db.table`，如 `srm_logistics_delivery.slod_asn_header`）。
-   - **`archery_describe_table` 探测兜底**：只有 catalog 未收录、模板也没有的偏表/新表（如部分 `SINV` 表）才调 `archery_describe_table(site, instance, db, "<表名>")` 校验字段存在；确认后通过 `upsert_table_knowledge` 补录。
-   - 字段层面同理：catalog 的 `entry_columns`、模板字段、`get_table_relations` 的 `join_on` 字段可直接信任；不确定或编造的字段才用 `archery_list_columns(site, instance, db, "<表名>", ["字段A","字段B"])` 确认。
+   - 模板、目录和本地参考只提供候选表与字段；目标环境的 `archery_describe_table`、`archery_list_columns` 或成功查询才证明当前结构。只补齐本次尚未验证的必要字段，不重复查整个库。
+   - 修复前核实 SET、WHERE 与关联字段及旧值；跨库显式写 `db.table`。目录未收录的已知表可直接 describe；需补录时先准备元数据并核对用户授权。
    - SQL 生成完成后调用 `record_table_usage("<表1,表2>")` 沉淀。
 5. **按依赖获取真实值**：能用一条有界、索引友好的 JOIN 同时返回租户、单据主键和业务状态时不要拆分；后一步确实依赖前一步提取值时才串行。禁止用硬编码 ID 直接生成修改 SQL。
 6. **生成 SQL**：命中修复模板时读取完整 `execution_flow` 并进入下方执行过程驱动模式；基于已验证的真实值生成，占位符用 `<...>` 标注并说明替换方法。生成 UPDATE 注意：
    - 仅修复用户要求修复的字段，不要画蛇添足；
    - **`sodr_*` 订单表更新必须带 `object_version_number = object_version_number + 1`**（乐观锁）；
    - 按团队惯例带 `last_update_date = now()`，数据修复建议在 `attribute_longtext10`（或表实际使用的留痕字段）追加 `concat(IFNULL(attribute_longtext10,','),'数据修复/<工单号>')`；
-   - WHERE 条件用 `tenant_id + 主键` 定位。
+   - WHERE 用 `tenant_id + 主键 + 已核实旧状态/版本` 定位；版本递增本身不构成并发保护。
 7. **自检安全规则**：套用「术语映射表与状态规则」「数据库约束与安全规则」逐条核对（多租户、乐观锁、pe_supplier 组合字段、关闭/取消互斥、ES 表联动、上下游协同、跨库前缀）。
 8. **MCP 异常回退**：若 MCP 工具调用失败或无返回，改用占位符并明确标注「未经过数据库验证」，绝不编造字段或值。
 9. **按价值沉淀**：只有新颖、已验证且可复用的方案才在交付后询问是否沉淀；常规查询、已有模板复用或未验证方案不追加确认轮次。
@@ -94,26 +97,10 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 
 ## 分级校验策略（正确性与效率兼顾）
 
-> **🚦 先探测后查询**：`archery_query` 通过「先确认再查询」纪律防止编造表/字段——即表/字段必须先经 `search_tables` 检索命中、或 `archery_describe_table`/`archery_list_columns` 确认存在，才能用于 `archery_query`。**「检索到 / describe 过」即视为已确认**，可直接查询；catalog/模板/describe 任意一处确认即可，不必重复 describe。
-
-### ✅ 已确认（可直接用于 archery_query，无需再 describe）
-- 来自 **zhenyun-pangu-mcp 认知层 检索结果中 `verified=true`（✅ 已验证）** 的盘古模板的表名与字段 —— 其 `core_tables` 直接作为可信来源；
-- 来自 **`search_tables` 检索命中**的候选表（注意结果中的 `db_name`，跨库表写成 `db.table`）；以及 `get_table_relations` 返回的关联表与 `join_on` 字段；
-- 在 **`references/table_meta.md`** 中明确列出的表名、主键、关联键（如 `po_header_id`、`rcv_trx_line_id`、`asn_line_id`、`tenant_id`）—— 与 catalog/模板结论一致时直接信任，若与 catalog/模板冲突以 catalog/模板为准，并修正本文件；
-- 在 **`references/relations.md`** 中明确给出的关联与规则；
-- `hpfm_tenant` / `hpfm_company` / `iam_user` 等基础表高频字段（已确认可信，可直接使用）。
-
-### ⚠️ 必须确认后再用（先 archery_describe_table / archery_list_columns 探测）
-- **标准拓展字段** `attribute_decimal / attribute_datetime / attribute_varchar / attribute_longtext` 各 `1~10`：仅当目标表经 `archery_describe_table`/`archery_list_columns` 确认存在该字段时才使用（部分物流表用到 `attribute_longtext60`）；这些字段**不要仅凭命名规则假设存在**，使用前需校验。
-- 表名不明确、不在上述可信来源中出现的：**先用 `search_tables` 检索候选表**；命中后即可直接用于 `archery_query`（无需再 describe）；目录未收录（如部分 SINV 表）才直接 `archery_describe_table`。
-- 用户口头描述或自定义的字段（如「那个含税金额」需确认是 `tax_included_amount` 还是 `tax_include_amount`——**订单头是 `tax_include_amount`、收货事务行是 `tax_included_amount`，极易写错**）；
-- 对拼写、存在性有任何怀疑的；生成 UPDATE/WHERE 前对关键字段调 `archery_list_columns` 确认。
-
-### 🔄 运行期真实值仍走 archery_query
-- `tenant_id`、`po_header_id`、`rcv_trx_header_id`、`asn_header_id`、各类记录表主键、具体状态值等**真实取值**，仍需通过 `archery_query` 逐步查询获得。
-
-### 🛡️ 异常回退
-- MCP 调用失败/无结果时：改用占位符并标注「未验证」，**严禁编造**。
+- **事实来源**：模板/目录/本地知识提供候选，当前目标环境的结构与数据由 Archery 证明；模板 `verified=true` 不能跨环境证明字段存在。
+- **复用条件**：相同 site/instance/db 且无升级或冲突信号时，复用本次已取得的 DDL/字段结果/成功查询，不重复 describe；切环境只重新核实受影响部分。
+- **最小校验**：只验证当前 SQL 使用的字段，尤其拓展字段、易错拼写、SET/WHERE 和 join 字段。主键、状态及影响行数仍须目标环境实时查询。
+- **失败与空结果**：工具失败不是 0 行；查询被截断不能证明全量影响范围。不可核实时输出占位符与缺失断言，不能声称已验证。
 
 ## 业务知识引用索引（Knowledge 层）
 
@@ -142,12 +129,12 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 - 优先复用 `verified_only=true` 模板；MCP 不可用时降级为「不检索直接生成」。
 
 ### 沉淀模板（生成后）
-- 完成一次**复杂场景或数据修复**后，**主动询问用户是否沉淀**，确认后按「盘古模板约定」调用 `save_sql_template`：
+- 仅对新颖、已验证且可复用的方案准备沉淀内容；未获相应授权时再询问，授权后按「盘古模板约定」调用 `save_sql_template`：
   - `title`：`【盘古-xx】...` 前缀；
   - `category`：`订单SPUC` / `物流收货SINV` / `物流发货SLOD` / `盘古通用查询` / `数据修复-盘古`；
   - `system`：`盘古`；`keywords` 必含 `盘古`；`core_tables` 照实填写；
   - 数据修复类必须把 `[INPUT]` + `[STEP n]`（QUERY/ASSERT/EXTRACT/CONDITION/ACTION）写入 `execution_flow`，并把脱敏的输入、中间结果和最终 SQL 摘要写入 `example_case`；
-  - `verified`：表/字段已 MCP 校验通过则置 `true`；未校验保持 `false`。
+  - `verified`：结构、适用前提与方案效果均有验证证据才置 `true`；仅核验字段或仅生成写 SQL 时保持 `false`，记录已验证部分。
   - `status`：模板状态，默认 `draft`，可用 `draft/verified/trusted/deprecated`。
   - `risk_level`：按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
   - `business_domain`：`盘古订单履约`；`system`：`盘古`；`execution_policy`：写操作执行策略说明；`parameters`：参数 JSON 对象字符串。
@@ -173,7 +160,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 
 1. **先 MCP 取结构**：用 `archery_describe_table(site, instance, db, '<新表>')` 获取真实字段与注释。
 2. **沉淀业务语义**：把数据库拿不到的关联/规则补充到 `references/relations.md` 或 `references/table_meta.md`。
-3. **沉淀可复用模板**：复杂场景完成后按盘古约定 `save_sql_template` 沉淀（校验通过置 `verified=true`）。
+3. **沉淀可复用模板**：复杂场景完成后按盘古约定 `save_sql_template` 沉淀（按实际验证程度设置 `verified`，仅校验字段不算效果验证）。
 4. **更新本 SKILL**：在术语映射表或参考文件指引中补充新概念。
 5. **禁止**：不要为每张表创建本地结构文件——结构事实统一走 MCP。
 
@@ -186,11 +173,13 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 1. **多租户强制**：业务 SQL 必须带 `tenant_id`（跨租户巡检除外，需显式说明）。
 2. **主键优先**：UPDATE/DELETE 必须用主键或唯一业务键（如 `po_header_id`、`rcv_trx_line_id`）定位，**严禁无 WHERE 或仅凭编号模糊更新**。
 3. **先查后改**：任何写入前必须保留对应 `SELECT` 核查原数据，必要时加 `LIMIT`/事务。
-4. **乐观锁**：`sodr_*` 表 UPDATE 必带 `object_version_number = object_version_number + 1`。
+4. **乐观锁**：`sodr_*` 表 UPDATE 按业务规则递增 `object_version_number`，WHERE 同时带本次读取的旧版本。
 5. **占位符规范**：输出 SQL 用 `<...>` 标注待替换值并说明替换方法。
-6. **生产库谨慎**：默认连接生产库，写入语句务必二次确认影响范围。
+6. **目标明确**：修复不默认生产；输出目标环境与查询时间，执行前重新核查影响范围。
 
 ## SQL 输出格式规范（写入类操作）
+
+修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。UPDATE/DELETE 的核查 SELECT 与写 SQL 保持相同 WHERE，并使用已读取的旧状态/版本；执行前重新核查，数据变化则重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
 
 > 仅适用于含 INSERT / UPDATE / DELETE 的输出。**纯查询类 SQL 不受此约束。**
 
@@ -199,9 +188,10 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 - 推荐写法：
   ```sql
   -- ① 原始数据核查（预期影响 1 行，确认无误后再执行下方 UPDATE）
-  SELECT po_header_id, status_code, released_flag, confirmed_flag, closed_flag, cancelled_flag
+  SELECT po_header_id, status_code, released_flag, confirmed_flag, closed_flag, cancelled_flag, object_version_number
   FROM sodr_po_header
-  WHERE tenant_id = <tenant_id> AND po_header_id = <po_header_id>;
+  WHERE tenant_id = <tenant_id> AND po_header_id = <po_header_id>
+    AND object_version_number = <已核实旧版本>;
 
   -- ② 修复为已发布
   UPDATE sodr_po_header
@@ -210,10 +200,11 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
       closed_flag = 0, cancelled_flag = 0,
       released_date = now(), last_update_date = now(),
       object_version_number = object_version_number + 1
-  WHERE tenant_id = <tenant_id> AND po_header_id = <po_header_id>;
+  WHERE tenant_id = <tenant_id> AND po_header_id = <po_header_id>
+    AND object_version_number = <已核实旧版本>;
   ```
 
-### ✅ 推荐包含：执行后校验 SELECT
+### ✅ 必须包含：执行后校验 SELECT
 - 更新/删除后附一段 `SELECT` 校验结果（如「预期状态 = 目标值」「预期 0 行」）。
 
 ### ❌ 禁止包含

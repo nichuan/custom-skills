@@ -5,7 +5,11 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 # 甄云 SRM 全局路由
 
-本 Skill 只识别意图、安排专项 Skill 的先后顺序和共享上下文，不复制专项业务流程，也不直接执行 MCP。当前运行时没有动态 Skill 加载工具时，不得构造 `use_skill`；直接按已经选中的专项 Skill 执行，或明确告诉用户下一入口。
+## 跨流程协作（按需）
+
+单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+
+本 Skill 只识别意图、安排专项 Skill 的先后顺序和共享上下文，不复制专项业务流程；仅可调用本地只读 `get_workflow_guide` 获取协作协议，不直接执行其它业务 MCP。当前运行时没有动态 Skill 加载工具时，不得构造 `use_skill`；直接按已经选中的专项 Skill 执行，或明确告诉用户下一入口。
 
 意图已明确时不要加载或复述本路由流程。跨域任务只按真实数据依赖串行；互不依赖且各自需要多轮取证的调查可委派子代理，否则优先同轮并行工具调用。每个专项 Skill 复用前序已验证的环境、租户、任务、脚本、表和源码信息，不重新发现。
 
@@ -15,6 +19,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | 修改已有 Marmot JS/SQL 的字段取值、常量、表达式或局部逻辑 | `srm-requirement-delivery` 快速修改 |
 | 按猪齿鱼需求号开发新的埋点、API 挂载/API 发布、CodeBlock 或 QueryBlock | `srm-requirement-delivery` 完整需求 |
+| 标准 Java / 混合需求的分析与实现 | 按目标仓库开发约定实现；`gitlab-code` 只定位，Marmot 子产物才用 `srm-requirement-delivery` |
 | 只查询猪齿鱼任务、评论、状态或附件 | `choerodon-task` |
 | 异常、错误码、traceId、日志、接口失败、超时或线上问题 | `java-troubleshoot` |
 | 询价、招标、报价、评分、资格预审、寻源结果相关 SQL | `ssrc-sql-generator` |
