@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
   "version": "1.5.1",
-  "description": "开发或修改 SRM Marmot 纯二开代码；已有脚本的明确字段、常量和局部逻辑改动走最小修改与定向检查，新需求才读取猪齿鱼与平台模板。",
+  "description": "开发或修改 SRM Marmot 纯二开代码；历史脚本增量更新默认只做本次需求的最小局部改动并保留原逻辑与风格，整体优化/重构/重写须用户明确要求；新需求才读取猪齿鱼与平台模板。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -19,6 +19,7 @@
     "platform_pull": "按租户和编码读取适配器或独立脚本的现有正文",
     "artifact_layout": "使用用户确认的输出目录，按需求、租户和产物类型分类落地",
     "focused_implementation": "只补当前二开逻辑，未知契约才做定向核实",
+    "legacy_incremental_patch": "历史脚本默认保留原逻辑、结构与代码风格，只做本次需求必需的局部改动；整体优化、重构或重写须用户明确要求",
     "selective_delegation": "仅在完整需求含多条独立且多轮的只读取证线时委派子代理，主代理统一实现与验证",
     "design_gates": "编码前确认字段来源、外部服务契约、日志、空值语义与执行范围",
     "static_quality_gate": "用每次需求提供的规则检查 Marmot JavaScript 与产物哈希",

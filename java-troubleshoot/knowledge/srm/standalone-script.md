@@ -1,6 +1,6 @@
 # 独立脚本（Marmot 脚本库，rel-table 宽表虚拟表）
 
-> 企业事实层。独立脚本（Marmot 脚本库）与适配器埋点脚本（`sada_adaptor_task_*`，见 `adapter-js.md`）是**两套独立体系**。独立脚本没有独立物理表，全部存于 rel-table 宽表（虚拟表机制，见 `virtual-table.md`）。2026-09-05 dev 实测（traceId LF0OYREN）+ 数据库验证。
+> 企业事实层。独立脚本（Marmot 脚本库）与适配器埋点脚本（`sada_adaptor_task_*`，见 `adapter-js.md`）是**两套独立体系**。独立脚本没有独立物理表，全部存于 rel-table 宽表（虚拟表机制，见 `virtual-table.md`）。源码/测试用例映射已于 2026-09-16 由 `cn/prod/srm.spfm_rel_table_definition.mapping_json` 核实；此前将测试输入误记为正文的结论已纠正。
 
 ## 存储位置（`srm` 库，rel-table 宽表）
 
@@ -15,7 +15,8 @@
 | `value3` | 脚本编码（task_code） | `SCUX_SRM_PECHION_PAYMENT_STATEMENT_PDF_PRINT_ADAPTOR` |
 | `value4` | 描述（常含猪齿鱼任务号） | `srm-84641，百雀羚付款结算单打印.` |
 | `value5` | 内容类型标记 | `template` / `api` 等 |
-| `longValue1`（或相邻 longValue 槽位） | 脚本/模板正文（Base64） | 样本为 UTF-16LE JSON；JS 正文按行探测编码 |
+| `longValue5`（定义键 `longvalue5`） | `content`，脚本内容（明文或历史 Base64） | 源码读取与搜索的唯一正文列 |
+| `longValue1`（定义键 `longvalue1`） | `contentInput`，测试用例（Base64） | 测试输入 JSON，不是脚本源码 |
 
 ⚠️ **关键陷阱**：该表所有行 `tenant_id = 0`，租户编码在 `value2` 槽位。查询独立脚本【禁止按 `tenant_id` 过滤】，必须按 `table_code + value2`。
 
@@ -29,9 +30,10 @@ search_standalone_scripts(tenant, query)
 ```
 
 - `tenant` 参数底层过滤 `value2`；`query` 匹配 `value3`（脚本编码）/`value4`（描述）。
-- MCP 在服务端完成 Base64 解码（自动探测 UTF-16LE/UTF-16BE/UTF-8），Agent 只接收正文文本。
+- MCP 直接返回明文源码；历史 Base64 内容在服务端自动探测 UTF-16LE/UTF-16BE/UTF-8 解码，Agent 只接收正文文本。
+- 只读取 `longValue5`；为空时返回空正文，不能回退到测试用例或其它槽位。结果的 `source_column` 明确标注来源。
 - 定位字段、函数、接口地址或报文时先搜索正文，再读取局部行号；只有确需全局分析时才 `full=true`。
-- 禁止用通用 `archery_query` 把 `longValue*` Base64 正文返回给 Agent。
+- 禁止用通用 `archery_query` 直接返回 `longValue*` 存储内容；统一由源码工具处理明文/历史 Base64 并限制返回范围。
 
 ## 底层数据模型（维护 Tool 时使用）
 
@@ -42,8 +44,8 @@ FROM spfm_rel_table_record
 WHERE table_code = 'marmot_script_library' AND value2 = '<租户编码>'
 LIMIT 50;
 
--- ② 正文在 longValue 槽位（探测 longValue/longValue1~5 取第一个非空）
-SELECT id, value3, longValue1
+-- ② 工具在服务端读取并解码唯一源码列；不得按非空值探测槽位
+SELECT id, value3, longValue5 AS encoded_source
 FROM spfm_rel_table_record
 WHERE table_code = 'marmot_script_library' AND value2 = '<租户编码>' AND value3 = '<脚本编码>';
 ```
@@ -60,7 +62,7 @@ WHERE table_code = 'marmot_script_library' AND value2 = '<租户编码>' AND val
 |---|---|---|
 | 存储表 | `spfm_rel_table_record`（table_code=`marmot_script_library`，虚拟表） | `sada_adaptor_task_header/_line`（物理表） |
 | 租户字段 | `value2` 槽位（tenant_id=0） | `apply_tenant_num`（无 tenant_id 列） |
-| 正文编码 | `longValue*` 槽位，Base64（UTF-16LE/BE/UTF-8 按行探测） | `script_content`，Base64(UTF-16BE) |
+| 正文编码 | `longValue5`，明文或历史 Base64（UTF-16LE/BE/UTF-8 探测） | `script_content`，Base64(UTF-16BE) |
 | 执行方式 | srm-script-container 独立执行（定时任务/导入/打印模板/API 配置等） | 挂钩点 BEFORE/AFTER 执行，与标准逻辑同事务 |
 | 典型场景 | 定时任务、PDF/送货单打印模板、Excel 导入、消息/邮件提醒、OCR/外部 API 配置 | ERP/WMS/OA 对接、报文字段映射、回调推送、单据前/后处理 |
 
