@@ -1,6 +1,6 @@
 ---
 name: gitlab-code
-description: 甄云代码与数据库脚本定位助手。用户要找类、方法、文件、二开逻辑、适配器脚本或外部接口实现时使用。二开、租户定制和外部对接先定位适配器/独立脚本，只有契约核实或用户明确要求时才定向查标准代码；普通代码只用本地 PG_ROOT/search_repo。GitLab 搜索当前禁用，仅允许已知 project_id/ref/path 的精确读取。不排障、不生成 SQL、不修改业务代码。
+description: 甄云代码与脚本平台实现定位助手。用户要找类、方法、文件、二开逻辑、适配器脚本或外部接口实现时使用。二开身份可用 Pangu 模糊发现，当前脚本正文统一由 zhenyun-script-platform-mcp 读取；只有契约核实或用户明确要求时才定向查标准代码。GitLab 搜索当前禁用。不排障、不生成 SQL、不修改业务代码。
 ---
 
 # 代码与脚本定位
@@ -22,10 +22,10 @@ description: 甄云代码与数据库脚本定位助手。用户要找类、方�
 | 请求特征 | 首选证据源 | 补充证据源 |
 |---|---|---|
 | Java 类、方法、DTO、配置、异常文本 | 本地 `search_repo` | 已知路径时精确读取 GitLab 文件 |
-| 二开、客户定制、租户专属逻辑 | 数据库适配器/独立脚本 | 本地代码用于确认平台入口 |
-| ERP/WMS/OA/SAP 等外部系统对接 | 数据库脚本 | 本地代码用于确认调用框架 |
-| 回调、Webhook、推送、同步、报文、字段映射、签名 | 数据库脚本 | 日志或本地入口代码 |
-| 标准能力与定制逻辑混合 | 先定位实际执行的数据库脚本 | 仅在契约核实需要时定向读取本地入口 |
+| 二开、客户定制、租户专属逻辑 | Script Platform 当前脚本 | 本地代码用于确认平台入口 |
+| ERP/WMS/OA/SAP 等外部系统对接 | Script Platform 当前脚本 | 本地代码用于确认调用框架 |
+| 回调、Webhook、推送、同步、报文、字段映射、签名 | Script Platform 当前脚本 | 日志或本地入口代码 |
+| 标准能力与定制逻辑混合 | 先定位实际执行的平台脚本 | 仅在契约核实需要时定向读取本地入口 |
 
 本地 Java 没有命中，不代表功能没有实现；定制逻辑可能全部存放在脚本中。
 
@@ -61,30 +61,35 @@ GitLab 只保留精确读取：当 `project_id`、`ref`、`path` 已由用户或
 适配器、标准 API 前后置、埋点脚本：
 
 ```text
-search_adapter_scripts
-  → get_adapter_script_info
-  → search_adapter_script_source
-  → get_adapter_script_source(start_line, end_line)
-  → 确需全局分析时才 full=true
+已知 tenant + task_code + running_service
+  → adapter_get
+
+身份不完整
+  → Pangu search_adapter_scripts
+  → 取得唯一精确身份
+  → adapter_get
 ```
 
 独立 API 或其它独立二开脚本：
 
 ```text
-search_standalone_scripts
-  → get_standalone_script_info
-  → search_standalone_script_source
-  → get_standalone_script_source(start_line, end_line)
-  → 确需全局分析时才 full=true
+已知 tenant + code
+  → independent_script_get
+
+编码不完整
+  → Pangu search_standalone_scripts
+  → 取得唯一精确身份
+  → independent_script_get
 ```
 
 要求：
 
 - 从请求提取租户、运行服务、业务关键词和接口名称，已知信息不重复询问。
-- `search_adapter_scripts` / `search_standalone_scripts` 先查元信息，不直接读取所有脚本正文。
-- 定位字段、函数、URL 或报文时，先搜索正文再读取局部行号。
+- `search_adapter_scripts` / `search_standalone_scripts` 只做候选发现；找到精确身份后，平台当前
+  源码、版本和启用状态以 Script Platform MCP 的 `get` 返回为准。
+- 定位字段、函数、URL 或报文时，在 `get` 返回的当前源码中查找；不要回退 Pangu 旧正文工具。
 - 排障为获取日志关键字时，只从脚本源码提取真实、稳定的日志字面量；不猜测异常文案或近义词。
-- MCP 返回的 `source` 已在服务端解码；不要查询、展示或让 LLM 处理 Base64。
+- Script Platform MCP 返回的 `source` 已解码；不要查询、展示或让 LLM 处理 Base64。
 - 命中启用脚本时，以脚本实际逻辑为准；确需核实契约或平台行为时才定向查标准代码。
 - 适配器结果来自 `sada_adaptor_task_*`；独立脚本结果来自 MCP 已实现的 standalone-script 数据源。两类结果必须按工具返回标识，不得混写或自行猜表。
 
@@ -94,7 +99,7 @@ search_standalone_scripts
 
 - 本地代码：绝对/仓库相对路径及行号。
 - 精确 GitLab 文件：`path_with_namespace@ref:path:line`，并说明该位置来自已知路径而非搜索。
-- 数据库脚本：租户、运行服务、`script_id`、`task_code`、版本及关键源码行号。
+- 平台脚本：租户、运行服务、Header/Line 或 Record ID、`task_code`、版本、源码哈希及关键源码行号。
 - 未命中：列出已检索的数据源和边界，不把“未找到”写成“不存在”。
 
 全程只读，不输出凭据、完整 Base64 或无关的大段源码。

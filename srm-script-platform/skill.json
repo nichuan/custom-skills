@@ -1,0 +1,64 @@
+{
+  "name": "srm-script-platform",
+  "version": "1.0.0",
+  "description": "甄云 SADA/Marmot/GraalJS 脚本平台开发助手：用 Script Platform MCP 读取权威当前源码、远程调试并受控保存或部署；Pangu 仅负责模糊发现、日志、数据库与静态检查。",
+  "author": "Zhenyun Engineering",
+  "license": "MIT",
+  "keywords": [
+    "srm",
+    "marmot",
+    "sada",
+    "graaljs",
+    "adapter",
+    "独立脚本",
+    "远程调试",
+    "部署"
+  ],
+  "features": {
+    "authoritative_read": "平台当前源码、版本、Fixture 和启用状态统一由 zhenyun-script-platform-mcp 读取",
+    "discovery_only_pangu": "Pangu 脚本搜索只补齐精确身份，不作为 Debug/Save/Deploy 前的最终源码",
+    "unsaved_debug": "当前编辑器源码可直接提交 DEV GraalJS Runtime，无需先保存",
+    "fixture_priority": "显式 Input、有效保存 Fixture、真实日志提取依次降级；禁止编造业务 DTO",
+    "explicit_write": "仅在用户明确要求保存或部署时调用写工具，并携带预期版本",
+    "safe_adapter_deploy": "Adapter 部署由 MCP 内部完成停用、刷新、完整保存、校验与原状态恢复"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-script-platform-mcp",
+      "tools": [
+        "independent_script_get",
+        "independent_script_debug",
+        "independent_script_save",
+        "adapter_get",
+        "adapter_debug",
+        "adapter_extract_input",
+        "adapter_deploy"
+      ],
+      "description": "脚本平台权威当前态、未保存源码远程调试、版本安全保存与 Adapter 安全部署。"
+    },
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "search_adapter_scripts",
+        "search_standalone_scripts",
+        "obs_sls_query",
+        "obs_log_query",
+        "query_script_trace",
+        "check_marmot_script_static",
+        "get_workflow_guide"
+      ],
+      "description": "只负责脚本身份发现、真实日志、trace 和静态检查，不读取权威当前源码或执行平台写入。"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "development",
+    "debugging",
+    "deployment"
+  ],
+  "metadata": {
+    "last_updated": "2026-09-17",
+    "scope": "script-platform-lifecycle",
+    "write_policy": "explicit-user-request-only"
+  }
+}

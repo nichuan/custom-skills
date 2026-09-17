@@ -1,7 +1,7 @@
 {
   "name": "gitlab-code",
-  "version": "1.1.1",
-  "description": "甄云代码与数据库脚本定位助手：普通代码使用 PG_ROOT/search_repo；二开与外部对接先定位适配器或独立脚本，只有契约核实或用户明确要求时才定向读取标准代码。GitLab 仅在 project/ref/path 已知时精确读取。只读定位，不排障、不生成 SQL。",
+  "version": "1.2.0",
+  "description": "甄云代码与脚本平台实现定位助手：普通代码使用 PG_ROOT/search_repo；Pangu 只发现二开身份，当前适配器或独立脚本正文统一由 Script Platform MCP 读取。只读定位，不排障、不生成 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -15,9 +15,9 @@
   "features": {
     "local_only_search": "普通源码检索直接使用 PG_ROOT/search_repo；本地无结果也不尝试当前不可用的 GitLab 搜索",
     "gitlab_search_disabled": "gitlab_search_projects/gitlab_search_code 当前不暴露；仅在 project_id/ref/path 已知时允许精确读取",
-    "script_first": "二开、租户定制和外部系统对接按载体检索适配器或独立脚本，再搜索正文并按行局部读取",
+    "script_first": "二开、租户定制和外部系统对接按载体发现身份，再由 Script Platform MCP 读取权威当前源码",
     "standard_repo_gate": "故障排查转入时，执行链确认无适配器/API 前后置挂载才默认查标准仓库；二开仅为契约核实定向读取",
-    "standalone_script_search": "独立 API 和独立二开脚本使用 search/get_standalone_* 完整只读链路",
+    "standalone_script_search": "独立 API 和独立二开脚本由 Pangu 发现候选、independent_script_get 读取当前正文",
     "ignore_snapshots": "op-deliver-* 快照仓库一律忽略，禁止作为检索目标",
     "read_file": "仅对已知 GitLab project/ref/path 使用 gitlab_list_branches/list_tree/get_file 精确核实，不遍历项目模拟搜索",
     "read_only": "只读检索，不修改业务代码"
@@ -28,19 +28,21 @@
       "tools": [
         "search_repo",
         "search_adapter_scripts",
-        "get_adapter_script_info",
-        "search_adapter_script_source",
-        "get_adapter_script_source",
         "search_standalone_scripts",
-        "get_standalone_script_info",
-        "search_standalone_script_source",
-        "get_standalone_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file",
         "get_workflow_guide"
       ],
-      "description": "Pangu 统一 MCP：本地代码检索、数据库适配器与独立脚本检索/解码/局部读取，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
+      "description": "Pangu 统一 MCP：本地代码检索、脚本身份发现，以及已知路径的 GitLab 精确文件访问。GitLab 搜索能力当前禁用。"
+    },
+    {
+      "name": "zhenyun-script-platform-mcp",
+      "tools": [
+        "adapter_get",
+        "independent_script_get"
+      ],
+      "description": "按精确身份读取 Script Platform 权威当前源码、版本和状态。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -54,6 +56,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-17"
   }
 }

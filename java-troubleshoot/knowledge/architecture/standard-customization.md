@@ -17,8 +17,8 @@
 
 | 优先信号 | 二开方式 | 怎么查 |
 |---|---|---|
-| 挂钩点、BEFORE/AFTER、报文映射、回调/推送 | 适配器埋点脚本 | `search_adapter_scripts` 系列查 `sada_adaptor_task_*`，以启用脚本为准 |
-| 独立任务、打印/导入、API 配置、`SCUX_*` / `STD_*` | 独立脚本 | `search_standalone_scripts` 系列查 `spfm_rel_table_record`（`table_code='marmot_script_library'`，租户在 value2） |
+| 挂钩点、BEFORE/AFTER、报文映射、回调/推送 | 适配器埋点脚本 | Pangu `search_adapter_scripts` 只发现身份，`adapter_get` 读取平台当前态 |
+| 独立任务、打印/导入、API 配置、`SCUX_*` / `STD_*` | 独立脚本 | Pangu `search_standalone_scripts` 只发现身份，`independent_script_get` 读取平台当前态 |
 | 物理表不存在且日志/脚本指向配置表 | 其他配置表（虚拟表） | 用 `table_code` 查 `spfm_rel_table_definition` / `spfm_rel_table_record`（或租户分表 `spfm_rel_table_record_srm_{租户}`） |
 | 证据明确指向老租户 Git 二开类 | Git 二开仓库 `operation-srm-{租户}/srm-{模块}-{租户}` | 仅按已知类/接口定向用本地 `search_repo`；只有仓库/分支/路径已知时才精确读取 GitLab |
 

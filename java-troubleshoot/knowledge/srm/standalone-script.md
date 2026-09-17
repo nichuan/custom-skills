@@ -23,16 +23,19 @@
 ## Agent 标准读取流程（MCP 工具链）
 
 ```text
-search_standalone_scripts(tenant, query)
-  → get_standalone_script_info(script_id)
-  → search_standalone_script_source(script_id, query)
-  → get_standalone_script_source(script_id, start_line, end_line)
+已知 tenant + code
+  → zhenyun-script-platform-mcp.independent_script_get
+
+编码不完整
+  → zhenyun-pangu-mcp.search_standalone_scripts(tenant, query)
+  → 唯一精确身份
+  → zhenyun-script-platform-mcp.independent_script_get
 ```
 
 - `tenant` 参数底层过滤 `value2`；`query` 匹配 `value3`（脚本编码）/`value4`（描述）。
-- MCP 直接返回明文源码；历史 Base64 内容在服务端自动探测 UTF-16LE/UTF-16BE/UTF-8 解码，Agent 只接收正文文本。
-- 只读取 `longValue5`；为空时返回空正文，不能回退到测试用例或其它槽位。结果的 `source_column` 明确标注来源。
-- 定位字段、函数、接口地址或报文时先搜索正文，再读取局部行号；只有确需全局分析时才 `full=true`。
+- Pangu 搜索只发现候选；平台当前 Record、版本、Fixture 和源码以 `independent_script_get` 为准。
+- Script Platform MCP 直接返回明文源码；Agent 不处理平台 Base64。
+- 定位字段、函数、接口地址或报文时在 `independent_script_get` 返回的当前源码中查找。
 - 禁止用通用 `archery_query` 直接返回 `longValue*` 存储内容；统一由源码工具处理明文/历史 Base64 并限制返回范围。
 
 ## 底层数据模型（维护 Tool 时使用）

@@ -1,6 +1,6 @@
 ---
 name: srm-requirement-delivery
-description: 开发或修改甄云 SRM Marmot 纯二开代码，覆盖埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。已有脚本的明确字段、常量、表达式或局部分支改动走快速修改，不因附带需求号、租户或环境重查猪齿鱼、平台、数据库或完整调用链；新需求才读取需求与平台模板并组织交付物。标准 Java 改造、故障排查和单纯 SQL 修复不使用本 Skill。
+description: 开发或修改甄云 SRM Marmot 纯二开代码，覆盖埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。已有脚本的明确局部改动走快速修改；新需求才读取需求与平台模板并组织交付物。平台当前源码、远程调试和受控保存统一使用 zhenyun-script-platform-mcp，Pangu 只补充发现、需求、日志、数据库和静态检查。标准 Java 改造、故障排查和单纯 SQL 修复不使用本 Skill。
 ---
 
 # SRM 纯二开需求开发
@@ -135,9 +135,9 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 完整需求模式必须先取得平台现有内容，再开始编码，避免覆盖用户提前建立的模板或配置。快速修改已有本地脚本时不进入本节。
 
-1. 埋点脚本使用 `search_adapter_scripts(tenant=<tenant>, query=<code>, enabled_only=false)`；API 挂载、API 发布、CodeBlock、QueryBlock 使用 `search_standalone_scripts(tenant=<tenant>, query=<code>)`。
-2. 只接受租户和编码精确匹配的唯一结果。存在多个版本或同名项时，结合需求环境、服务、描述和更新时间判断；仍不唯一就停止该产物并请用户选择，不猜 `script_id`。
-3. 取得唯一 `script_id` 后，并行调用 `get_*_script_info` 与 `get_*_script_source(full=true)`；二者互不依赖。空模板也要保留原有注释、入口形态和配置线索。
+1. 已知埋点的 `tenant + task_code + running_service` 时直接调用 `adapter_get`；已知独立脚本的 `tenant + code` 时直接调用 `independent_script_get`。Script Platform MCP 返回的当前源码、版本、Fixture 和启用状态是后续实现的权威基线。
+2. 身份不完整时，埋点仅用 Pangu `search_adapter_scripts`、独立脚本仅用 `search_standalone_scripts` 做模糊发现；取得精确编码和运行服务后必须回到对应 `get`，不继续用 Pangu 旧正文读取工具。
+3. 只接受租户、编码、运行服务精确匹配的唯一结果。存在多个候选或多 Line 未指定 `line_id` 时停止该产物并请用户选择，不猜环境、服务或第一条 Line。空模板也要保留原有注释、入口形态和配置线索。
 4. 本地目标不存在时，直接按需求目录结构创建对应目录和文件，再把平台正文写入目标文件；不调用 `marmot-dev` 的建档命令。本地目标已存在时先比较；本地和平台都已有非模板逻辑且内容不一致时，不静默覆盖，保留本地文件并报告冲突。
 5. 在 `<delivery-root>/<issue>/<tenant>/` 维护三个轻量文件：
    - `request.md`：需求标题、目标行为、关键约束和验收点的简要快照。
@@ -171,7 +171,7 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 快速修改按“先判定工作模式”中的定向检查结束，不追加下面的完整交付步骤。完整需求模式执行：
 
-1. 为可本地表达的关键分支补少量 `fixtures/*.json`；依赖真实 Java、事务、权限、数据库或远程服务的行为明确保留为未验证。当前无法提供 Marmot 运行时的本地模拟执行器时，不得用 Node 模拟结果冒充联调。
+1. 为可本地表达的关键分支补少量 `fixtures/*.json`；依赖真实 Java、事务、权限、数据库或远程服务的行为明确保留为未验证。不得用 Node 模拟结果冒充 GraalJS 联调。用户要求真实运行验证且有有效 DEV Input 时，按 `srm-script-platform` 的 Fixture 优先级调用对应 Debug，直接提交未保存源码，不先保存。
 2. JavaScript 至少执行 `node --check <entry.js>`，并检查只有一个同步全局 `function process(input)` 入口、没有 ESM/CommonJS 导出以及 Node/浏览器专属全局误用。外部服务契约在 `design-gates.md` 中人工核对；所有 JavaScript 调用 `check_marmot_script_static`。文件写入后并行执行语法检查与静态检查。QueryBlock 检查非空、占位符闭合及只读/写入意图是否符合需求。
 3. `artifacts.json` 中每个源码哈希必须在静态检查后更新；哈希不一致视为门禁失败。
 4. 有真实 trace 时调用 `query_script_trace(trace_id, from_time, to_time, script_code)`，验证 `design-gates.md` 中声明适用的日志阶段；只给 traceId 没有时间范围时，记录为“待补时间范围”，不得结论化为“没有日志”。没有真实 trace 时明确标记未联调。
@@ -179,6 +179,6 @@ API 挂载和 API 发布都属于 `SCRIPT_LIB`。前置/后置只是挂载阶段
 
 ## 外部写入边界
 
-- 当前默认只读猪齿鱼和平台脚本；不自动改任务状态、写评论、保存脚本、挂载或发布。
+- 当前默认只读猪齿鱼和平台脚本；不自动改任务状态、写评论、保存脚本、挂载或发布。远程 Debug 也只在用户要求运行/调试且 DEV Input 有效时执行。
 - 用户明确要求写猪齿鱼评论时，先展示 Markdown 内容并获得确认。
-- 将来接入平台写工具后，只有用户明确要求“保存/发布到平台”才能执行；写前比较平台版本或源码哈希，发现平台已变化就停止，不能覆盖并发修改。
+- 只有用户明确要求“保存、发布、部署或更新到 DEV”时，才调用 `independent_script_save` 或 `adapter_deploy`；必须携带最近一次 `get` 的预期版本。发现版本冲突就重新读取并报告差异，不能覆盖并发修改。

@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "1.5.1",
-  "description": "开发或修改 SRM Marmot 纯二开代码；历史脚本增量更新默认只做本次需求的最小局部改动并保留原逻辑与风格，整体优化/重构/重写须用户明确要求；新需求才读取猪齿鱼与平台模板。",
+  "version": "1.6.0",
+  "description": "开发或修改 SRM Marmot 纯二开代码；历史脚本只做本次需求的最小局部改动，新需求才读取猪齿鱼与平台模板。平台当前源码、远程调试和受控保存统一使用 Script Platform MCP。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -16,7 +16,7 @@
   "features": {
     "fast_patch": "已有脚本的明确局部改动不查询猪齿鱼、平台、数据库或完整调用链",
     "issue_driven": "仅在实现新需求或用户明确要求时读取猪齿鱼；详情与评论并行获取，目录只在首次写入前确认",
-    "platform_pull": "按租户和编码读取适配器或独立脚本的现有正文",
+    "platform_pull": "Pangu 只发现脚本身份，Script Platform MCP 按精确身份读取权威当前正文与版本",
     "artifact_layout": "使用用户确认的输出目录，按需求、租户和产物类型分类落地",
     "focused_implementation": "只补当前二开逻辑，未知契约才做定向核实",
     "legacy_incremental_patch": "历史脚本默认保留原逻辑、结构与代码风格，只做本次需求必需的局部改动；整体优化、重构或重写须用户明确要求",
@@ -24,7 +24,8 @@
     "design_gates": "编码前确认字段来源、外部服务契约、日志、空值语义与执行范围",
     "static_quality_gate": "用每次需求提供的规则检查 Marmot JavaScript 与产物哈希",
     "portable_validation": "基础检查不依赖 marmot-dev；只维护轻量 design-gates.md，不创建正式审阅包",
-    "manual_release": "默认输出可复制代码，不写平台、不挂载、不发布"
+    "remote_debug": "用户要求真实运行且有有效 DEV Input 时直接调试未保存源码",
+    "manual_release": "只有用户明确要求保存或部署时才携带预期版本调用平台写工具"
   },
   "mcp_servers": [
     {
@@ -37,11 +38,7 @@
         "choerodon_list_attachments",
         "choerodon_download_attachment",
         "search_adapter_scripts",
-        "get_adapter_script_info",
-        "get_adapter_script_source",
         "search_standalone_scripts",
-        "get_standalone_script_info",
-        "get_standalone_script_source",
         "search_repo",
         "archery_list_instances",
         "archery_query_tenant",
@@ -53,7 +50,20 @@
         "query_script_trace",
         "get_workflow_guide"
       ],
-      "description": "只读获取本地交付目录、猪齿鱼需求、平台脚本、标准调用契约和必要数据库事实。"
+      "description": "只读获取猪齿鱼需求、脚本身份候选、标准调用契约和必要数据库事实。"
+    },
+    {
+      "name": "zhenyun-script-platform-mcp",
+      "tools": [
+        "independent_script_get",
+        "independent_script_debug",
+        "independent_script_save",
+        "adapter_get",
+        "adapter_debug",
+        "adapter_extract_input",
+        "adapter_deploy"
+      ],
+      "description": "读取平台权威当前源码和版本，调试未保存源码，并在用户明确授权后保存或部署。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -62,7 +72,7 @@
     "delivery"
   ],
   "metadata": {
-    "last_updated": "2026-09-16",
+    "last_updated": "2026-09-17",
     "scope": "marmot-custom-only",
     "release_integration": "not-integrated"
   }

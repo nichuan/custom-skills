@@ -1,7 +1,7 @@
 {
   "name": "zhenyun-ops",
-  "version": "1.4.1",
-  "description": "甄云 SRM 全局路由中心：在意图跨域或不明确时，路由需求开发、猪齿鱼查询、故障排查、工作台排障、寻源/履约 SQL、数据库访问、认知库治理及代码/脚本定位。",
+  "version": "1.5.0",
+  "description": "甄云 SRM 全局路由中心：在意图跨域或不明确时，路由需求开发、脚本平台查询/调试/保存、猪齿鱼、故障排查、工作台、SQL、数据库、认知库及代码定位。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -17,6 +17,7 @@
     "router_only": "只做路由与共享上下文，可读取本地协作指引，不执行业务查询或写入",
     "direct_hit_first": "明确请求直接进入目标 Skill",
     "requirement_delivery": "Marmot 纯二开需求开发路由到 srm-requirement-delivery",
+    "script_platform_routing": "脚本平台查询、远程调试和受控保存部署路由到 srm-script-platform；Pangu 仅做身份发现",
     "workbench_routing": "采购员工作台待办、卡片、超级搜索、关注与 ES 问题路由到 srm-workbench-bug-triage",
     "knowledge_routing": "knowledge_docs 查询与治理路由到 knowledge-governance，SQL 模板和表目录保留给领域 SQL Skill",
     "real_tool_boundary": "不构造不存在的动态 Skill 工具，MCP 选择以现有服务能力为准",
@@ -42,6 +43,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-17"
   }
 }

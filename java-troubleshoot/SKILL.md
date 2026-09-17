@@ -155,18 +155,17 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 标准类 Bug 才默认用 `search_repo(keyword)` 检索本地 `PG_ROOT`。二开类 Bug 只有在核实脚本入参/返回/平台默认行为或用户明确要求时才定向检索；`unknown` 状态不得宽泛扫描本地仓库。
 - 当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
 - 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
-- 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）：
+- 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）。Pangu 只在身份不完整时发现候选，平台当前源码必须由 Script Platform MCP 读取：
   - **适配器埋点脚本**（挂钩点 BEFORE/AFTER 执行，报文映射、回调、单据前后处理）：
-    `search_adapter_scripts` → `get_adapter_script_info` → `search_adapter_script_source` → `get_adapter_script_source(start_line,end_line)`。
+    已知 `tenant + task_code + running_service` 时直接 `adapter_get`；否则 `search_adapter_scripts` → 唯一精确身份 → `adapter_get`。
   - **独立脚本**（Marmot 脚本库：定时任务、打印/PDF 模板、Excel 导入、消息/邮件提醒、外部 API 配置等非挂钩点执行）：
-    `search_standalone_scripts` → `get_standalone_script_info` → `search_standalone_script_source` → `get_standalone_script_source(start_line,end_line)`。
+    已知 `tenant + code` 时直接 `independent_script_get`；否则 `search_standalone_scripts` → 唯一精确身份 → `independent_script_get`。
     独立脚本存于 rel-table 宽表 `spfm_rel_table_record`（`table_code='marmot_script_library'`），**租户过滤用 `tenant` 参数（底层 value2 槽位，tenant_id 恒为 0，勿按 tenant_id 查）**。
   - 有明确载体信号时只走对应工具链；拿不准但租户/服务/接口信息足以定位时，先按最强信号查一套，未命中或信号冲突再查另一套。不要机械地读取两套全部源码。
-  - 只有全局分析确有必要时才 `full=true`。
-- 先查脚本元信息，再搜索源码并读取局部行号。为了获得日志关键字时，只提取代码里真实的稳定日志字面量，不要把变量值或推测文案当关键字。
-- 脚本 Tool 已在 MCP 服务端完成 Base64 解码（适配器 UTF-16BE；独立脚本自动探测 UTF-16LE/BE/UTF-8）；禁止通过通用 SQL 把 Base64 正文返回给 Agent。
+- 为了获得日志关键字时，只从 `get` 返回的当前源码提取真实、稳定的日志字面量，不要把变量值或推测文案当关键字。
+- Script Platform MCP 已完成平台文本解码；禁止通过通用 SQL 把 Base64 正文返回给 Agent，也不要回退 Pangu 旧正文读取工具。
 - 命中启用脚本时，以脚本实际逻辑为准。标准库只在验证入参、返回结构、执行入口或默认行为确有必要时作为对照；本地 Java 无命中不能作为“没有实现”的证据。
-- 本地代码报告路径与行号；数据库脚本报告租户、运行服务、`script_id`、`task_code`、版本和源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
+- 本地代码报告路径与行号；平台脚本报告租户、运行服务、Header/Line 或 Record ID、`task_code`、版本、源码哈希和关键源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
 - 标准 vs 二开判定、适配器 JS、独立脚本、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/standalone-script.md`、`knowledge/srm/virtual-table.md`。
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）

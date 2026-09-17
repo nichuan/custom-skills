@@ -6,6 +6,9 @@ dependencies:
   tools:
     - type: "mcp"
       value: "zhenyun-pangu-mcp"
-      description: "读取猪齿鱼、平台脚本、标准源码和必要数据库事实"
+      description: "读取猪齿鱼、脚本身份候选、标准源码和必要数据库事实"
+    - type: "mcp"
+      value: "zhenyun-script-platform-mcp"
+      description: "读取平台当前源码、远程调试并受控保存或部署"
 policy:
   allow_implicit_invocation: true

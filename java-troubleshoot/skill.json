@@ -1,7 +1,7 @@
 {
   "name": "java-troubleshoot",
-  "version": "1.2.1",
-  "description": "Java 微服务故障排查助手：按执行链区分标准与二开。二开优先限定 srm-script-container 查 traceId/明确关键字，无可靠关键字时先读脚本提取真实日志字面量；标准仓库仅在标准链路确认后或二开契约核实时检索。仅查询数据、生成 SQL 或数据修复时不要触发。",
+  "version": "1.3.0",
+  "description": "Java 微服务故障排查助手：按执行链区分标准与二开。二开优先查 srm-script-container；无可靠关键字时由 Pangu 发现脚本身份，再用 Script Platform MCP 读取当前源码。标准仓库仅在标准链路确认后或契约核实时检索。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -28,7 +28,7 @@
     "knowledge_base": "优先按场景读取一份本地精确手册；本地未覆盖时才用 search_knowledge 跨案例检索",
     "code_routing": "普通代码只用 search_repo 本地检索；GitLab 搜索禁用，仅允许已知 project/ref/path 的精确读取",
     "implementation_routing": "执行链无适配器/API 前后置挂载才判为标准 Bug；载体未知时不默认扫描标准仓库",
-    "script_first": "二开优先限定 srm-script-container 查 traceId/明确关键字；无可靠关键字时先检索适配器或独立脚本，从源码真实日志字面量反查日志",
+    "script_first": "二开优先限定 srm-script-container 查日志；无可靠关键字时由 Pangu 发现身份、Script Platform MCP 读取当前源码，再用真实日志字面量反查",
     "evidence_report": "结构化输出：问题结论/根因分析/证据链（每条标注 source 与 confidence）/Confirmed-Probable-Unknown 分级，禁止把推测写成事实、禁止输出原始日志全文",
     "read_only": "数据库仅只读（archery_query 仅基础 SELECT/EXPLAIN/SHOW CREATE TABLE），严禁写操作；凭据不外泄"
   },
@@ -54,13 +54,7 @@
         "record_table_usage",
         "search_repo",
         "search_adapter_scripts",
-        "get_adapter_script_info",
-        "search_adapter_script_source",
-        "get_adapter_script_source",
         "search_standalone_scripts",
-        "get_standalone_script_info",
-        "search_standalone_script_source",
-        "get_standalone_script_source",
         "gitlab_list_branches",
         "gitlab_list_tree",
         "gitlab_get_file",
@@ -72,7 +66,15 @@
         "choerodon_download_attachment",
         "get_workflow_guide"
       ],
-      "description": "Pangu 统一 MCP：日志、Archery、本地代码、数据库脚本检索/服务端解码、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
+      "description": "Pangu 统一 MCP：日志、Archery、本地代码、脚本身份发现、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
+    },
+    {
+      "name": "zhenyun-script-platform-mcp",
+      "tools": [
+        "adapter_get",
+        "independent_script_get"
+      ],
+      "description": "按精确身份读取故障环境中 Script Platform 的权威当前源码、版本和启用状态。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -87,6 +89,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-17"
   }
 }

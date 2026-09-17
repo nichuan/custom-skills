@@ -14,15 +14,18 @@
 ## Agent 标准读取流程
 
 ```text
-search_adapter_scripts(tenant, running_service, query)
-  → get_adapter_script_info(script_id)
-  → search_adapter_script_source(script_id, query)
-  → get_adapter_script_source(script_id, start_line, end_line)
+已知 tenant + task_code + running_service
+  → zhenyun-script-platform-mcp.adapter_get
+
+身份不完整
+  → zhenyun-pangu-mcp.search_adapter_scripts(tenant, running_service, query)
+  → 唯一精确身份
+  → zhenyun-script-platform-mcp.adapter_get
 ```
 
-- MCP 在服务端完成 Base64(UTF-16BE) 解码，Agent 只接收 JavaScript。
-- 定位字段、函数、接口地址或报文时先搜索正文，再读取局部行号。
-- 只有确需全局分析时才请求完整源码。
+- Pangu 搜索只发现候选；平台当前源码、Header/Line 版本、启用状态以 `adapter_get` 为准。
+- Script Platform MCP 在服务端完成 Base64(UTF-16BE) 解码，Agent 只接收 JavaScript。
+- 定位字段、函数、接口地址或报文时在 `adapter_get` 返回的当前源码中查找。
 - 禁止用通用 `archery_query` 把 `script_content` Base64 正文返回给 Agent。
 
 ## 底层数据模型（维护 Tool 时使用）
