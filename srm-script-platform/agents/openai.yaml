@@ -1,12 +1,12 @@
 interface:
-  display_name: "SRM 脚本平台开发"
-  short_description: "查询、修改、调试并安全保存或部署 SRM 二开平台脚本"
-  default_prompt: "使用 $srm-script-platform 读取目标脚本，在 DEV 真实运行时调试，并仅在我明确要求后保存。"
+  display_name: "SRM 脚本与配置平台"
+  short_description: "查询、调试并受控管理 SRM 脚本和平台配置"
+  default_prompt: "使用 $srm-script-platform 读取目标脚本或平台配置；写操作先生成并展示签名计划，必须等我后续明确确认后才执行。"
 dependencies:
   tools:
     - type: "mcp"
       value: "zhenyun-script-platform-mcp"
-      description: "脚本平台权威读取、DEV 远程调试和受控保存部署"
+      description: "脚本平台权威读取、DEV 远程调试和受控资源管理"
     - type: "mcp"
       value: "zhenyun-pangu-mcp"
       description: "脚本身份发现、日志、trace、数据库和静态检查"

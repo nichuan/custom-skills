@@ -25,7 +25,7 @@
     "static_quality_gate": "用每次需求提供的规则检查 Marmot JavaScript 与产物哈希",
     "portable_validation": "基础检查不依赖 marmot-dev；只维护轻量 design-gates.md，不创建正式审阅包",
     "remote_debug": "用户要求真实运行且有有效 DEV Input 时直接调试未保存源码",
-    "manual_release": "只有用户明确要求保存或部署时才携带预期版本调用平台写工具"
+    "manual_release": "只有用户明确要求保存或部署时才携带预期版本生成签名计划；展示计划并结束当前轮，收到后续人工确认才执行"
   },
   "mcp_servers": [
     {
