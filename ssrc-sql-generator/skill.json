@@ -1,7 +1,7 @@
 {
   "name": "ssrc-sql-generator",
   "version": "1.8.1",
-  "description": "生成或核实 SRM 采购寻源域的查询与数据修复 SQL；只验证必要的表、字段和真实值，不直接执行写 SQL。",
+  "description": "生成或核实 SRM 采购寻源域（询价、招标、报价、评分、资格预审、寻源结果、征询单）的查询与数据修复 SQL。使用只读 MCP 验证必要的表、字段和真实值；不直接执行写 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -50,7 +50,8 @@
         "get_table_relations",
         "diagnose_context",
         "search_pangu",
-        "get_workflow_guide"
+        "get_workflow_guide",
+        "inspect_object_relation"
       ],
       "description": "Pangu 统一 MCP：Archery 只读查询与表/字段结构校验（实例名由别名自动解析）+ 认知层（SQL 模板检索/沉淀 search_sql_templates、业务知识 search_knowledge、表目录 search_tables/get_table_relations、组合诊断 diagnose_context）。模板/知识/表能力已从 sql-template/table-catalog/knowledge 三个独立 MCP 整合进来"
     }
@@ -66,6 +67,6 @@
     "template_store": "supabase",
     "sql_templates_count": 30,
     "sql_examples_count": 1,
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-19"
   }
 }

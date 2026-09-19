@@ -1,7 +1,7 @@
 {
   "name": "gitlab-code",
   "version": "1.2.0",
-  "description": "甄云代码与脚本平台实现定位助手：普通代码使用 PG_ROOT/search_repo；Pangu 只发现二开身份，当前适配器或独立脚本正文统一由 Script Platform MCP 读取。只读定位，不排障、不生成 SQL。",
+  "description": "甄云代码与脚本平台实现定位助手。用户要找类、方法、文件、二开逻辑、适配器脚本或外部接口实现时使用。二开身份可用 Pangu 模糊发现，当前脚本正文统一由 zhenyun-script-platform-mcp 读取；只有契约核实或用户明确要求时才定向查标准代码。GitLab 搜索当前禁用。不排障、不生成 SQL、不修改业务代码。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -56,6 +56,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-17"
+    "last_updated": "2026-09-19"
   }
 }

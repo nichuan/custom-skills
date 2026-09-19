@@ -7,7 +7,7 @@ description: Java 微服务故障排查助手。仅在用户描述异常、报�
 
 ## 跨流程协作（按需）
 
-单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)（未安装时改用 `get_workflow_guide(topic="handoff")`）：复用已验证的环境/租户/证据、可变数据执行前重核、只问真正阻塞的未知、已授权同范围动作不重复确认——完整协作规则以该协议为准。
 
 ## 职责边界（三层 + 两数据）
 
@@ -115,7 +115,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 独立脚本、适配器脚本、API 挂载或外部接口对接问题，必须按下列顺序选择**第一个可执行动作**；证据足够即停，不是要求把每一步全部执行一遍：
 
-1. **有明确 traceId**：先查脚本容器日志。国内 SLS 调 `obs_sls_query(trace_id=..., container_name="srm-script-container", environment=...)`；AWS 海外用 `obs_log_query`，以已验证的服务标签构造 `{app="srm-script-container"} |= "<traceId>"`，不得用不限服务的 `obs_log_trace`。不得先拉其它服务的全链路日志。
+1. **有明确 traceId**：先查脚本容器日志。国内优先用专用工具 `query_script_trace(trace_id, from_time, to_time, script_code)` 直接得到 srm-script-container 的阶段时间线（from_time/to_time 是强制边界，用户未给时间范围时按「时间策略」补默认窗口）；需要 ERROR/WARN 级过滤、自动扩窗或跨容器检索时改用 `obs_sls_query(trace_id=..., container_name="srm-script-container", environment=...)`。AWS 海外用 `obs_log_query`，以已验证的服务标签构造 `{app="srm-script-container"} |= "<traceId>"`，不得用不限服务的 `obs_log_trace`。不得先拉其它服务的全链路日志。
 2. **无 traceId，但用户给了明确日志关键字**：按该关键字查 `srm-script-container`；国内 SLS 调 `obs_sls_query(keyword=<精确关键字>, container_name="srm-script-container", level="", environment=...)`，AWS 海外同样用带 `srm-script-container` 服务标签的 `obs_log_query`。只用用户给出的关键字，不自行改写或轮番猜近义词。
 3. **traceId 和可靠关键字都没有，但能定位脚本**：先按脚本编码、租户、运行服务或接口信息获取适配器/独立脚本，再从源码中提取实际打印的稳定日志字面量，用该字面量查询 `srm-script-container`。不得先猜日志关键字。
 4. **traceId、关键字、脚本编码/租户/接口定位信息均不足**：停止工具尝试，向用户索取最小必要信息，优先询问 traceId 或脚本编码，并按需补环境与发生时间。不得无休止地宽泛查日志或本地代码。
@@ -144,7 +144,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 路由原则速记：**国内公有云盘古 prod + 非生产 dev/test → 阿里云 SLS（`obs_sls_query`）；AWS 海外全部环境 → Loki（`obs_log_query`/`obs_log_trace`）**。默认 cn/盘古、默认非 aws。
 - ⚠️ 盘古非生产已迁回阿里云 SLS：`obs_log_*` 不再接受 `region="cn"`，查国内盘古非生产必须用 `obs_sls_query(environment="dev"/"test")`。
 - 不确定 environment → `obs_sls_targets()`；不确定 Loki 的 env → `obs_log_datasources(region="aws")`，不要瞎猜。
-- 二开日志查询必须限定 `srm-script-container`。SLS 用 `container_name="srm-script-container"`；Loki 用 `obs_log_query` 加已验证的服务标签（通常为 `{app="srm-script-container"}`），不得退化成不限服务的 `obs_log_trace` 或全量扫描。
+- 二开日志查询必须限定 `srm-script-container`。SLS 用 `container_name="srm-script-container"`，或按 traceId 直接用 `query_script_trace`（输出阶段时间线，from_time/to_time 强制）；Loki 用 `obs_log_query` 加已验证的服务标签（通常为 `{app="srm-script-container"}`），不得退化成不限服务的 `obs_log_trace` 或全量扫描。
 - 无 traceId 时，日志关键字只能来自用户明确提供的文本或目标脚本中的真实日志字面量；禁止猜测异常文案、类名或近义词后连续试搜。
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。

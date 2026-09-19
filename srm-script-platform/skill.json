@@ -1,7 +1,7 @@
 {
   "name": "srm-script-platform",
   "version": "1.2.0",
-  "description": "甄云 SADA/Marmot/GraalJS 脚本与配置平台助手：用 Script Platform MCP 读取权威当前态、远程调试并受控管理脚本、API、消费端、调度、常量、OutBound、CodeBlock 和 QueryBlock；Pangu 仅负责发现、日志、数据库与静态检查。",
+  "description": "查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的平台当前态，或远程调试、保存、部署平台脚本及管理 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等资源时使用。本地脚本文件的最小改动走 srm-requirement-delivery。平台当前态以 zhenyun-script-platform-mcp 为准；Pangu 只负责模糊发现、日志、数据库和静态检查。不用于标准 Java 改造、单纯 SQL 修复或只有日志/trace 的根因排查。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -52,7 +52,8 @@
         "adapter_create",
         "adapter_update",
         "adapter_toggle",
-        "adapter_delete"
+        "adapter_delete",
+        "independent_script_create"
       ],
       "description": "脚本平台权威当前态、自动认证、封闭资源查询与定义、未保存源码远程调试，以及两阶段人工确认后的版本安全写入。"
     },
@@ -78,7 +79,7 @@
     "configuration"
   ],
   "metadata": {
-    "last_updated": "2026-09-18",
+    "last_updated": "2026-09-19",
     "scope": "script-platform-lifecycle-and-config",
     "write_policy": "mandatory-two-phase-human-confirmation"
   }

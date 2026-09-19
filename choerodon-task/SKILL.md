@@ -7,7 +7,7 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 
 ## 跨流程协作（按需）
 
-单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)（未安装时改用 `get_workflow_guide(topic="handoff")`）：复用已验证的环境/租户/证据、可变数据执行前重核、只问真正阻塞的未知、已授权同范围动作不重复确认——完整协作规则以该协议为准。
 
 ## 定位
 
@@ -28,19 +28,19 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 
 认证说明：Token 由 `.env` 的 `CHOERODON_USERNAME` / `CHOERODON_PASSWORD` 登录获取，带 8h 缓存与失效重登，调用方无需关心登录细节。
 
-### 工具与参数声明（真实签名，严禁臆造）
+### 工具清单（参数 Schema 以 MCP 运行时为唯一事实源，不在此重复签名与默认值）
 
-| 工具名（MCP） | 底层函数签名 | 用途 | 关键参数铁律 |
-|---|---|---|---|
-| `choerodon_list_projects` | `list_projects(keyword="", size=100)` | 列出或搜索当前账号可访问项目 | `keyword` 可传项目 ID、名称或编码；使用返回的真实 `projectId`，不要从名称猜 id |
-| `choerodon_query_issue` | `query_issue(issue_id, project_id?)` | 按**加密 issue id**查详情 | `issue_id` 必须来自猪齿鱼列表返回；跨项目时必须传已解析的 `project_id` |
-| `choerodon_search_tasks_by_person` | `search_tasks_by_person(name, size=50, project_id?)` | 按**经办人**查任务 | `name` 必填（猪齿鱼用户名/真实名，如 `22554` / `倪川22554`）；内部会先搜成员再按 id 过滤 |
-| `choerodon_list_issue` | `list_issue(keyword="", size=20, project_id?, assignee="", status="")` | 按关键词/经办人/状态列 issue | `assignee`/`status` 传**名称字符串**，内部自动转 id；`keyword` 为空则按过滤条件列 |
-| `choerodon_search_users` | `search_users(name, size=50, project_id?)` | 按关键字搜成员，拿真实 `id`/`realName`/`loginName` | 拿到真实身份后再用于其它工具 |
-| `choerodon_get_status_map` | `get_status_map(project_id?)` | 取状态名→加密 id 映射 | 用于理解任务状态流转 |
-| `choerodon_list_comments` | `list_comments(issue_id, size=100, project_id?)` | 读任务评论 | 先用真实 `issue_id`；开发或排障前读取已有结论 |
-| `choerodon_list_attachments` | `list_attachments(issue_id, project_id?)` | 列某任务附件 | `issue_id` 为加密 id |
-| `choerodon_download_attachment` | `download_attachment(file_url)` | 取附件签名下载地址 | 参数是附件的 `file_url`（来自 `list_attachments` 返回），**不是** attachment_id |
+| 工具名（MCP） | 用途 | 关键参数铁律 |
+|---|---|---|
+| `choerodon_list_projects` | 列出或搜索当前账号可访问项目 | `keyword` 可传项目 ID、名称或编码；使用返回的真实 `projectId`，不要从名称猜 id |
+| `choerodon_query_issue` | 按**加密 issue id** 查详情 | `issue_id` 必须来自猪齿鱼列表返回；跨项目时必须传已解析的 `project_id` |
+| `choerodon_search_tasks_by_person` | 按**经办人**查任务 | `name` 必填（猪齿鱼用户名/真实名，如 `22554` / `倪川22554`）；内部会先搜成员再按 id 过滤 |
+| `choerodon_list_issue` | 按关键词/经办人/状态列 issue | `assignee`/`status` 传**名称字符串**，内部自动转 id；`keyword` 为空则按过滤条件列 |
+| `choerodon_search_users` | 按关键字搜成员，拿真实 `id`/`realName`/`loginName` | 拿到真实身份后再用于其它工具 |
+| `choerodon_get_status_map` | 取状态名→加密 id 映射 | 用于理解任务状态流转 |
+| `choerodon_list_comments` | 读任务评论 | 先用真实 `issue_id`；开发或排障前读取已有结论 |
+| `choerodon_list_attachments` | 列某任务附件 | `issue_id` 为加密 id |
+| `choerodon_download_attachment` | 取附件签名下载地址 | 参数是附件的 `file_url`（来自 `list_attachments` 返回），**不是** attachment_id |
 
 > 注：`project_id` 默认走正式项目（`CHOERODON_PROJECT_ID=58`）。用户指定任何其它项目时，先用 `choerodon_list_projects` 解析，再把同一个真实 `projectId` 显式传给后续所有项目级工具。
 

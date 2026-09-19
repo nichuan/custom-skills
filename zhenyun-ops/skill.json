@@ -1,7 +1,7 @@
 {
   "name": "zhenyun-ops",
   "version": "1.5.1",
-  "description": "甄云 SRM 全局路由中心：在意图跨域或不明确时，路由需求开发、脚本与平台配置查询/调试/受控写入、猪齿鱼、故障排查、工作台、SQL、数据库、认知库及代码定位。",
+  "description": "甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、脚本与平台配置查询/调试/受控写入、猪齿鱼查询、故障排查、工作台排障、SQL、数据库、认知库和代码定位；意图明确时直接使用对应子 Skill。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -43,6 +43,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-18"
+    "last_updated": "2026-09-19"
   }
 }

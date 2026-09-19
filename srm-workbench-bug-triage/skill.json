@@ -1,7 +1,7 @@
 {
   "name": "srm-workbench-bug-triage",
   "version": "1.2.1",
-  "description": "排查 srm-workbench 的待办、卡片、超级搜索、关注、整改和 ES 权限/消费问题；使用本地手册及只读数据库、ES、日志和源码证据定位根因。",
+  "description": "排查 srm-workbench 的待办、卡片、超级搜索、关注、整改和 ES 权限/消费问题，使用本地手册及只读数据库、ES、日志和源码证据定位根因。SQL-only 任务或其它服务异常不使用。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -73,6 +73,6 @@
     "sql_templates_count": 0,
     "sql_examples_count": 0,
     "knowledge_docs_synced": "35-41",
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-19"
   }
 }

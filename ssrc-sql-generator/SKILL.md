@@ -7,7 +7,7 @@ description: 生成或核实 SRM 采购寻源域（询价、招标、报价、�
 
 ## 跨流程协作（按需）
 
-单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)（未安装时改用 `get_workflow_guide(topic="handoff")`）：复用已验证的环境/租户/证据、可变数据执行前重核、只问真正阻塞的未知、已授权同范围动作不重复确认——完整协作规则以该协议为准。
 
 > 本助手专门用于 **SRM（供应商关系管理）采购寻源系统** 的数据库 SQL 生成与调整。
 > 核心业务：**询价单、招标单、报价单、评分/评标、资格预审、寻源结果、征询单**。
@@ -56,7 +56,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ### 2.4 写操作安全
 - UPDATE/DELETE 必须用主键或唯一业务键（如 `rfx_header_id`）定位，**严禁无 WHERE 或仅凭名称更新**。
-- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足（如不要自添 `last_update_date`/`last_update_by`），WHERE 使用 `tenant_id` + 主键，并补已核实的旧状态/版本条件以防覆盖并发修改。
+- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足：天工寻源域**不自添** `last_update_date`/`last_update_by`（盘古履约域的团队惯例相反、固定附加 `last_update_date = now()`，见 `spuc-sql-generator`；两域约定各自独立，勿跨域套用），WHERE 使用 `tenant_id` + 主键，并补已核实的旧状态/版本条件以防覆盖并发修改。
 - 输出用 `<...>` 占位符，附「替换为真实值的方法」。
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
@@ -98,7 +98,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ### 工具选择
 
-- 不知表名才用 `search_tables`；已知表但关联不明才用 `get_table_relations`；字段存在性由 Archery 证明。
+- 不知表名才用 `search_tables`；已知表但关联不明才用 `get_table_relations`；字段存在性由 Archery 证明。复杂 JOIN 或修复前需要一次受限样例核验两端字段与关联条件时，可用 `inspect_object_relation`（字段缺失时返回明确结论，不会凭空推断）。
 - 复杂或重复场景才检索模板；命中后用 `get_sql_template` 读取执行流程。工具参数以 MCP Schema 为准，不在 Skill 中重复。
 - 认知层或 Archery 不可用时跳过失败步骤，用占位符标注缺失事实并继续完成可交付方案，不得假装已验证。
 

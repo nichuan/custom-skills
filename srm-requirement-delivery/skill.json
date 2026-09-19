@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
   "version": "1.6.0",
-  "description": "开发或修改 SRM Marmot 纯二开代码；历史脚本只做本次需求的最小局部改动，新需求才读取猪齿鱼与平台模板。平台当前源码、远程调试和受控保存统一使用 Script Platform MCP。",
+  "description": "开发或修改甄云 SRM Marmot 纯二开代码，覆盖埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。已有脚本的明确局部改动走快速修改；新需求才读取需求与平台模板并组织交付物。平台当前源码、远程调试和受控保存统一使用 zhenyun-script-platform-mcp，Pangu 只补充发现、需求、日志、数据库和静态检查。标准 Java 改造、故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -72,7 +72,7 @@
     "delivery"
   ],
   "metadata": {
-    "last_updated": "2026-09-17",
+    "last_updated": "2026-09-19",
     "scope": "marmot-custom-only",
     "release_integration": "not-integrated"
   }

@@ -1,7 +1,7 @@
 {
   "name": "knowledge-governance",
   "version": "1.0.1",
-  "description": "甄云盘古认知库查询与治理助手：检索、查看、沉淀、修正、归档或删除 knowledge_docs 中的稳定业务知识、系统机制和排障经验；不维护 SQL 模板、表目录或实时生产事实。",
+  "description": "甄云盘古认知库查询与治理助手。用于检索、查看、沉淀、修正、归档或删除 knowledge_docs 中的稳定业务知识、系统机制和排障经验，也可用 search_pangu/diagnose_context 做跨认知层发现。不用于维护 SQL 模板、表目录或查询实时生产数据。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -43,6 +43,6 @@
   ],
   "metadata": {
     "store": "supabase",
-    "last_updated": "2026-09-16"
+    "last_updated": "2026-09-19"
   }
 }

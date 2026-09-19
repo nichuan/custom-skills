@@ -1,6 +1,6 @@
 ---
 name: srm-script-platform
-description: 查询、读取、修改、远程调试、保存或部署甄云 SADA/Marmot/GraalJS 脚本与平台配置时使用，覆盖 Adapter、Independent Script、API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等资源。平台当前态以 zhenyun-script-platform-mcp 为准；Pangu 只负责模糊发现、日志、数据库和静态检查。不用于标准 Java 改造、单纯 SQL 修复或只有日志/trace 的根因排查。
+description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的平台当前态，或远程调试、保存、部署平台脚本及管理 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等资源时使用。本地脚本文件的最小改动走 srm-requirement-delivery。平台当前态以 zhenyun-script-platform-mcp 为准；Pangu 只负责模糊发现、日志、数据库和静态检查。不用于标准 Java 改造、单纯 SQL 修复或只有日志/trace 的根因排查。
 ---
 
 # SRM 脚本平台开发
@@ -26,10 +26,12 @@ description: 查询、读取、修改、远程调试、保存或部署甄云 SAD
 | 已知 `tenant + code` 的 Independent Script | `independent_script_get` |
 | Adapter 身份不完整 | Pangu `search_adapter_scripts`，再 `adapter_get` |
 | Independent 编码不完整 | Pangu `search_standalone_scripts`，再 `independent_script_get` |
+| 对 Marmot JS 做静态门禁检查 | Pangu `check_marmot_script_static`（需求规则经 `rules_json` 传入） |
 | 未保存 Adapter 源码调试 | `adapter_debug` |
 | 未保存 Independent 源码调试 | `independent_script_debug` |
 | 从已查询日志文本提取 Adapter Input | `adapter_extract_input` |
 | 用户明确要求保存 Independent Script | `independent_script_save` |
+| 用户明确要求新建 Independent Script | `independent_script_create`（写操作，两阶段确认；创建后回读验证） |
 | 用户明确要求部署 Adapter | `adapter_deploy` |
 | 查看目标环境、脱敏认证元数据和写入边界 | `platform_context_get` |
 | 不确定当前 MCP 覆盖范围或 `resource_type` | `platform_capabilities_list` |
@@ -43,6 +45,11 @@ description: 查询、读取、修改、远程调试、保存或部署甄云 SAD
 
 Pangu 搜索只提供候选身份，不作为 Debug/Save/Deploy 前的最终源码依据。搜索命中多个精确候选
 时停止并让用户选择，不猜环境、服务或 Line。
+
+适配器与独立脚本的模糊发现走 Pangu `search_adapter_scripts` / `search_standalone_scripts`；
+`platform_resource_search(resource_type="adapter_task"/"independent_script")` 用于按已知租户、
+编码或关键词精确列取，以及平台配置资源调查。两条路都能命中同一脚本对象时，一律以 Script
+Platform `get` 的返回为当前态依据，不把任一搜索结果当源码。
 
 通用资源只使用 `platform_capabilities_list` 返回的封闭 `resource_type`。当前覆盖 Adapter 与独立
 脚本全览、Topic 消费端、API 发布、API 改写与挂载、功能数据导入、调度、常量、OutBound 白名单、
@@ -110,7 +117,7 @@ Debug 不持久化脚本，但脚本自身可能调用 DEV 服务或数据库。
   编解码、完整对象保存、停用恢复和回读校验。
 - 通用 `save/delete`、`platform_table_action`、`adapter_update/toggle/delete` 必须使用刚刚读取的
   `objectVersionNumber` 作为 `expected_version`；冲突后重新读取并报告，不自动覆盖。
-- `adapter_create` 必须使用真实事件任务编码和至少一条初始 Line；创建源码后回读验证。
+- `adapter_create` 必须使用平台事件注册表中真实存在的事件任务编码；工具本身不接收 Line，平台会按注册表预填首条 Line 并创建为禁用状态，创建后先 reload 回读再编辑源码并验证。
 - 调度启停/立即执行和 OutBound 连通性测试可能产生真实业务副作用，必须把具体目标和动作写清楚；
   不因工具名含“test”就自动执行。
 - 常量 `value` 等秘密字段会被屏蔽，也禁止通过模型上下文创建或修改；这类值必须走平台外的受控

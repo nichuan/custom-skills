@@ -7,7 +7,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 
 ## 跨流程协作（按需）
 
-单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+跨技能/跨 agent 交接或恢复任务时读取[协作协议](../zhenyun-ops/references/collaboration-contract.md)（未安装时改用 `get_workflow_guide(topic="handoff")`）：复用已验证的环境/租户/证据、可变数据执行前重核、只问真正阻塞的未知、已授权同范围动作不重复确认——完整协作规则以该协议为准。
 
 > 本助手专门用于 **SRM 盘古（订单履约域）** 的数据库 SQL 生成与调整。
 > 涉及的核心业务包括：**采购订单（SODR）、收货工作台事务（SINV_RCV）、发货工作台（SLOD：送货/计划/标签）、老送货单（SINV_ASN）、状态机（SIEC）、委外（SINV_OUTSOURCE）** 等。
@@ -30,7 +30,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 ## 工具选择
 
 - 数据库访问直接使用运行时提供的 Archery 工具，并遵守 `archery` Skill；工具参数以 MCP Schema 为准。
-- 不知表名才用 `search_tables`；已知表但关联不明才用 `get_table_relations`；字段存在性由 Archery 证明。
+- 不知表名才用 `search_tables`；已知表但关联不明才用 `get_table_relations`；字段存在性由 Archery 证明。复杂 JOIN 或修复前需要一次受限样例核验两端字段与关联条件时，可用 `inspect_object_relation`（字段缺失时返回明确结论，不会凭空推断）。
 - `slod_*` 属 `srm_logistics_delivery`，与 `srm` 表 JOIN 时显式带库前缀。部分 `SINV` 表未收入目录，目录未命中时直接 describe，不因未收录而停止。
 - 复杂或重复场景才检索模板；命中后用 `get_sql_template` 读取执行流程。认知层不可用时跳过模板复用，不阻塞 SQL 生成。
 
@@ -58,7 +58,8 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 6. **生成 SQL**：命中修复模板时读取完整 `execution_flow` 并进入下方执行过程驱动模式；基于已验证的真实值生成，占位符用 `<...>` 标注并说明替换方法。生成 UPDATE 注意：
    - 仅修复用户要求修复的字段，不要画蛇添足；
    - **`sodr_*` 订单表更新必须带 `object_version_number = object_version_number + 1`**（乐观锁）；
-   - 按团队惯例带 `last_update_date = now()`，数据修复建议在 `attribute_longtext10`（或表实际使用的留痕字段）追加 `concat(IFNULL(attribute_longtext10,','),'数据修复/<工单号>')`；
+   - 除本次修复字段外，按盘古团队惯例固定附加 `last_update_date = now()`（属团队约定，不算画蛇添足；天工寻源域约定相反、明确不自添该字段，见 `ssrc-sql-generator` §2.4，两域约定各自独立，勿跨域套用）；
+   - 数据修复在 `attribute_longtext10`（或表实际使用的留痕字段）追加 `concat_ws(',', NULLIF(attribute_longtext10,''), '数据修复/<工单号>')`——`concat_ws` 自动跳过 NULL/空串，不要用 `concat(IFNULL(...))` 写法（NULL 时产生前导逗号、非空时新标记与旧值粘连）；
    - WHERE 用 `tenant_id + 主键 + 已核实旧状态/版本` 定位；版本递增本身不构成并发保护。
 7. **自检安全规则**：套用「术语映射表与状态规则」「数据库约束与安全规则」逐条核对（多租户、乐观锁、pe_supplier 组合字段、关闭/取消互斥、ES 表联动、上下游协同、跨库前缀）。
 8. **MCP 异常回退**：若 MCP 工具调用失败或无返回，改用占位符并明确标注「未经过数据库验证」，绝不编造字段或值。
@@ -80,14 +81,15 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 [INPUT] <tenant_num>, <po_num>               ← 需向用户确认的入参
 [STEP n: 步骤名]
   QUERY: <前置查询 SQL>                       ← 必须通过 archery_query 真实执行
-  ASSERT: <断言>                              ← 对 QUERY 结果的硬性校验（行数/取值），并提取 {变量}
+  ASSERT: <断言>                              ← 对 QUERY 结果的硬性校验（行数/取值）
+  EXTRACT: <变量> -> {变量}                   ← 显式提取真实值，供后续 STEP 引用（与 ssrc 同一约定）
   CONDITION: IF <条件> THEN RETURN <结论>     ← 条件短路，满足则终止并向用户报告
   ACTION: <UPDATE/DELETE/INSERT 语句>         ← 不执行，仅在所有前置 STEP 通过后代入真实值生成
 ```
 
 ### 执行规则（逐条强制）
 1. **建立执行轨迹**：根据模板场景和当前任务整理全部 `[STEP]` 及其 `QUERY` / `ASSERT` / `CONDITION` / `ACTION`。
-2. **按依赖执行 QUERY**：后一步使用前一步提取值时保持串行；互不依赖的 QUERY 并行执行，或在不降低租户隔离、索引使用和断言清晰度时合并成一条有界 JOIN。把真实结果填入上下文变量 `{...}`；跨库表注意带库名前缀。
+2. **按依赖执行 QUERY**：后一步使用前一步提取值时保持串行；互不依赖的 QUERY 并行执行，或在不降低租户隔离、索引使用和断言清晰度时合并成一条有界 JOIN。把真实结果填入上下文变量 `{...}`，每步用 `EXTRACT` 显式写出变量绑定（如 `tenant_id -> {tenant_id}`），不要从 ASSERT 里猜变量；跨库表注意带库名前缀。
 3. **校验 ASSERT**：每步执行后立即核对断言（如「必须返回 1 行」）；**不满足则立即向用户报告并停止，绝不盲目继续**（如查到 0 行/多行、状态组合不符合修复前提）。
 4. **CONDITION 短路**：条件命中（如「单据已在目标状态」「已被下游占用」）时直接返回结论，不生成修复 SQL。
 5. **生成最终 SQL**：所有前置 QUERY 成功、ASSERT 全部通过后，才将真实值代入 `ACTION` 生成 UPDATE/DELETE/INSERT（仍遵循「SQL 输出格式规范」与盘古规则：`sodr_*` 乐观锁、留痕字段、ES 联动）。
@@ -211,7 +213,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 - **执行前备份**：不得输出 `CREATE TABLE bak_xxx AS SELECT ...`。
 - **回滚方案**：不得输出回滚段；生产修复以「先 SELECT 核查 → 人工确认 → 可控提交」为准。
 
-## 附录：Archery 工具参数声明（严禁瞎猜瞎传）
+## 附录：Archery 调用速记
 
 调用 `archery_*` 任意工具前，**必须**确认参数取真实值。完整参数 Schema、实例别名映射、各环境库清单、双站点 site/instance 规范、跨库规则和安全降级统一由 `archery` Skill 管辖；本 Skill 不重复列参数附录。
 

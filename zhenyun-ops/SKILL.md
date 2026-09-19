@@ -7,7 +7,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 ## 跨流程协作（按需）
 
-单项任务沿用本技能最短路径。仅在跨技能/跨 agent 交接或恢复任务时读取[协作协议](references/collaboration-contract.md)；若该文件未安装，使用 `get_workflow_guide(topic="handoff")`，无需为此额外安装技能。复用已有环境、租户、证据引用与验证结果；可变数据执行前重核，知识库命中不等于实时事实。用户已要求后续实现/修复时继续完成，只询问真正阻塞的未知信息。知识沉淀先准备可审阅内容，已明确授权的同范围动作不重复确认。
+跨技能/跨 agent 交接或恢复任务时读取[协作协议](references/collaboration-contract.md)（未安装时改用 `get_workflow_guide(topic="handoff")`）：复用已验证的环境/租户/证据、可变数据执行前重核、只问真正阻塞的未知、已授权同范围动作不重复确认——完整协作规则以该协议为准。
 
 本 Skill 只识别意图、安排专项 Skill 的先后顺序和共享上下文，不复制专项业务流程；仅可调用本地只读 `get_workflow_guide` 获取协作协议，不直接执行其它业务 MCP。当前运行时没有动态 Skill 加载工具时，不得构造 `use_skill`；直接按已经选中的专项 Skill 执行，或明确告诉用户下一入口。
 
@@ -72,6 +72,10 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 平台配置与关系 | Script Platform `platform_resource_*` / `platform_definition_get` / `platform_relations_get` / `platform_api_point_list` | `srm-script-platform`；资源类型为封闭枚举，写入和动作须最新版本及两阶段人工确认 |
 | 数据与表结构 | `archery_*`、`search_tables`、`get_table*` | `archery` 和领域 SQL Skill；纯二开编码被具体字段阻塞时可只读核实 |
 | 日志 | `obs_sls_*`、`obs_log_*` | `java-troubleshoot` |
+| 脚本容器 trace 时间线 | Pangu `query_script_trace` | `java-troubleshoot`；按 traceId 汇总 `srm-script-container` 日志阶段 |
+| Marmot 静态检查 | Pangu `check_marmot_script_static` | `srm-requirement-delivery` 编码后调用；`srm-script-platform` 复用 |
+| 字段关联核验 | Pangu `inspect_object_relation` | 领域 SQL Skill 与 `srm-requirement-delivery` 在编码/修复前核验两端字段与受限 JOIN 样例 |
+| 跨流程协作协议 | Pangu `get_workflow_guide` | 全部 Skill 在交接/恢复任务时按 topic 读取 |
 | 业务知识 | `search/get/save/update/delete_knowledge`、`search_pangu`、`diagnose_context` | `knowledge-governance`；专项 Skill 可只读复用 |
 | SQL 模板 | `search/get/save/update/delete_sql_template`、使用统计 | `ssrc-sql-generator` / `spuc-sql-generator` |
 | GitLab 精确读取 | `gitlab_list_branches`、`gitlab_list_tree`、`gitlab_get_file` | `gitlab-code`；仅 project/ref/path 已知时 |
