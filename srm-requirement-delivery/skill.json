@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "1.6.0",
-  "description": "开发或修改甄云 SRM Marmot 纯二开代码，覆盖埋点脚本、API 前后置挂载、API 发布、CodeBlock 和 QueryBlock。已有脚本的明确局部改动走快速修改；新需求才读取需求与平台模板并组织交付物。平台当前源码、远程调试和受控保存统一使用 zhenyun-script-platform-mcp，Pangu 只补充发现、需求、日志、数据库和静态检查。标准 Java 改造、故障排查和单纯 SQL 修复不使用本 Skill。",
+  "version": "2.0.0",
+  "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot 纯二开适配器或独立脚本（API 前置、后置、发布、CodeBlock、QueryBlock）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -9,23 +9,23 @@
     "marmot",
     "choerodon",
     "二开",
+    "标准业务",
     "埋点",
     "api挂载",
     "api发布"
   ],
   "features": {
-    "fast_patch": "已有脚本的明确局部改动不查询猪齿鱼、平台、数据库或完整调用链",
-    "issue_driven": "仅在实现新需求或用户明确要求时读取猪齿鱼；详情与评论并行获取，目录只在首次写入前确认",
-    "platform_pull": "Pangu 只发现脚本身份，Script Platform MCP 按精确身份读取权威当前正文与版本",
-    "artifact_layout": "使用用户确认的输出目录，按需求、租户和产物类型分类落地",
-    "focused_implementation": "只补当前二开逻辑，未知契约才做定向核实",
-    "legacy_incremental_patch": "历史脚本默认保留原逻辑、结构与代码风格，只做本次需求必需的局部改动；整体优化、重构或重写须用户明确要求",
-    "selective_delegation": "仅在完整需求含多条独立且多轮的只读取证线时委派子代理，主代理统一实现与验证",
-    "design_gates": "编码前确认字段来源、外部服务契约、日志、空值语义与执行范围",
-    "static_quality_gate": "用每次需求提供的规则检查 Marmot JavaScript 与产物哈希",
-    "portable_validation": "基础检查不依赖 marmot-dev；只维护轻量 design-gates.md，不创建正式审阅包",
-    "remote_debug": "用户要求真实运行且有有效 DEV Input 时直接调试未保存源码",
-    "manual_release": "只有用户明确要求保存或部署时才携带预期版本生成签名计划；展示计划并结束当前轮，收到后续人工确认才执行"
+    "fast_patch": "已有本地脚本的明确局部改动默认不查询猪齿鱼、平台、数据库或完整调用链",
+    "mode_routing": "区分标准业务、标准 Adapter 埋点、标准 API 挂载点、纯二开 Adapter、Independent 和混合需求",
+    "standard_delivery": "标准仓改造按业务、Adapter 埋点和 API 挂载点三条独立链路实施与验证",
+    "platform_authority": "精确 get 是平台源码、版本、Fixture、Header/Line 与资源关系的权威当前态",
+    "adapter_delivery": "覆盖 Adapter 事件前置、多 Line 选择、输入返回契约、Debug 和安全部署",
+    "independent_delivery": "分别覆盖 API_PRE、API_POST、API_PUBLISH 的输入输出、事务和验证语义",
+    "platform_relations": "把脚本源码、API 改写绑定和 API 发布资源作为独立产物读取、写入和回读",
+    "design_gates": "仅对新增或契约级脚本需求确认身份、字段、关系、事务、幂等、日志和异常",
+    "artifact_layout": "使用用户确认的输出目录，记录脚本、Line、绑定、版本和最终验证哈希",
+    "remote_debug": "用户要求且 DEV Input 有效时调试未保存源码，不把 Debug 当作平台发布验证",
+    "two_phase_write": "平台创建、保存、绑定、发布和部署都要求最新版本、签名计划与后续人工确认"
   },
   "mcp_servers": [
     {
@@ -37,6 +37,7 @@
         "choerodon_list_comments",
         "choerodon_list_attachments",
         "choerodon_download_attachment",
+        "choerodon_add_comment",
         "search_adapter_scripts",
         "search_standalone_scripts",
         "search_repo",
@@ -56,14 +57,23 @@
       "name": "zhenyun-script-platform-mcp",
       "tools": [
         "independent_script_get",
+        "independent_script_create",
         "independent_script_debug",
         "independent_script_save",
         "adapter_get",
+        "adapter_create",
         "adapter_debug",
         "adapter_extract_input",
-        "adapter_deploy"
+        "adapter_deploy",
+        "platform_resource_search",
+        "platform_resource_get",
+        "platform_definition_get",
+        "platform_relations_get",
+        "platform_api_point_list",
+        "platform_resource_create",
+        "platform_resource_save"
       ],
-      "description": "读取平台权威当前源码和版本，调试未保存源码，并在用户明确授权后保存或部署。"
+      "description": "读取平台权威当前源码、版本、定义与资源关系，调试未保存源码，并在用户明确授权后受控创建、保存、绑定或部署。"
     }
   ],
   "entry_point": "SKILL.md",
@@ -72,8 +82,8 @@
     "delivery"
   ],
   "metadata": {
-    "last_updated": "2026-09-19",
-    "scope": "marmot-custom-only",
+    "last_updated": "2026-09-20",
+    "scope": "srm-standard-and-marmot-delivery",
     "release_integration": "not-integrated"
   }
 }

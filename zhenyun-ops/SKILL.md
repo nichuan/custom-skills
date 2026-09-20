@@ -19,8 +19,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | 查询、读取、远程调试、保存或部署 Script Platform 脚本，或管理 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等平台配置 | `srm-script-platform` |
 | 修改需求目录中已有 Marmot JS/SQL 的字段取值、常量、表达式或局部逻辑 | `srm-requirement-delivery` 快速修改；需要平台当前态或远程 Debug 时采用 `srm-script-platform` 路由 |
-| 按猪齿鱼需求号开发新的埋点、API 挂载/API 发布、CodeBlock 或 QueryBlock | `srm-requirement-delivery` 完整需求 |
-| 标准 Java / 混合需求的分析与实现 | 按目标仓库开发约定实现；`gitlab-code` 只定位，Marmot 子产物才用 `srm-requirement-delivery` |
+| 按猪齿鱼需求号开发标准业务、标准 Adapter 埋点、标准 API 挂载点或 Marmot 产物 | `srm-requirement-delivery` 先判定标准、脚本或混合模式后完整交付 |
+| 标准 Java / 混合需求的分析与实现 | `srm-requirement-delivery`；`gitlab-code` 只负责定位，不负责修改业务代码 |
 | 只查询猪齿鱼任务、评论、状态或附件 | `choerodon-task` |
 | 异常、错误码、traceId、日志、接口失败、超时或线上问题 | `java-troubleshoot` |
 | 询价、招标、报价、评分、资格预审、寻源结果相关 SQL | `ssrc-sql-generator` |
@@ -32,7 +32,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 ## 判定规则
 
-- “查需求”和“开发纯二开需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。只有新需求实现或用户明确要求重新取证时，才读取任务和平台模板。需要标准 Java 改造时不进入该 Skill。
+- “查需求”和“开发需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 先区分标准业务、标准扩展点、纯二开脚本或混合模式再实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。只有需求号是事实源、正文不足或用户明确要求重新取证时，才读取任务。
 - “查脚本/调试脚本/保存或部署脚本”以及“查或管理平台 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock”直接走 `srm-script-platform`。平台当前态、定义、版本和状态以 Script Platform MCP 为准；Pangu 脚本搜索只在精确身份缺失时发现候选。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 普通 Bug 不能直接假定为标准 Bug：只有执行链覆盖故障区段且没有适配器或 API 前/后置挂载调用，才默认检索标准仓库。载体未知时由 `java-troubleshoot` 先按 traceId、明确日志关键字或脚本定位信息取证；信息均不足则追问，不宽泛搜索日志或代码。
@@ -48,7 +48,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | Skill | 职责 |
 | --- | --- |
 | `srm-script-platform` | Script Platform 的权威当前态与配置资源读取、未保存源码 DEV 调试及显式授权后的安全 CRUD、动作、保存和部署 |
-| `srm-requirement-delivery` | 最小修改已有 Marmot 脚本，或按需求号拉取并实现新的纯二开产物 |
+| `srm-requirement-delivery` | 交付标准业务、标准 Adapter/API 扩展点、Marmot 脚本及其混合需求；已有脚本局部修改走快捷路径 |
 | `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；仅在用户明确确认后新增评论 |
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
@@ -64,8 +64,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | 能力 | 主要工具 | Owner |
 | --- | --- | --- |
-| 猪齿鱼 | `choerodon_query_issue`、`choerodon_list_issue`、`choerodon_list_comments`、附件与状态工具 | `choerodon-task`；纯二开开发由 `srm-requirement-delivery` 调用 |
-| 本地代码 | `search_repo`，显式使用足够深度 | `gitlab-code`；纯二开契约阻塞时由 `srm-requirement-delivery` 定向调用 |
+| 猪齿鱼 | `choerodon_query_issue`、`choerodon_list_issue`、`choerodon_list_comments`、附件与状态工具 | `choerodon-task`；需求交付由 `srm-requirement-delivery` 按需调用 |
+| 本地代码 | `search_repo`，显式使用足够深度 | `gitlab-code`；`srm-requirement-delivery` 在标准实现或脚本契约阻塞时定向调用 |
 | 脚本身份发现 | Pangu `search_adapter_scripts` / `search_standalone_scripts` | `srm-script-platform`、`gitlab-code`、`java-troubleshoot` 按缺失身份调用 |
 | 平台当前源码/版本/状态 | Script Platform `adapter_get` / `independent_script_get` | `srm-script-platform`；其它 Skill 复用其路由 |
 | 未保存源码 Debug 与受控保存 | Script Platform `*_debug` / `*_save` / `adapter_deploy` | `srm-script-platform`；写操作须两阶段人工确认 |
@@ -88,7 +88,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | 平台脚本查询或调试 | `srm-script-platform`；身份不完整才用 Pangu 发现，再回到 Script Platform 当前态 |
 | 已有纯二开脚本小改 | `srm-requirement-delivery` 只读目标文件、最小修改并定向检查 |
-| 新纯二开需求开发 | `srm-requirement-delivery` 读取需求与平台模板、实现并快速检查 |
+| 新标准或纯二开需求开发 | `srm-requirement-delivery` 按模式读取必要事实、实现并分别验证 |
 | 任务上下文 + 故障 | 猪齿鱼只读上下文 → `java-troubleshoot` |
 | 故障 + 数据修复 | `java-troubleshoot` 先定位根因 → 对应 SQL Skill 生成修复 SQL |
 | 工作台待办/单据异常 + 要改数据 | `srm-workbench-bug-triage` 先定位根因 → `ssrc/spuc-sql-generator` 生成修复 SQL，交用户执行 |
@@ -99,6 +99,6 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 ## 约束
 
 - 能直接命中专项 Skill 时不要加载本 Skill。
-- 不在本 Skill 内复制排障、SQL 或纯二开开发规则。
+- 不在本 Skill 内复制排障、SQL 或需求交付规则。
 - 平台写工具已经可用，但只有用户明确要求保存/发布/部署/更新 DEV 时才能生成签名计划；展示计划并结束当前轮，收到用户后续确认才执行。本地文件或 Debug 通过不代表已经部署。
 - 不得用失败调用探测禁用能力，也不得伪造不存在的工具。

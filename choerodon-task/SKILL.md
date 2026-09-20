@@ -1,6 +1,6 @@
 ---
 name: choerodon-task
-description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。Marmot 纯二开需求开发使用 srm-requirement-delivery。
+description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。SRM 标准或纯二开需求开发使用 srm-requirement-delivery。
 ---
 
 # 猪齿鱼任务查询助手（choerodon-task）
@@ -62,7 +62,7 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 
 - 用户要**排障定位根因**（有 traceId/报错/日志）→ `java-troubleshoot`
 - 用户要**生成/修复 SQL**、改业务库数据 → `spuc-sql-generator`（盘古履约）/ `ssrc-sql-generator`（采购寻源）
-- 用户要**实现 Marmot 纯二开需求**，包括埋点、API 挂载/API 发布、CodeBlock、QueryBlock → `srm-requirement-delivery`
+- 用户要**实现 SRM 标准或纯二开需求**，包括标准业务、标准 Adapter/API 扩展点、Marmot 脚本、CodeBlock、QueryBlock → `srm-requirement-delivery`
 - 这些场景由本 Skill 在"处理任务"阶段路由出去（见下文）。
 
 ---
@@ -116,7 +116,7 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 
 | 用户后续意图 | 后续 Skill |
 |---|---|
-| "实现/开发这个纯二开需求"，需要埋点、API 挂载/API 发布或公共块代码 | `srm-requirement-delivery` |
+| “实现/开发这个 SRM 需求”，需要标准业务、扩展点、Marmot 脚本、API 挂载/发布或公共块代码 | `srm-requirement-delivery` |
 | "这个任务为什么报错/接口失败/超时"（有日志/traceId 线索，要定位根因） | `java-troubleshoot` |
 | "这个任务关联的订单/收货/发货数据不对，生成查询或修复 SQL" | `spuc-sql-generator` |
 | "这个任务关联的询价/招标/报价数据不对，生成查询或修复 SQL" | `ssrc-sql-generator` |
@@ -148,7 +148,7 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 | 技能 | 关系 |
 |---|---|
 | `zhenyun-ops` | 路由总管；意图模糊时由它决定进本 Skill 还是别的技能 |
-| `srm-requirement-delivery` | 用户要求实现 Marmot 纯二开需求时，由它读取需求、拉取平台模板并完成代码 |
+| `srm-requirement-delivery` | 用户要求实现标准或纯二开需求时，由它判定模式、读取必要事实并完成代码与验证 |
 | `java-troubleshoot` | 当查询后需要排障定位根因时，本 Skill 路由过去 |
 | `spuc-sql-generator` | 当查询后需要盘古履约域（订单/收货/发货）数据修复时，路由过去 |
 | `ssrc-sql-generator` | 当查询后需要采购寻源域（询价/招标/报价）数据修复时，路由过去 |
