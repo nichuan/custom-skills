@@ -1,6 +1,6 @@
 {
   "name": "zhenyun-ops",
-  "version": "1.5.2",
+  "version": "1.5.4",
   "description": "甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、脚本与平台配置查询/调试/受控写入、猪齿鱼查询、故障排查、工作台排障、SQL、数据库、认知库和代码定位；意图明确时直接使用对应子 Skill。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -16,7 +16,8 @@
   "features": {
     "router_only": "只做路由与共享上下文，可读取本地协作指引，不执行业务查询或写入",
     "direct_hit_first": "明确请求直接进入目标 Skill",
-    "requirement_delivery": "标准业务、标准扩展点、Marmot 脚本及混合需求开发路由到 srm-requirement-delivery",
+    "requirement_delivery": "标准业务、标准扩展点、Marmot 脚本、Independent 子类型及配套平台资源需求路由到 srm-requirement-delivery",
+    "historical_requirement_discovery": "历史需求增量且目标资产未知时，路由为需求号聚合发现、精确读取和最小修改",
     "script_platform_routing": "脚本、API、消费端、调度、常量、OutBound、CodeBlock 和 QueryBlock 的查询、远程调试与两阶段人工确认写入路由到 srm-script-platform；Pangu 仅做身份发现",
     "workbench_routing": "采购员工作台待办、卡片、超级搜索、关注与 ES 问题路由到 srm-workbench-bug-triage",
     "knowledge_routing": "knowledge_docs 查询与治理路由到 knowledge-governance，SQL 模板和表目录保留给领域 SQL Skill",

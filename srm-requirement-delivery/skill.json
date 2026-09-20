@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "2.0.0",
-  "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot 纯二开适配器或独立脚本（API 前置、后置、发布、CodeBlock、QueryBlock）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
+  "version": "2.2.0",
+  "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（API 关系、Constant、CodeBlock、QueryBlock 等）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -16,14 +16,15 @@
   ],
   "features": {
     "fast_patch": "已有本地脚本的明确局部改动默认不查询猪齿鱼、平台、数据库或完整调用链",
+    "historical_requirement_discovery": "历史需求增量先按需求号聚合定位 Adapter、Independent、CodeBlock、QueryBlock 与 API 关系资源，精确读取后再最小修改",
     "mode_routing": "区分标准业务、标准 Adapter 埋点、标准 API 挂载点、纯二开 Adapter、Independent 和混合需求",
     "standard_delivery": "标准仓改造按业务、Adapter 埋点和 API 挂载点三条独立链路实施与验证",
     "platform_authority": "精确 get 是平台源码、版本、Fixture、Header/Line 与资源关系的权威当前态",
     "adapter_delivery": "覆盖 Adapter 事件前置、多 Line 选择、输入返回契约、Debug 和安全部署",
-    "independent_delivery": "分别覆盖 API_PRE、API_POST、API_PUBLISH 的输入输出、事务和验证语义",
+    "independent_delivery": "按平台实际 quickType 区分 Independent，API 前后置阶段与 quickType 分开记录，并分别处理配套关系资源",
     "platform_relations": "把脚本源码、API 改写绑定和 API 发布资源作为独立产物读取、写入和回读",
     "design_gates": "仅对新增或契约级脚本需求确认身份、字段、关系、事务、幂等、日志和异常",
-    "artifact_layout": "使用用户确认的输出目录，记录脚本、Line、绑定、版本和最终验证哈希",
+    "artifact_layout": "新交付按平台资源类型分层，Independent 再按实际 quickType 分型；旧目录原地兼容，artifacts.json 逐对象记录身份、关系和验证",
     "remote_debug": "用户要求且 DEV Input 有效时调试未保存源码，不把 Debug 当作平台发布验证",
     "two_phase_write": "平台创建、保存、绑定、发布和部署都要求最新版本、签名计划与后续人工确认"
   },
@@ -65,6 +66,7 @@
         "adapter_debug",
         "adapter_extract_input",
         "adapter_deploy",
+        "platform_requirement_artifacts_search",
         "platform_resource_search",
         "platform_resource_get",
         "platform_definition_get",

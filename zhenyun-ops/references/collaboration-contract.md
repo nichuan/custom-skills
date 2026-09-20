@@ -7,9 +7,10 @@
 | 目标 | 入口 / 后续 |
 | --- | --- |
 | 已有 Marmot 脚本的明确局部修改 | srm-requirement-delivery 快速修改；不因附带需求号重查全链路 |
+| 历史需求增量但原平台资产未知 | srm-requirement-delivery 先用 Script Platform `platform_requirement_artifacts_search` 按需求号聚合定位，精确读取后最小修改；零结果按历史元数据不规范降级 |
 | 查询、调试、保存或部署平台脚本 | srm-script-platform；Pangu 只发现身份，Script Platform MCP 读取权威当前态并执行 DEV 调试/受控写入 |
-| 新需求分析与 Marmot 实现 | srm-requirement-delivery；需求/评论 → 验收条件 → 平台模板与必要契约 → 实现与验证 |
-| 标准 Java 或混合需求 | 按仓库开发约定实现标准部分；gitlab-code 只定位；Marmot 部分才交 srm-requirement-delivery，不强制套二开流程 |
+| 新标准或 Marmot 脚本/资源需求分析与实现 | srm-requirement-delivery；先判定标准、脚本或混合模式，再按平台对象类型拆分产物、读取必要事实、实现与验证 |
+| 标准 Java 或混合需求 | srm-requirement-delivery 拆分标准与脚本产物；按仓库约定实现标准部分，gitlab-code 只定位，脚本部分使用 Marmot 链路 |
 | 异常、trace、接口失败 | java-troubleshoot；工作台待办/搜索/ES 现象优先 srm-workbench-bug-triage |
 | 寻源 / 履约数据修复 | ssrc-sql-generator / spuc-sql-generator；原因未知时先排障，原因已知直接准备修复 SQL |
 | 表结构与真实数据 | archery；环境/租户已确定就复用，只查缺失事实 |
@@ -24,7 +25,7 @@
 
 先提取目标行为、现状、约束、验收条件和真实未知项。已有局部修改只读目标与必要上下文，最小修改并定向检查。新增入口、输入输出契约、持久化范围或外部调用发生变化时再补相应设计证据。
 
-新需求仅在确有需要时读任务、评论、附件；冲突记录来源与时间。平台脚本身份不完整时先用 Pangu 发现，随后用 Script Platform MCP 读取实际当前源码、版本和 Fixture 并保留入口，核实字段来源/关联、空值语义和外部服务契约。标准 Java/混合需求按仓库约定拆分，不默认重写成 Marmot。
+新需求仅在确有需要时读任务、评论、附件；冲突记录来源与时间。历史需求增量只有需求号且目标平台资产未知时，先用 Script Platform `platform_requirement_artifacts_search` 聚合搜索 Adapter、Independent、CodeBlock、QueryBlock、API 发布和改写候选，不先完整读取任务。候选唯一后按类型精确 `get`，需要时读取关系；零结果或扫描不完整不证明不存在，再按本地产物记录、任务中的明确编码和 Pangu 身份发现降级。其它平台脚本身份不完整场景才直接用 Pangu 发现，随后回到 Script Platform MCP 读取实际当前源码、版本和 Fixture，并保留入口，核实字段来源/关联、空值语义和外部服务契约。完整交付按平台对象逐项记录 Adapter、Independent、Block、Constant、绑定和其它配置，Independent 的原始 quickType 与 API 前后置阶段分开；已有旧目录不因结构升级强制迁移。标准 Java/混合需求由 srm-requirement-delivery 按仓库约定拆分，不默认重写成 Marmot。
 
 实现结果逐条对应验收条件，区分语法检查、静态检查、本地测试、平台联调、上线验证。未运行的检查明确记录，不把本地代码完成写成已发布。若出现运行异常，将源码引用/哈希、输入范围、实际与预期、检查结果和 trace 交给排障流程，沿用已有证据。
 

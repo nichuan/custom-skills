@@ -13,7 +13,8 @@ description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的�
 
 - `zhenyun-script-platform-mcp` 是平台当前源码、版本、Fixture、启用状态、资源定义、挂载关系、
   远程 Debug、保存和部署的权威入口。
-- `zhenyun-pangu-mcp` 的脚本工具只用于编码、租户或 `running_service` 不完整时的模糊发现；
+- 历史需求号对应的平台资产先由 Script Platform MCP 按描述字段聚合发现；`zhenyun-pangu-mcp`
+  的脚本工具只用于历史描述不规范，或编码、租户、`running_service` 仍不完整时的模糊降级；
   找到精确身份后必须回到 Script Platform MCP 读取当前对象。
 - Pangu 继续负责日志、数据库、trace、标准源码、猪齿鱼和静态检查。不要用 Archery 直接读取
   Base64 脚本正文。
@@ -35,6 +36,7 @@ description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的�
 | 用户明确要求部署 Adapter | `adapter_deploy` |
 | 查看目标环境、脱敏认证元数据和写入边界 | `platform_context_get` |
 | 不确定当前 MCP 覆盖范围或 `resource_type` | `platform_capabilities_list` |
+| 已知历史需求号，但不确定关联脚本、CodeBlock、QueryBlock 或 API 资源 | `platform_requirement_artifacts_search`，再按类型精确 `get` |
 | 搜索/精确读取平台配置资源 | `platform_resource_search` / `platform_resource_get` |
 | 查看字段定义、动作元数据 | `platform_definition_get` |
 | 查脚本、CodeBlock、API 改写之间的引用关系 | `platform_relations_get` |
@@ -43,10 +45,16 @@ description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的�
 | 用户明确要求执行已登记表动作 | `platform_table_action` |
 | 用户明确要求创建/改元数据/启停/删除 Adapter | `adapter_create` / `adapter_update` / `adapter_toggle` / `adapter_delete` |
 
-Pangu 搜索只提供候选身份，不作为 Debug/Save/Deploy 前的最终源码依据。搜索命中多个精确候选
+`platform_requirement_artifacts_search` 和 Pangu 搜索都只提供候选身份，不作为 Debug/Save/Deploy
+前的最终源码依据。搜索命中多个精确候选
 时停止并让用户选择，不猜环境、服务或 Line。
 
-适配器与独立脚本的模糊发现走 Pangu `search_adapter_scripts` / `search_standalone_scripts`；
+历史需求增量且只有需求号时，先用 `platform_requirement_artifacts_search(requirement_code, tenant?)`
+聚合查 Adapter、Independent、CodeBlock、QueryBlock、API 发布和 API 改写；零结果不证明不存在，
+因为早期资源可能没有把需求号写入描述。仅在该结果不完整或仍缺身份时，才降级到 Pangu
+`search_adapter_scripts` / `search_standalone_scripts`，或从猪齿鱼描述/评论取得明确编码。
+
+适配器与独立脚本的通用模糊发现走 Pangu `search_adapter_scripts` / `search_standalone_scripts`；
 `platform_resource_search(resource_type="adapter_task"/"independent_script")` 用于按已知租户、
 编码或关键词精确列取，以及平台配置资源调查。两条路都能命中同一脚本对象时，一律以 Script
 Platform `get` 的返回为当前态依据，不把任一搜索结果当源码。
@@ -61,6 +69,10 @@ CodeBlock、QueryBlock、脚本日志和 Adapter 事件注册表。不要构造�
 
 直接调用对应 `get`，返回当前源码、`source_hash`、版本、Fixture 状态和 Adapter 全部 Lines。
 查询请求不调用 Debug，不改变启用状态，也不触发写工具。
+
+历史需求号检索先用 `platform_requirement_artifacts_search` 得到跨资源候选；候选唯一后仍必须调用
+对应精确 `get`，需要确认引用时再调用 `platform_relations_get`。未传租户且命中多个租户时不得
+代替用户选择；零结果按历史描述不规范处理，不得直接结论为没有二开资产。
 
 平台资源调查先用 `platform_resource_search` 缩小范围，再用 `platform_resource_get` 读取唯一记录；
 不清楚字段时先看能力清单的 `definition` 标记，再对可用资源读 `platform_definition_get`，查依赖时
@@ -130,6 +142,8 @@ Debug 不持久化脚本，但脚本自身可能调用 DEV 服务或数据库。
 
 - 新需求、本地交付目录和产物组织由 `srm-requirement-delivery` 负责；需要平台当前态、真实
   Debug 或用户授权的保存时采用本 Skill 的路由。
+- 历史需求增量由 `srm-requirement-delivery` 决定最小改动范围；目标未知时复用本 Skill 的
+  `platform_requirement_artifacts_search` 路由，找到唯一资产后回到精确读取和需求实现。
 - 异常、traceId、接口失败或线上行为不明由 `java-troubleshoot` 负责；它读取平台当前源码，
   但不因排障请求自动 Debug 或部署。
 - 只定位实现位置由 `gitlab-code` 负责；平台脚本正文仍以对应 `get` 为准。

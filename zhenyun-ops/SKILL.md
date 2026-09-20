@@ -19,6 +19,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | 查询、读取、远程调试、保存或部署 Script Platform 脚本，或管理 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等平台配置 | `srm-script-platform` |
 | 修改需求目录中已有 Marmot JS/SQL 的字段取值、常量、表达式或局部逻辑 | `srm-requirement-delivery` 快速修改；需要平台当前态或远程 Debug 时采用 `srm-script-platform` 路由 |
+| 历史需求增量修改，只有需求号且原脚本、CodeBlock、QueryBlock 或 API 资源未知 | `srm-requirement-delivery` 先按需求号聚合定位平台资产，精确读取后走最小修改或完整链路 |
+| 按需求新增或修改 Independent 类型、CodeBlock、QueryBlock、Constant、API 关系或其它配套平台资源 | `srm-requirement-delivery` 按资源类型拆分产物；平台读取和受控写入复用 `srm-script-platform` 路由 |
 | 按猪齿鱼需求号开发标准业务、标准 Adapter 埋点、标准 API 挂载点或 Marmot 产物 | `srm-requirement-delivery` 先判定标准、脚本或混合模式后完整交付 |
 | 标准 Java / 混合需求的分析与实现 | `srm-requirement-delivery`；`gitlab-code` 只负责定位，不负责修改业务代码 |
 | 只查询猪齿鱼任务、评论、状态或附件 | `choerodon-task` |
@@ -32,8 +34,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 ## 判定规则
 
-- “查需求”和“开发需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 先区分标准业务、标准扩展点、纯二开脚本或混合模式再实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。只有需求号是事实源、正文不足或用户明确要求重新取证时，才读取任务。
-- “查脚本/调试脚本/保存或部署脚本”以及“查或管理平台 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock”直接走 `srm-script-platform`。平台当前态、定义、版本和状态以 Script Platform MCP 为准；Pangu 脚本搜索只在精确身份缺失时发现候选。
+- “查需求”和“开发需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 先区分标准业务、标准扩展点、纯二开脚本或混合模式再实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。历史需求增量只有需求号且目标资产未知时，先按需求号聚合搜索平台候选，不先完整读取任务；零结果再按本地产物、任务中的明确编码和 Pangu 身份发现降级。只有需求正文是事实源、当前增量不足或用户明确要求重新取证时，才完整读取任务。
+- “查脚本/调试脚本/保存或部署脚本”以及不带需求实现的“查或管理平台 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock”直接走 `srm-script-platform`。若目标是按需求设计、编码和交付这些资源，则走 `srm-requirement-delivery`，由它逐对象组织本地产物并复用平台工具。平台当前态、定义、版本和状态以 Script Platform MCP 为准；Pangu 脚本搜索只在精确身份缺失时发现候选。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 普通 Bug 不能直接假定为标准 Bug：只有执行链覆盖故障区段且没有适配器或 API 前/后置挂载调用，才默认检索标准仓库。载体未知时由 `java-troubleshoot` 先按 traceId、明确日志关键字或脚本定位信息取证；信息均不足则追问，不宽泛搜索日志或代码。
 - 独立脚本、适配器、API 挂载、租户定制及外部接口对接 Bug 走 `java-troubleshoot` 的脚本优先路径：日志固定限定 `srm-script-container`；无可靠日志关键字时先取脚本并使用源码中的真实日志字面量；标准仓库只在核实脚本契约/平台行为确有必要或用户明确要求时最后定向检索。
@@ -47,8 +49,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | Skill | 职责 |
 | --- | --- |
-| `srm-script-platform` | Script Platform 的权威当前态与配置资源读取、未保存源码 DEV 调试及显式授权后的安全 CRUD、动作、保存和部署 |
-| `srm-requirement-delivery` | 交付标准业务、标准 Adapter/API 扩展点、Marmot 脚本及其混合需求；已有脚本局部修改走快捷路径 |
+| `srm-script-platform` | Script Platform 的权威当前态、历史需求号资产聚合发现、配置资源读取、未保存源码 DEV 调试及显式授权后的安全 CRUD、动作、保存和部署 |
+| `srm-requirement-delivery` | 交付标准业务、标准 Adapter/API 扩展点、Marmot 脚本、Independent 子类型及配套平台资源；已有脚本和历史需求增量局部修改走快捷路径 |
 | `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；仅在用户明确确认后新增评论 |
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
@@ -67,6 +69,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 猪齿鱼 | `choerodon_query_issue`、`choerodon_list_issue`、`choerodon_list_comments`、附件与状态工具 | `choerodon-task`；需求交付由 `srm-requirement-delivery` 按需调用 |
 | 本地代码 | `search_repo`，显式使用足够深度 | `gitlab-code`；`srm-requirement-delivery` 在标准实现或脚本契约阻塞时定向调用 |
 | 脚本身份发现 | Pangu `search_adapter_scripts` / `search_standalone_scripts` | `srm-script-platform`、`gitlab-code`、`java-troubleshoot` 按缺失身份调用 |
+| 历史需求资产发现 | Script Platform `platform_requirement_artifacts_search` | `srm-requirement-delivery` / `srm-script-platform`；候选仍需按类型精确 `get`，零结果不证明不存在 |
 | 平台当前源码/版本/状态 | Script Platform `adapter_get` / `independent_script_get` | `srm-script-platform`；其它 Skill 复用其路由 |
 | 未保存源码 Debug 与受控保存 | Script Platform `*_debug` / `*_save` / `adapter_deploy` | `srm-script-platform`；写操作须两阶段人工确认 |
 | 平台配置与关系 | Script Platform `platform_resource_*` / `platform_definition_get` / `platform_relations_get` / `platform_api_point_list` | `srm-script-platform`；资源类型为封闭枚举，写入和动作须最新版本及两阶段人工确认 |
@@ -88,7 +91,8 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | 平台脚本查询或调试 | `srm-script-platform`；身份不完整才用 Pangu 发现，再回到 Script Platform 当前态 |
 | 已有纯二开脚本小改 | `srm-requirement-delivery` 只读目标文件、最小修改并定向检查 |
-| 新标准或纯二开需求开发 | `srm-requirement-delivery` 按模式读取必要事实、实现并分别验证 |
+| 历史需求增量且目标资产未知 | `srm-requirement-delivery` 按需求号聚合搜索 → 对唯一候选精确 `get` → 最小修改；零结果才降级到本地记录、需求明确编码和 Pangu 发现 |
+| 新标准或纯二开需求开发 | `srm-requirement-delivery` 按模式和平台资源类型读取必要事实、组织产物、实现并分别验证 |
 | 任务上下文 + 故障 | 猪齿鱼只读上下文 → `java-troubleshoot` |
 | 故障 + 数据修复 | `java-troubleshoot` 先定位根因 → 对应 SQL Skill 生成修复 SQL |
 | 工作台待办/单据异常 + 要改数据 | `srm-workbench-bug-triage` 先定位根因 → `ssrc/spuc-sql-generator` 生成修复 SQL，交用户执行 |

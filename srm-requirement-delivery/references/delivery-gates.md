@@ -8,9 +8,9 @@
 
 | 产物 | 角色 | tenant | 主编码 | 子身份 | quickType/阶段 | 当前状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `<artifact>` | Adapter/API_PRE/API_POST/API_PUBLISH/CodeBlock/QueryBlock/绑定/发布资源 | `<tenant>` | `<taskCode/scriptCode/apiCode>` | `<runningService/lineId/recordId>` | `<value>` | `<existing/new/TBD>` |
+| `<artifact>` | Adapter/Independent/CodeBlock/QueryBlock/Constant/API 关系/其它配置资源 | `<tenant>` | `<taskCode/scriptCode/resourceCode>` | `<runningService/lineId/recordId>` | `<平台原始 quickType 或独立阶段>` | `<existing/new/TBD>` |
 
-记录事实源：需求/评论、标准源码位置、平台 `get` 版本与源码哈希、平台资源版本、本地路径。
+记录事实源：需求/评论、标准源码位置、平台 `get` 版本与源码哈希、平台资源版本、本地路径。Independent 的原始 `quickType` 与 API 前/后置阶段分列；每个真实平台对象单独一行。
 
 ## 2. 需求与产物关系
 
@@ -52,8 +52,10 @@ Adapter、API 前置、API 后置和 API 发布必须分别填写，不能复制
 | --- | --- | --- | --- | --- | --- | --- |
 | Adapter Event/Header/Line | `<taskCode>` | `<runningService + lineId>` | `<event>` | `<version>` | `<none/create/deploy>` | `<status>` |
 | API Rewrite | `<apiCode>` | `<scriptCode>` | `<pre/post>` | `<version>` | `<none/create/update>` | `<status>` |
-| API Publish | `<route/code>` | `<scriptCode>` | `API_PUBLISH` | `<version>` | `<none/create/update>` | `<status>` |
+| API Publish | `<route/code>` | `<scriptCode>` | `<平台原始 quickType>` | `<version>` | `<none/create/update>` | `<status>` |
 | Block 引用 | `<caller>` | `<blockCode>` | `<relation>` | `<version>` | `<action>` | `<status>` |
+| Constant 引用 | `<caller>` | `<constantCode>` | `N/A` | `<version>` | `<none/create/update>` | `<status>` |
+| Consumer/Scheduler | `<topic/jobCode>` | `<scriptCode/CodeBlock>` | `<quickType>` | `<version>` | `<none/create/update>` | `<status>` |
 
 脚本存在不代表绑定或发布生效。新对象尚未创建时版本写 `N/A`，不要伪造平台 ID。
 
@@ -119,7 +121,9 @@ Adapter、API 前置、API 后置和 API 发布必须分别填写，不能复制
 ```text
 - node --check：pass/fail/N/A
 - check_marmot_script_static：pass/warn/fail；最终源码 SHA-256：...
+- CodeBlock 检查：pass/fail/N/A；引用关系：已核实/未核实
 - QueryBlock 检查：pass/fail/N/A
+- Constant/配置资源：身份与版本已核实/未核实；秘密值：不进入本地产物
 - DEV Debug：pass/fail/NO_VALID_FIXTURE/未要求；Input 来源：...
 - 真实 trace：已验证/待补时间范围/N/A
 - 平台源码：仅本地/平台未改/待确认计划/已写入并回读

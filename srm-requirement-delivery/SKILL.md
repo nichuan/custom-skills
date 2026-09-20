@@ -1,6 +1,6 @@
 ---
 name: srm-requirement-delivery
-description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot 纯二开适配器或独立脚本（API 前置、后置、发布、CodeBlock、QueryBlock）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。
+description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（API 关系、Constant、CodeBlock、QueryBlock 等）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。
 ---
 
 # SRM 标准与纯二开需求交付
@@ -16,11 +16,13 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 | 模式 | 判定信号 | 本次交付物 | 不应自动生成 |
 | --- | --- | --- | --- |
 | 已有脚本快速修改 | 目标文件或平台脚本唯一，改动局部，不新增入口、绑定或产物 | 原脚本的最小 diff 与定向验证 | 需求包、全链路调研、平台写入 |
+| 历史需求增量修改 | 已知需求号，但不确定原需求涉及哪些 Adapter、Independent、CodeBlock、QueryBlock 或 API 关系资源 | 按需求号定位候选，精确读取目标后做最小 diff | 先完整重读需求、宽搜全部脚本或把零结果当作不存在 |
 | 标准业务需求 | 修改标准产品的 Java、接口、DTO、业务规则、持久化或显式要求的数据库迁移 | 标准仓源码、测试和必要迁移 | Marmot 脚本或平台配置 |
 | 标准新增适配器埋点 | 在标准 Controller/Service 增加前置或后置 Adapter 调用点 | 标准常量、调用点、测试 | 租户 Adapter 脚本 |
 | 标准新增 API 挂载点 | 在 Controller 增加 `@MarmotApiPoint(apiCode = ...)` | 注解、必要的 `ApiCode` 常量、测试 | API 前置/后置独立脚本与绑定 |
 | 纯二开 Adapter | 已有标准埋点，要求实现租户适配器脚本 | 指定 Header/Line 的脚本、验证记录 | 标准 Java 改造 |
-| 纯二开 Independent | 要求 API 前置、API 后置、API 发布或独立脚本 | 独立脚本及其已确认的绑定/发布契约 | 未授权的平台创建、挂载或发布 |
+| 纯二开 Independent | 要求 API 改写/发布、消费端、调度或其它独立脚本 | 独立脚本、平台实际 `quickType` 及其已确认的配套资源 | 把前后置阶段当成固定 `quickType`，或未授权地创建配套资源 |
+| 纯二开平台资源 | 要求新增或修改 CodeBlock、QueryBlock、Constant、API 关系或其它配置资源 | 独立记录的资源内容、身份、版本、引用和验证 | 把资源混入 Independent 源码目录或保存秘密常量值 |
 | 混合需求 | 同时要求标准能力和租户脚本，或多个脚本/绑定产物 | 每个产物各自的契约、实现与验证 | 用一个脚本产物代替标准改造 |
 
 “新增埋点”若只给标准类方法、任务编码和触发时机，判为标准新增适配器埋点；“增加 API 埋点/支持前后置挂载”若要求 `@MarmotApiPoint`，判为标准新增 API 挂载点。只有明确给出租户脚本逻辑、脚本编码或平台绑定要求时，才增加纯二开产物。
@@ -29,7 +31,16 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 ## 2. 需求入口与最小身份
 
-用户已给出完整需求时直接使用，不为流程完整重复查猪齿鱼。需求号是主要事实源、用户要求按需求号实现或正文不足时：
+用户已给出完整需求时直接使用，不为流程完整重复查猪齿鱼。
+
+历史需求增量修改且目标平台资产未知时，需求号先作为资产索引，不先作为正文查询入口：
+
+1. 用 `platform_requirement_artifacts_search(requirement_code, tenant?)` 一次检索 Adapter、Independent、CodeBlock、QueryBlock、API 发布和 API 改写候选；已知租户必须传入。
+2. 结果只是候选身份。结合用户本次增量、资源类型、`quickType`、描述和租户缩小范围；跨租户或多个同类候选时不得猜选。
+3. 对唯一候选调用对应精确 `get`，并按需读取 `platform_relations_get`；列表结果不能替代当前源码、版本、Line 和关系。
+4. 零结果或扫描不完整不证明不存在。按本地产物记录 → 猪齿鱼描述/评论中的明确编码 → Pangu 身份发现 → 平台精确读取降级；只有目标或增量仍不清楚时才完整读取需求正文。
+
+需求号本身是主要事实源、用户明确要求按需求正文实现或当前描述不足时：
 
 1. 用 `choerodon_list_issue` 找到唯一任务；指定项目时先取得真实 `project_id`，后续始终沿用。
 2. 取得加密 `issue_id` 后并行读取 `choerodon_query_issue` 与 `choerodon_list_comments`；仅在理解依赖附件时读取附件。
@@ -40,12 +51,13 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 | 模式 | 最小身份与契约 |
 | --- | --- |
+| 历史需求增量修改 | `requirementCode + 已知 tenant（如有）+ 本次增量目标`；目标资产通过聚合搜索和精确 `get` 确认 |
 | 标准业务 | 可写标准仓、模块/入口、目标行为、影响契约、验收条件 |
 | 标准 Adapter 埋点 | `类#方法 + taskCode + 前置/后置时机 + 输入/返回/异常语义` |
 | 标准 API 挂载点 | `Controller#方法 + HTTP 路由 + apiCode + 原请求/响应` |
 | 纯二开 Adapter | `tenant + taskCode + runningService + lineId（多 Line 时必填）+ 标准埋点契约` |
-| API 前置/后置 | `tenant + scriptCode + quickType + apiCode + 阶段 + 请求/响应契约 + 绑定身份` |
-| API 发布 | `tenant + scriptCode + quickType + 发布路由/方法 + 输入/输出 + 权限/租户上下文 + 发布资源身份` |
+| Independent Script | `tenant + scriptCode + 平台实际 quickType + 输入/输出契约 + 配套资源身份`；API 前/后置阶段与 `quickType` 分开记录 |
+| 平台资源 | `tenant + resourceType + 主编码 + recordId/version + 内容/引用契约`；Constant 不读取或落盘秘密值 |
 
 标准源码未在可写工作区时可以先做只读取证；需要实际实现时，在首次修改前取得明确的可写仓库路径。纯二开完整需求在首次写本地产物前按“本地产物”确认输出目录；只读取证不因目录未定而停止。
 
@@ -53,13 +65,14 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 - 标准业务、标准新增适配器埋点、标准新增 API 挂载点：读取[标准需求实施链路](references/standard-delivery.md)，只执行命中的小节。
 - 新增脚本、契约级修改、平台绑定或混合需求中的脚本部分：读取[Marmot 产物实施链路](references/marmot-delivery.md)和[设计门禁模板](references/delivery-gates.md)。
+- 历史需求增量修改但目标资产未知：只读取[Marmot 产物实施链路](references/marmot-delivery.md)的“历史需求增量快速定位”；目标唯一后，若仍满足快捷条件就返回下一节，不加载完整门禁模板。
 - 已有脚本快速修改：直接按下一节执行，不加载完整门禁模板。
 
 仅要求分析时，输出模式判定、目标行为、产物拆分、关键契约、验收条件与真实阻塞，不修改代码。要求实现时直接编码和验证，不再等待一次“开始实现”确认。
 
 ## 4. 已有脚本快速修改
 
-只有同时满足下列条件才走快捷路径：目标脚本唯一；改动局部；不新增产物、入口、绑定、数据库写入范围或外部调用；不改变输入输出契约、字段类型或空值语义；用户未报告异常，也未要求重查需求或平台。
+只有同时满足下列条件才走快捷路径：目标脚本原本唯一，或已按需求号定位并经精确 `get` 确认为唯一；改动局部；不新增产物、入口、绑定、数据库写入范围或外部调用；不改变输入输出契约、字段类型或空值语义；用户未报告异常，也未要求重查需求正文或扩大平台调查。
 
 1. 读取目标文件和理解该改动所需的最小上下文。
 2. 只改本次逻辑，保留原入口、结构、变量、格式、注释、日志、分支顺序和兼容行为；不顺手重构或格式化。
@@ -70,22 +83,11 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 ## 5. 本地产物
 
-标准模式直接修改用户指定的标准仓，不创建 Marmot 交付目录。脚本完整需求使用用户在当前请求或对话中确认的输出根目录；未给出时仅在首次写文件前询问一次，不回退到当前目录、Skill 目录或固定工程。
+标准模式直接修改用户指定的标准仓，不创建 Marmot 交付目录。Marmot 完整需求使用用户在当前请求或对话中确认的输出根目录；未给出时仅在首次写文件前询问一次，不回退到当前目录、Skill 目录或固定工程。
 
-```text
-<delivery-root>/<issue-or-short-name>/<tenant>/
-  request.md
-  design-gates.md
-  artifacts.json
-  srm-adaptor/<task-code>/entry.js
-  srm-adaptor/<task-code>/<line-id>/entry.js   # 同一 taskCode 有多个交付 Line 时
-  SCRIPT_LIB/<script-code>/entry.js
-  CodeBlock/<code>/entry.js
-  QueryBlock/<code>/query.sql
-  fixtures/*.json                              # 仅真实或明确构造的最小样例
-```
+新增、多产物或需要维护交付清单时，读取[产物分类与目录](references/artifact-layout.md)。新交付按平台资源类型分层，并只在 Independent 内按平台实际 `quickType` 分目录；API 前/后置阶段另记在关系资源中。已有需求目录或用户指定路径原地维护，不为套新结构搬迁文件。
 
-`request.md` 只保留目标、约束与验收点；`design-gates.md` 只填写当前需求适用的门禁；`artifacts.json` 记录产物类型、编码、`quickType`/阶段、租户、平台 ID 与版本、Adapter Line、绑定/发布资源、平台源码哈希、本地路径和最近验证哈希。长整型 ID 以字符串保存。
+`request.md` 只保留目标、约束与验收点；`design-gates.md` 只填写当前需求适用的门禁；`artifacts.json` 是产物身份和关系清单，每个 Adapter Line、Independent、Block、Constant、绑定或配置资源分别记录 `kind`、子类型、租户、精确身份、平台 ID/版本、实际本地路径、关系和验证哈希。长整型 ID 以字符串保存。目录不能代替清单，也不能把多个平台对象合成一项。
 
 ## 6. 事实源与修改边界
 
@@ -102,7 +104,9 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 - 标准 Java：目标模块可行的编译、单元/集成测试或仓库约定的定向检查；无法构建时记录具体原因和未验证范围。
 - Marmot JavaScript：`node --check`、入口/运行时兼容检查、`check_marmot_script_static`；有 `error` 不交付，`warning` 修正或在门禁中解释。
+- CodeBlock：按其真实入口/导出约定执行 JavaScript 和调用契约检查，并核实引用关系。
 - QueryBlock：检查非空、占位符闭合、参数契约以及只读/写入意图；需要真实结构时做只读核实。
+- Constant 与配置资源：检查编码、租户、版本、非秘密字段和引用；秘密值不得进入模型上下文或本地产物。
 - 平台 Debug：只有用户要求运行/调试、目标是 DEV 且 Input 有效时才执行。使用未保存源码；Debug 不持久化，但脚本本身可能产生业务副作用。
 - 真实 trace：必须同时有 `trace_id + from_time + to_time` 才调用 `query_script_trace`；缺时间范围只标记待补，不得结论化为“没有日志”。
 

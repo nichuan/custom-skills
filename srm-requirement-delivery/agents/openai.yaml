@@ -1,6 +1,6 @@
 interface:
   display_name: "SRM 标准与纯二开需求交付"
-  short_description: "交付标准业务、扩展点与 Marmot 脚本需求"
+  short_description: "交付标准业务、扩展点与 Marmot 脚本/资源需求"
   default_prompt: "使用 $srm-requirement-delivery 判定需求模式，并完成对应的标准源码或 Marmot 产物、验证与交付。"
 dependencies:
   tools:
