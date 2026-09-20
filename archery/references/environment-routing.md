@@ -11,7 +11,7 @@ cn:
   dev       -> SAAS-SRM-DEV数据库
   test      -> SAAS-SRM-TEST数据库
 aws:
-  aws / aws-prod -> JP-SaaS-1-Prod-RW-8.0
+  aws -> JP-SaaS-1-Prod-RW-8.0
 default_site = cn, default_db = srm
 ```
 

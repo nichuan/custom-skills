@@ -35,7 +35,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 ### 铁律 1：实例必须用别名，site 必传
 
 - `site` 只能是 `cn` / `aws`。
-- `instance` **必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`；`aws-prod` 是指向同一读写实例的遗留别名，未在文档主推），**严禁直传真实实例名**（如 `SAAS-SRM-PROD数据库`）。真实名由别名自动转换。
+- `instance` **必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直传真实实例名**（如 `SAAS-SRM-PROD数据库`）。真实名由别名自动转换；AWS 当前只有 `aws` 正式实例别名。
 - `archery_list_instances` 明确警告：**只传 instance 不传 site 会按默认 `site=cn` 解析而报「未关联该实例」**。因此 `aws` 实例务必带 `site="aws"`。
 
 ### 铁律 2：环境选择——查询默认 prod，修改必确认
@@ -61,8 +61,8 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 ### 铁律 4：查询/修改分离，Agent 不直接写库
 
 - `archery_query` 仅执行**只读** SQL（单条基础 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE）。
-- 不支持其它 SHOW/DESC、WITH、多语句、注释、函数/子查询、窗口函数、集合运算或任何写入语法。
-- 校验器同样拒绝**一切函数调用**（含 `COUNT(*)`、`IFNULL` 等无副作用函数）。需要影响行数时：用有界 `SELECT`（带 LIMIT）抽样确认，并把含 `COUNT` 的核查 SQL 写进交付物交用户人工执行；不得因函数被拒而改用无界查询或省略行数确认。
+- 不支持其它 SHOW/DESC、WITH、多语句、注释、子查询、窗口函数、集合运算或任何写入语法；括号只允许白名单无副作用函数。
+- 当前函数白名单仅为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数、函数之外的括号结构和嵌套子查询一律拒绝。需要影响行数时优先使用有界 `COUNT(*)`，仍须关注查询条件与数据库权限。
 - 表结构/字段请使用专用 `archery_describe_table` / `archery_list_columns`，不要拿 `archery_query` 跑 DDL。
 - 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能**生成 SQL 后交用户人工确认执行**，Agent 不直接执行写操作。
 
