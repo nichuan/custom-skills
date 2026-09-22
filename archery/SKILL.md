@@ -60,9 +60,9 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 
 ### 铁律 4：查询/修改分离，Agent 不直接写库
 
-- `archery_query` 仅执行**只读** SQL（单条基础 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE）。
-- 不支持其它 SHOW/DESC、WITH、多语句、注释、子查询、窗口函数、集合运算或任何写入语法；括号只允许白名单无副作用函数。
-- 当前函数白名单仅为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数、函数之外的括号结构和嵌套子查询一律拒绝。需要影响行数时优先使用有界 `COUNT(*)`，仍须关注查询条件与数据库权限。
+- `archery_query` 仅执行**只读** SQL（单条 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE），SELECT 可使用 `CASE WHEN ... THEN ... ELSE ... END` 表达式和 `IN (...)` / `NOT IN (...)` 值列表。
+- 不支持其它 SHOW/DESC、WITH、多语句、注释、子查询、窗口函数、集合运算或任何写入语法；括号只允许白名单无副作用函数及 `IN` 值列表。
+- 当前函数白名单仅为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数、任意分组括号和嵌套子查询一律拒绝。需要影响行数时优先使用有界 `COUNT(*)`，仍须关注查询条件与数据库权限。
 - 表结构/字段请使用专用 `archery_describe_table` / `archery_list_columns`，不要拿 `archery_query` 跑 DDL。
 - 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能**生成 SQL 后交用户人工确认执行**，Agent 不直接执行写操作。
 
@@ -112,7 +112,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 | 401 / 凭据缺失 | 凭据问题 | 提示检查 `.env` 的 `ARCHERY_*` 配置，不让用户贴密码 |
 | 「未关联该实例」 | 只传 instance 没传 site | 补 `site`（aws 实例必带 `site="aws"`） |
 | 库不存在 / 表不存在 | db/表名错 | 先 `archery_list_databases` 确认真实库；`archery_describe_table` 探测真实表 |
-| query 报语法不支持 | 用了 WITH/子查询/多语句/写入 | 改写为基础 SELECT；结构用 describe/list_columns |
+| query 报语法不支持 | 核对是否用了 WITH/子查询/多语句/写入；CASE 表达式和 IN 值列表受支持，若单独使用时仍被拒绝，说明当前 MCP runtime 可能未更新 | 合法只读语法可直接查询；结构用 describe/list_columns |
 | 空结果 | 条件/环境错 | 核对租户、环境、表名；先用 `hpfm_tenant` 缩小范围 |
 
 > **MCP 异常降级**：Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注真实值缺失、完成后提示能力缺失，**不得假装执行通过**。

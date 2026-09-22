@@ -170,7 +170,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
-- **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 仅接受单条基础 `SELECT`、`EXPLAIN SELECT`、`SHOW CREATE TABLE` 及 `COUNT/SUM/AVG/MIN/MAX/IFNULL/NULLIF/CONCAT/CONCAT_WS/CAST` 白名单函数；不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、子查询、窗口函数或集合运算；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
+- **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 接受单条 `SELECT`、`EXPLAIN SELECT`、`SHOW CREATE TABLE`，SELECT 支持 `CASE WHEN` 和 `IN (...)` / `NOT IN (...)` 值列表，以及 `COUNT/SUM/AVG/MIN/MAX/IFNULL/NULLIF/CONCAT/CONCAT_WS/CAST` 白名单函数；不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、子查询、窗口函数或集合运算；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
 - **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；独立脚本宽表按 `table_code + value2`（value2=租户编码，tenant_id 恒为 0）；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
 - **明确 WHERE + LIMIT**（≤100）：禁止 `SELECT *`、无 WHERE、无 LIMIT、全表扫描。
 - **索引意识**：优先命中以 `tenant_id` 打头的联合索引；不在索引列套函数/隐式转换；避免前置 `%` 模糊；大表叠加时间范围。
