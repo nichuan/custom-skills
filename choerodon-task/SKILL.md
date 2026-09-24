@@ -1,6 +1,6 @@
 ---
 name: choerodon-task
-description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。SRM 标准或纯二开需求开发使用 srm-requirement-delivery。
+description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；经明确授权可新增、编辑或删除评论。SRM 标准或纯二开需求开发使用 srm-requirement-delivery。
 ---
 
 # 猪齿鱼任务查询助手（choerodon-task）
@@ -18,7 +18,7 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 3. **理上下文**：把任务关联的业务信息（项目、租户、模块、状态、附件、关联人）梳理清楚。
 4. **给出后续入口**：当查询结果指向需求开发、排障或 SQL 时，保留已查上下文并明确应由哪个专项 Skill 继续。运行时没有动态 Skill 加载工具时，不得构造 `use_skill` 调用。
 
-> 默认只做只读查询。唯一写能力是用户明确要求、预览并确认后的 `choerodon_add_comment`；改状态、改业务数据、生成修复 SQL和定位代码根因仍必须路由到对应技能。
+> 默认只做只读查询。评论的新增、编辑和删除须有针对目标与最终内容的明确授权；改状态、改业务数据、生成修复 SQL和定位代码根因仍必须路由到对应技能。
 
 ---
 
@@ -38,7 +38,11 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 | `choerodon_list_issue` | 按关键词/经办人/状态列 issue | `assignee`/`status` 传**名称字符串**，内部自动转 id；`keyword` 为空则按过滤条件列 |
 | `choerodon_search_users` | 按关键字搜成员，拿真实 `id`/`realName`/`loginName` | 拿到真实身份后再用于其它工具 |
 | `choerodon_get_status_map` | 取状态名→加密 id 映射 | 用于理解任务状态流转 |
-| `choerodon_list_comments` | 读任务评论 | 先用真实 `issue_id`；开发或排障前读取已有结论 |
+| `choerodon_list_comments` | 读任务评论及 `commentId`、`objectVersionNumber` | 先用真实 `issue_id`；编辑前取得当前版本 |
+| `choerodon_preview_comment` | 离线预览完整 Markdown 与实际将提交的 HTML | 确认前展示完整内容，不能只给摘要 |
+| `choerodon_add_comment` | 新增本人评论 | 传完整 Markdown 正文；写前展示最终内容 |
+| `choerodon_update_comment` | 编辑本人评论 | 传真实 `issue_id`、`comment_id`、当前 `object_version_number` 和完整 Markdown 正文 |
+| `choerodon_delete_comment` | 删除本人评论 | 传真实 `issue_id`、`comment_id`、当前 `object_version_number`；先确认目标评论身份 |
 | `choerodon_list_attachments` | 列某任务附件 | `issue_id` 为加密 id |
 | `choerodon_download_attachment` | 取附件签名下载地址 | 参数是附件的 `file_url`（来自 `list_attachments` 返回），**不是** attachment_id |
 
@@ -134,8 +138,9 @@ description: 猪齿鱼（Choerodon）跨项目协作任务查询助手。用于�
 
 - **只读为主**：本 Skill 定位**只读查询**，不得擅自改猪齿鱼状态/数据，也不得绕过 MCP 直接写猪齿鱼/业务库。
 - **评论区即排查资产**：处理任务/缺陷前用 `choerodon_list_comments`（只读）查看已有评论——历史排查结论、traceId、修复方案常沉淀在评论区，先看评论可避免重复排查；路由到其他技能时把评论中的关键线索一并传递。
-- **写评论例外（有明确工具）**：zhenyun-pangu-mcp 提供 `choerodon_add_comment`（写接口，有副作用）。**仅当用户明确要求"把内容写到猪齿鱼评论区"时才可使用**，且必须先展示内容向用户确认、确认后再写入。日常查询/排查流程中**不得**自动调用它。
-- **评论格式**：用 `choerodon_add_comment` 写评论时，`comment` **必须是规范 Markdown**（建议包含标题、列表、引用、代码块或加粗/行内代码），由工具自动转 HTML 在评论区展示；不得传纯文本、原始 HTML、未闭合代码块或混合 HTML/Markdown。
+- **受控评论**：`choerodon_add_comment`、`choerodon_update_comment` 和 `choerodon_delete_comment` 均有真实副作用。用户明确要求对应动作时，先读取目标任务和评论；新增/编辑先用 `choerodon_preview_comment` 渲染并展示将实际写入的**完整正文**（含全部 SQL），删除则展示待删除评论全文、ID 与版本；获得针对最终内容的确认后调用。已有明确、同范围授权不重复询问。日常查询/排查中不得自动写评论。
+- **编辑与删除**：编辑先从 `choerodon_list_comments` 读取目标评论的 `commentId`、版本与正文，按该版本提交；冲突时重新读取、重新预览，不自动覆盖。删除先核对目标评论属于该任务，明确授权后提交；写后回读确认。接口仅操作本人评论，服务端权限仍为最终边界。
+- **评论格式与 SQL 检查**：新增/编辑的 `comment` 必须是规范 Markdown，由工具转 HTML；不得传原始 HTML、未闭合代码块或混合格式。若评论提供数据修复 SQL，正文必须包含完整预查、UPDATE、更新后核验；按对应 SQL Skill 检查每条写入条件、字段和值，并与最终回复、模板所用同一份 SQL 正文逐字核对。预览必须展示完整最终评论和 SQL，不得只展示摘要。
 - **参数真实**：项目 id、任务号、经办人 id 必须来自猪齿鱼真实返回，严禁编造 `project_id` 或 `issue_id`。
 - **项目上下文固定**：未指定项目时走 `project_id=58`（正式）；指定其它项目先解析并在整条调用链显式传参，不得静默回退默认项目。
 - **凭据不外泄**：输出中绝不展示 `CHOERODON_PASSWORD` 或 `access_token`，必要时写 `****`。

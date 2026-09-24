@@ -1,6 +1,6 @@
 {
   "name": "ssrc-sql-generator",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "生成或核实 SRM 采购寻源域（询价、招标、报价、评分、资格预审、寻源结果、征询单）的查询与数据修复 SQL。使用只读 MCP 验证必要的表、字段和真实值；不直接执行写 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "graded_validation": "分级校验：已验证模板/语义层明确项免 MCP 校验提效，表名/字段名不明确必校验",
     "bid_rfx_terminology": "招标单(BID)与询价单(RFX)术语映射",
     "mcp_validation": "通过 zhenyun-pangu-mcp 校验表/字段真实存在，禁止编造",
-    "stepwise_execution": "按真实数据依赖执行只读查询；无依赖项并行或合并为有界 JOIN，异常回退占位符"
+    "stepwise_execution": "按真实数据依赖执行只读查询；无依赖项并行或合并为有界 JOIN，异常回退占位符",
+    "repair_package_check": "寻源 UPDATE WHERE 只用 tenant_id 与已核实主键；写入前检查预查、UPDATE、核验和评论/模板 SQL 正文一致"
   },
   "mcp_servers": [
     {
@@ -67,6 +68,6 @@
     "template_store": "supabase",
     "sql_templates_count": 30,
     "sql_examples_count": 1,
-    "last_updated": "2026-09-19"
+    "last_updated": "2026-09-24"
   }
 }

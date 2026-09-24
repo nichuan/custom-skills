@@ -32,11 +32,11 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 
 ## 铁律（踩坑总结，必须严格遵守）
 
-### 铁律 1：实例必须用别名，site 必传
+### 铁律 1：按目标站点选择实例
 
-- `site` 只能是 `cn` / `aws`。
-- `instance` **必须用别名**（`prod`/`prod-ro`/`aws`/`dev`/`test`），**严禁直传真实实例名**（如 `SAAS-SRM-PROD数据库`）。真实名由别名自动转换；AWS 当前只有 `aws` 正式实例别名。
-- `archery_list_instances` 明确警告：**只传 instance 不传 site 会按默认 `site=cn` 解析而报「未关联该实例」**。因此 `aws` 实例务必带 `site="aws"`。
+- `site` 支持 `cn` / `aws`，工具默认 `cn`；`instance` 省略时使用该站点配置的默认实例（当前 `cn` 默认生产）。只有目标是 AWS 或国内 dev/test/prod-ro 时才需要显式指定站点和实例。
+- 显式指定 `instance` 时使用 `archery_list_instances` 返回的别名（`prod`/`prod-ro`/`dev`/`test`/`aws`），不要自行拼真实实例名。真实实例名由 MCP 配置映射。
+- AWS 查询必须传 `site="aws", instance="aws"`；只传 `instance="aws"` 会沿用默认 `site="cn"` 并报站点不匹配。
 
 ### 铁律 2：环境选择——查询默认 prod，修改必确认
 
@@ -50,7 +50,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 
 - **查询类**：不提环境可默认 `cn`/`prod`。
 - **修改类（数据修复、生产写操作）**：**必须明确目标环境 + 目标租户 + 影响范围（用户或前序已明确则复用，不重复询问）**，不得因「默认 prod」就直接执行/生成。拿不准先问清。
-- 用户只要提到**非生产环境**，必须显式传 `site`+`instance`，否则会误查/误改生产。
+- 用户只要提到**非默认环境**（AWS、dev、test 或 prod-ro），必须显式传 `site`+`instance`，否则会落到默认 cn 生产。
 
 ### 铁律 3：库名以实测为准，默认 `srm`，跨库显式带库名
 

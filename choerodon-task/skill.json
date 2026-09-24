@@ -1,7 +1,7 @@
 {
   "name": "choerodon-task",
-  "version": "1.2.2",
-  "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；仅在用户明确要求并确认评论内容后允许新增评论。SRM 标准或纯二开需求开发使用 srm-requirement-delivery。",
+  "version": "1.3.0",
+  "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手。用于定位可访问项目并按任务号、经办人、关键词或状态查询 issue、评论、状态和附件；经明确授权可新增、编辑或删除评论。SRM 标准或纯二开需求开发使用 srm-requirement-delivery。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -20,7 +20,7 @@
     "status_map": "取状态名→加密 id 映射，理解状态流转",
     "attachments": "列附件并取签名下载地址",
     "read_mostly": "默认只读查询；不改任务状态或业务库",
-    "controlled_comment": "仅在用户明确要求、预览并确认内容后调用 choerodon_add_comment",
+    "controlled_comment": "明确授权后新增、按当前版本编辑或删除本人评论；预览完整最终内容并回读",
     "route_on_action": "SRM 标准或纯二开需求开发交给 srm-requirement-delivery；排障和 SQL 交给对应专项 Skill"
   },
   "mcp_servers": [
@@ -34,12 +34,15 @@
         "choerodon_search_users",
         "choerodon_get_status_map",
         "choerodon_list_comments",
+        "choerodon_preview_comment",
         "choerodon_list_attachments",
         "choerodon_download_attachment",
         "choerodon_add_comment",
+        "choerodon_update_comment",
+        "choerodon_delete_comment",
         "get_workflow_guide"
       ],
-      "description": "猪齿鱼协作平台：可访问项目发现、跨项目任务/issue 查询、成员搜索、状态映射、评论与附件读取；Token 由 .env 凭据登录获取，带缓存与失效重登。注意：choerodon_add_comment 是唯一写操作（写评论区，需先向用户确认内容，comment 必须为规范 Markdown），其余均为只读查询"
+      "description": "猪齿鱼协作平台：项目与任务查询、评论和附件读取；Token 由 .env 凭据登录获取。评论新增、按版本编辑和删除均为写操作，须明确授权并预览完整内容；其余工具为只读查询"
     }
   ],
   "entry_point": "SKILL.md",
@@ -53,6 +56,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-20"
+    "last_updated": "2026-09-24"
   }
 }

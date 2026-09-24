@@ -55,8 +55,8 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 - 任何写入前必须保留对应 `SELECT` 核查（见 §6）。
 
 ### 2.4 写操作安全
-- UPDATE/DELETE 必须用主键或唯一业务键（如 `rfx_header_id`）定位，**严禁无 WHERE 或仅凭名称更新**。
-- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足：天工寻源域**不自添** `last_update_date`/`last_update_by`（盘古履约域的团队惯例相反、固定附加 `last_update_date = now()`，见 `spuc-sql-generator`；两域约定各自独立，勿跨域套用），WHERE 使用 `tenant_id` + 主键，并补已核实的旧状态/版本条件以防覆盖并发修改。
+- UPDATE 必须先从查询结果取得并核实目标表主键；`UPDATE WHERE` **只允许** `tenant_id = ... AND <该表主键> = ...` 两个等值条件。单据号、轮次、供应商、旧状态、版本及关联字段仅用于更新前的关联查询和预查断言，不进入 `UPDATE WHERE`。DELETE 另按其具体场景核实唯一定位与影响范围。
+- 生成写 SQL 时仅修复用户要求的字段，不画蛇添足：天工寻源域**不自添** `last_update_date`/`last_update_by`（盘古履约域的团队惯例相反、固定附加 `last_update_date = now()`，见 `spuc-sql-generator`；两域约定各自独立，勿跨域套用）。
 - 输出用 `<...>` 占位符，附「替换为真实值的方法」。
 
 ### 2.5 环境选择（查询默认 / 修改必确认）
@@ -82,7 +82,7 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 默认先用 `search_sql_templates(..., use_semantic=false, verified_only=true, limit=3)` 做快速关键词检索；只有关键词未命中且任务复杂、历史方案明显有价值时才启用语义检索。数据修复任务进入 §5 `execution_flow`，但相邻步骤若无数据依赖，可合并为一条只读 JOIN 或并行查询，同时保留各项 ASSERT。
 
-每轮结果已足够回答核心请求时立即停止；不要为了走完整流程重复查询同一事实。只有新颖、已验证且可复用的方案才在交付后询问是否沉淀模板。
+每轮结果已足够回答核心请求时立即停止；不要为了走完整流程重复查询同一事实。只有新颖且可复用的方案才在交付后考虑沉淀模板；未验证效果的方案仅可存为草稿。
 
 ---
 
@@ -135,13 +135,17 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 
 ## 6. SQL 输出规范
 
-修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。UPDATE/DELETE 的核查 SELECT 与写 SQL 保持相同 WHERE，并使用已读取的旧状态/版本；执行前重新核查，数据变化则重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
+修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。查询可用租户、单据、轮次、供应商等关联条件定位；取得目标表主键后，每条 UPDATE 只按 `tenant_id + 主键` 更新。旧状态/版本及关联关系通过更新前 SELECT 核查，执行前重新核查；数据变化则停止并重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
 
 > 仅适用于含 INSERT / UPDATE / DELETE 的输出。**纯查询类 SQL 不受此约束。**
 
-- **原始数据核查 SELECT（必须）**：每条 UPDATE/DELETE 之前，保留一段 WHERE 条件完全一致的 `SELECT`，标注「预期影响 N 行」，供人工提交前确认。`archery_query` 取数过程中用到的核查 SELECT 应原样保留。
+- **原始数据核查 SELECT（必须）**：每条 UPDATE 前先按同一 `tenant_id + 主键` 选出目标行，并在 SELECT 的结果/断言中核对已读旧状态、版本、单据归属和目标值；关联定位查询也原样保留。预查须注明「预期影响 N 行」，与更新主键集合一一对应。不要把预查的附加过滤条件复制进 UPDATE。DELETE 按其场景单独核查定位与影响范围。
 - **执行后校验 SELECT（必须）**：更新/删除后附 `SELECT` 校验（如「预期 0 行」「预期状态=目标值」）。
+- **单一 SQL 正文与写入前检查**：生成一次含关联定位、逐条预查、UPDATE、更新后核验的完整 SQL 正文；最终回复、工单评论中的 SQL 代码块和模板 `sql_text` 复用该正文，不分别改写。保存评论/模板前检查：评论正文确实含完整预查与 UPDATE；逐条核对 UPDATE WHERE 只有已核实的 `tenant_id` 和该表主键；SQL 字段、旧值、新值及行数与本次只读证据一致；模板未经过实际执行、修复效果及 MQ 重算验证时保持 `status=draft`、`verified=false`。需要脱敏参数化时先形成参数化源稿，三处均使用同一文本；本次真实值另列参数绑定及核验记录，不独立改写 SQL。
+- **可复跑检查**：简单单表 UPDATE 修复包在写评论/模板前运行 [check_repair_package.py](scripts/check_repair_package.py)。输入 JSON 包含 `sql`、`comment`（完整 Markdown）、`template_sql` 和按 UPDATE 顺序列出的 `verified_updates`；每项填写已核实的 `table`、`primary_key`、`tenant_id`、`primary_key_value`、`set`（SQL 字面值）。脚本检查全文一致、预查/更新/核验齐全及 UPDATE WHERE；[验收样例](tests/test_repair_package.py)覆盖关联查询多条件但 UPDATE 仅用租户与主键。复杂语法无法解析时须人工逐条核对，不得把脚本通过当作数据库事实验证。
 - **禁止包含**：执行前备份（`CREATE TABLE bak_xxx AS SELECT`）、回滚方案（`INSERT INTO ... SELECT * FROM bak_xxx`）。生产修复以「先 SELECT 核查 → 人工确认 → 事务/可控提交」为准。
+
+验收样例：关联查询可按 `tenant_id`、`rfx_header_id`、轮次和供应商定位报价行，并提取真实 `<quote_id>`；预查按 `tenant_id + quote_id` 读取旧无效标识、版本及归属；`UPDATE <报价表> SET <无效标识字段> = <目标值> WHERE tenant_id = <已核实租户ID> AND <报价表主键> = <quote_id>;`。任何把 `rfx_header_id`、轮次、供应商、旧无效标识或版本放入此 UPDATE WHERE 的方案均不通过检查。
 
 ---
 
@@ -168,10 +172,10 @@ SRM 是强多租户系统，几乎所有业务表都含 `tenant_id`。生成的 
 > 字段级结构（字段名/类型/注释/索引）一律走 Archery 实时获取，不在此列文件内。模板库已迁移 DB（zhenyun-pangu-mcp 认知层）。
 
 ### 模板沉淀（生成后）
-仅对新颖、已验证且可复用的方案准备沉淀内容；未获相应授权时再询问，授权后 `save_sql_template`：
+仅对新颖且可复用的方案准备沉淀内容；未获相应授权时再询问，授权后 `save_sql_template`。未完成实际修复与效果验证的方案只可存为草稿、未验证：
 - `title`/`category`/`scenario`/`sql_text`（保留 `<...>`/`{...}` 占位符原样）；
 - `keywords`/`core_tables` 便于检索；`system` 标注所属系统（天工/盘古）；
-- `verified`：结构、适用前提和方案效果均有验证证据才置 `true`；仅验证字段或仅生成写 SQL 时保持 `false`，在说明中记录部分验证；
+- `verified`：结构、适用前提和方案效果均有验证证据才置 `true`；仅验证字段、生成写 SQL 或只核查更新前数据时保持 `false`。依赖 MQ 重算的方案须有实际修复回执、MQ 重推与重算后核验结果，才可认定效果已验证；
 - `status`：默认 `draft`，可用 `draft/verified/trusted/deprecated`；
 - `risk_level`：只读查询=`LOW`、单条修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`；
 - `business_domain`：如 `采购寻源`；`system`：`天工`/`盘古`；
