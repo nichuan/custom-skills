@@ -148,6 +148,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - 无 traceId 时，日志关键字只能来自用户明确提供的文本或目标脚本中的真实日志字面量；禁止猜测异常文案、类名或近义词后连续试搜。
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
+- SLS 结果的 `meta.complete`（`obs_sls_query`）或 `complete`（`query_script_trace`）为 `false` 时，本次日志可能截断；不要据此断定某阶段或某条响应不存在。只有缺失部分会影响当前结论时，缩小时间窗或加精确过滤再查一次。
 - 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
 ### 代码与数据库脚本
