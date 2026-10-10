@@ -16,7 +16,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 ## 重要提示（必读）
 
 1. **多租户隔离**：几乎所有业务表都含 `tenant_id` 字段。**生成的 SQL 必须包含 `tenant_id` 条件**（除非明确说明是跨租户巡检/监控查询），否则会误改/误查其他租户的数据。
-2. **环境与范围**：只有未指定环境的只读查询可默认 `cn/prod`；修复必须明确环境、租户和影响范围，已有明确上下文直接复用。写 SQL 只生成交人工执行，先用 `SELECT` 核查；未知值使用占位符并标注未验证。
+2. **环境与范围**：只有未指定环境的只读查询可默认 `cn/prod`；修复必须明确环境、租户和影响范围，已有明确上下文直接复用。写 SQL 生成后交人工执行；用户明确要求提交 Archery 数据修复工单时，按 `archery` Skill 先校验纯 DML，再提交审批工单，工单提交不等于执行。先用 `SELECT` 核查；未知值使用占位符并标注未验证。
 3. **跨库注意**：发货工作台表在 **`srm_logistics_delivery`** 库（`slod_*`），其余（订单/收货/老送货/主数据）在 **`srm`** 库。跨库 JOIN 时表名必须带库名前缀（如 `srm_logistics_delivery.slod_asn_line`、`srm.sinv_rcv_trx_line`）。
 4. **结构事实走 MCP**：表的字段名、类型、注释、拓展字段、索引等**不再本地维护**，一律通过 `zhenyun-pangu-mcp` 的 `archery_describe_table` / `archery_list_columns` 实时获取；本地文件只沉淀数据库拿不到或高频易错的**业务语义**（见「参考文件指引」）。
 5. **禁止编造**：不确定的表名、字段名、状态值、枚举值，必须调 MCP 验证或查询真实数据，**绝不凭记忆臆造**。
@@ -140,7 +140,7 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
   - `status`：模板状态，默认 `draft`，可用 `draft/verified/trusted/deprecated`。
   - `risk_level`：按影响面判定——只读查询=`LOW`、单条数据修复=`MEDIUM`、批量 `UPDATE`=`HIGH`、批量 `DELETE`=`CRITICAL`。
   - `business_domain`：`盘古订单履约`；`system`：`盘古`；`execution_policy`：写操作执行策略说明；`parameters`：参数 JSON 对象字符串。
-- 排障类按需补充 `problem_description`、`symptom`、`root_cause`、`preconditions`、`diagnosis_steps`、`verify_sql`；只有确有安全回滚方案时才写 `rollback_sql`。
+- 排障类按需补充 `problem_description`、`symptom`、`root_cause`、`preconditions`、`diagnosis_steps`、`verify_sql`；本次 SQL 产物不额外生成 `rollback_sql`。
 - 复用模板生成后调用 `record_template_usage(id)`。
 
 ### 去重
@@ -174,14 +174,14 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 
 1. **多租户强制**：业务 SQL 必须带 `tenant_id`（跨租户巡检除外，需显式说明）。
 2. **主键优先**：UPDATE/DELETE 必须用主键或唯一业务键（如 `po_header_id`、`rcv_trx_line_id`）定位，**严禁无 WHERE 或仅凭编号模糊更新**。
-3. **先查后改**：任何写入前必须保留对应 `SELECT` 核查原数据，必要时加 `LIMIT`/事务。
+3. **先查后改**：任何写入前必须保留对应 `SELECT` 核查原数据；有必要时给查询加 `LIMIT`，但不能从截断结果推断完整影响范围。
 4. **乐观锁**：`sodr_*` 表 UPDATE 按业务规则递增 `object_version_number`，WHERE 同时带本次读取的旧版本。
 5. **占位符规范**：输出 SQL 用 `<...>` 标注待替换值并说明替换方法。
 6. **目标明确**：修复不默认生产；输出目标环境与查询时间，执行前重新核查影响范围。
 
 ## SQL 输出格式规范（写入类操作）
 
-修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。UPDATE/DELETE 的核查 SELECT 与写 SQL 保持相同 WHERE，并使用已读取的旧状态/版本；执行前重新核查，数据变化则重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
+修复输出须附目标环境、租户、核验时间、修复原因与目标不变量。SQL 代码块只放必要的简短注释、定位与前后核验 `SELECT`，以及本次需要的 `UPDATE`/`DELETE`/`INSERT`；不附事务控制、备份、回滚、DDL 或会话设置语句。预期影响行数须来自未截断的结果；无法确认完整范围就停止可执行批量方案。UPDATE/DELETE 的核查 SELECT 与写 SQL 保持相同 WHERE，并使用已读取的旧状态/版本；执行前重新核查，数据变化则重新评估。INSERT 核实目标缺失、唯一性和引用完整性。只生成 SQL 不代表已修复，需人工执行回执与执行后校验结果。
 
 > 仅适用于含 INSERT / UPDATE / DELETE 的输出。**纯查询类 SQL 不受此约束。**
 
@@ -210,8 +210,8 @@ description: 生成或核实 SRM 订单履约域（订单、收货、发货、�
 - 更新/删除后附一段 `SELECT` 校验结果（如「预期状态 = 目标值」「预期 0 行」）。
 
 ### ❌ 禁止包含
-- **执行前备份**：不得输出 `CREATE TABLE bak_xxx AS SELECT ...`。
-- **回滚方案**：不得输出回滚段；生产修复以「先 SELECT 核查 → 人工确认 → 可控提交」为准。
+- `BEGIN`、`START TRANSACTION`、`COMMIT`、`ROLLBACK`、`SAVEPOINT`、`SET autocommit` 等事务控制语句。
+- `CREATE TABLE bak_xxx AS SELECT` 等备份语句、回滚 SQL 及其它非必要语句。历史模板若带这些内容，复用业务条件与核查步骤时须删去，不原样输出。
 
 ## 附录：Archery 调用速记
 

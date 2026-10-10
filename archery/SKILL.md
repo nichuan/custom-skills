@@ -1,9 +1,9 @@
 ---
 name: archery
-description: 只读访问 Archery，负责选择 site/instance/db、查询真实数据与表结构并安全降级。数据修复只生成写 SQL交用户确认，不直接写库。
+description: 使用 Archery 查询真实数据与表结构，并在用户明确要求时校验和提交数据修复 SQL 审批工单；不直接执行写 SQL。
 ---
 
-# Archery 数据库查询助手（统一数据访问层）
+# Archery 数据查询与修复工单助手
 
 ## 跨流程协作（按需）
 
@@ -15,6 +15,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 - 某个环境/业务应该用哪个 `site` + `instance`？真实实例名是什么？
 - 某实例下有哪些库？某个表/业务属于哪个库（跨库怎么写）？
 - 怎样调用 `archery_query` / `archery_describe_table` / `archery_list_columns` / `archery_list_databases` / `archery_list_instances` / `archery_query_tenant`？
+- 用户明确要求提交数据修复工单时，怎样先校验纯 DML，再提交审批工单？
 - 查询失败/异常时如何降级？
 
 它**不生成业务 SQL**（交给 `ssrc-sql-generator` / `spuc-sql-generator`），**不做故障根因分析**（交给 `java-troubleshoot`）。本 Skill 只描述"怎么查、往哪查"。
@@ -38,7 +39,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 - 显式指定 `instance` 时使用 `archery_list_instances` 返回的别名（`prod`/`prod-ro`/`dev`/`test`/`aws`），不要自行拼真实实例名。真实实例名由 MCP 配置映射。
 - AWS 查询必须传 `site="aws", instance="aws"`；只传 `instance="aws"` 会沿用默认 `site="cn"` 并报站点不匹配。
 
-### 铁律 2：环境选择——查询默认 prod，修改必确认
+### 铁律 2：环境选择——查询可默认 prod，修复需明确范围
 
 | 用户说 | 传 `site` / `instance` | 真实实例 |
 |--------|------------------------|----------|
@@ -49,7 +50,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 | 「aws」/ 海外站点 | `aws` / `aws` | `JP-SaaS-1-Prod-RW-8.0` |
 
 - **查询类**：不提环境可默认 `cn`/`prod`。
-- **修改类（数据修复、生产写操作）**：**必须明确目标环境 + 目标租户 + 影响范围（用户或前序已明确则复用，不重复询问）**，不得因「默认 prod」就直接执行/生成。拿不准先问清。
+- **数据修复 SQL**：必须明确目标环境、租户和影响范围；可从用户请求、工单内容及实时查询确定，已确定就直接核验并生成，不因工单“待评审”或未再次口头确认而停下。仅凭查询的默认 `prod` 不可推定修复环境。确实无法定位或信息冲突时才询问；缺实时核验时可交付注明不可直接执行的占位符方案。
 - 用户只要提到**非默认环境**（AWS、dev、test 或 prod-ro），必须显式传 `site`+`instance`，否则会落到默认 cn 生产。
 
 ### 铁律 3：库名以实测为准，默认 `srm`，跨库显式带库名
@@ -60,11 +61,18 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 
 ### 铁律 4：查询/修改分离，Agent 不直接写库
 
-- `archery_query` 仅执行**只读** SQL（单条 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE），SELECT 可使用 `CASE WHEN ... THEN ... ELSE ... END` 表达式和 `IN (...)` / `NOT IN (...)` 值列表。
-- 不支持其它 SHOW/DESC、WITH、多语句、注释、子查询、窗口函数、集合运算或任何写入语法；括号只允许白名单无副作用函数及 `IN` 值列表。
-- 当前函数白名单仅为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数、任意分组括号和嵌套子查询一律拒绝。需要影响行数时优先使用有界 `COUNT(*)`，仍须关注查询条件与数据库权限。
+- `archery_query` 仅执行**只读** SQL（单条 SELECT / EXPLAIN SELECT / SHOW CREATE TABLE）；SELECT 支持 `CASE`、JOIN、EXISTS、派生表、IN 子查询、UNION 和普通前置 `/*Mapper.id*/` 标记，便于直接核对生产日志中的查询。
+- 不支持其它 SHOW/DESC、WITH、多语句、SQL 行注释、可执行注释、窗口函数或任何写入语法。函数白名单为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数一律拒绝。
+- 执行日志 SQL 前确认目标环境与租户，保留原查询的业务和权限条件；分析某条件的影响时仅做有界只读对照，不将去掉权限条件的结果当成正常接口结果。
 - 表结构/字段请使用专用 `archery_describe_table` / `archery_list_columns`，不要拿 `archery_query` 跑 DDL。
-- 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能**生成 SQL 后交用户人工确认执行**，Agent 不直接执行写操作。
+- 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能生成；`archery_query` 不执行写 SQL。用户明确要求提交修复工单时可使用下方两个工单工具，工单提交不等于数据库执行。
+
+### 数据修复工单：先校验，再提交
+
+- 仅当用户明确要求“提交数据修复工单”等动作时进入此流程；只要求生成、检查或评论 SQL 时不提交。目标 site、实例名称、库名、审批组名称、租户和影响范围须已有真实证据。用户或当前界面已给出审批组和实例名称时，先调用 `archery_resolve_workflow_target(group_name, instance_name, site)`，按当前账号可见的 SQL 上线选项解析数字 `group_id` 与 `instance_id`；工具必须返回名称的精确唯一匹配，不得按别名猜数字 ID。`workflow_name` 来自用户或工单上下文，缺失时询问。
+- 从最终修复 SQL 中提取实际要执行的 `INSERT`、`UPDATE`、`DELETE`，保持原顺序；预查/核验 `SELECT`、注释、事务控制、DDL 和其它语句均不传入工单工具。工具会拒绝混入的非 DML。提交前完成对应 SQL Skill 的只读核验与影响范围检查。
+- 用解析得到的数字 ID 调用 `archery_workflow_sqlcheck(sql_content=<纯DML>, site, instance_id, db_name)`。仅返回 `passed=true` 且有 `check_token` 时，使用同一 `site` 调用 `archery_submit_workflow(check_token, workflow_name, group_id, demand_url?, is_backup?)`；提交工具使用已校验的原文，不接收另一份 SQL。
+- 校验未通过就报告错误/警告，不提交。提交成功只报告实际返回的工单 ID，不声称已审批或执行。提交超时或返回结果不明时先在 Archery 按名称核对，不直接重试；凭证过期或已使用时重新校验。
 
 ---
 
@@ -84,8 +92,11 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 | `archery_list_columns(table, site, instance, db)` | 列字段名清单 | 生成 UPDATE/WHERE 前核对字段拼写 |
 | `archery_describe_table(table, site, instance, db)` | SHOW CREATE TABLE（结构+注释+索引） | 不确定字段/需完整结构时 |
 | `archery_list_instances(site?)` | `site` 留空返回全部，传 `cn`/`aws` 只返回该站点 | 拿不准实例名时先调 |
+| `archery_resolve_workflow_target(group_name, instance_name, site)` | 按当前账号 SQL 上线选项中的精确名称解析数字审批组和实例 ID；不创建工单、不执行 SQL | 提交审批时名称已确定但数字 ID 未知 |
 | `archery_list_databases(site, instance)` | 列出某实例下所有库 | 确认 `srm` / `srm_logistics_delivery` 等库名 |
 | `archery_query_tenant(tenant, site, instance, db)` | 按租户编码/名称反查 `tenant_id` | 生成 SQL 前确认真实租户，禁止硬编码 |
+| `archery_workflow_sqlcheck(sql_content, instance_id, db_name, site)` | 校验纯 DML，返回校验结果及一次性凭证 | 用户明确要求提交数据修复工单时先调；实例 ID 须已核实 |
+| `archery_submit_workflow(check_token, workflow_name, group_id, site, demand_url?, is_backup?)` | 创建 Archery 审批工单 | 上一步 `passed=true` 后调；不执行 SQL |
 
 **示例**：
 - 查 dev 采购订单：`archery_query(site="cn", instance="dev", db="srm", sql="<SQL>")`
@@ -112,7 +123,7 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 | 401 / 凭据缺失 | 凭据问题 | 提示检查 `.env` 的 `ARCHERY_*` 配置，不让用户贴密码 |
 | 「未关联该实例」 | 只传 instance 没传 site | 补 `site`（aws 实例必带 `site="aws"`） |
 | 库不存在 / 表不存在 | db/表名错 | 先 `archery_list_databases` 确认真实库；`archery_describe_table` 探测真实表 |
-| query 报语法不支持 | 核对是否用了 WITH/子查询/多语句/写入；CASE 表达式和 IN 值列表受支持，若单独使用时仍被拒绝，说明当前 MCP runtime 可能未更新 | 合法只读语法可直接查询；结构用 describe/list_columns |
+| query 报语法不支持 | 核对是否用了 WITH/多语句/写入/非白名单函数；安全的 EXISTS、派生表、IN 子查询与前置 Mapper 标记应受支持 | 若合法只读 SQL 仍被拒绝，检查 MCP runtime 是否已更新；结构用 describe/list_columns |
 | 空结果 | 条件/环境错 | 核对租户、环境、表名；先用 `hpfm_tenant` 缩小范围 |
 
 > **MCP 异常降级**：Archery 任一不可用，不阻塞主流程——跳过对应步骤、用占位符标注真实值缺失、完成后提示能力缺失，**不得假装执行通过**。
@@ -130,4 +141,4 @@ description: 只读访问 Archery，负责选择 site/instance/db、查询真实
 ## 安全检查
 
 - 凭据只由 MCP 从环境变量读取；输出不得展示密码 / Token / AccessKey，必要时写为 `****`。
-- 只读取数；不执行写入；写 SQL 生成后交用户人工确认。
+- 数据查询工具保持只读；工单提交仅创建审批工单，不直接执行写 SQL。

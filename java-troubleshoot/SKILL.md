@@ -138,7 +138,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 > 工具**真实参数 Schema 以 MCP 为唯一事实源**，严禁在本 Skill 猜测/重复定义。下面只写"何时用、怎么选、安全约束"。
 
-### 日志（zhenyun-pangu-mcp：obs_sls_query / obs_log_query / obs_log_trace）
+### 日志（zhenyun-pangu-mcp：obs_sls_query / query_sql_trace / obs_log_query / obs_log_trace）
 
 - **平台/数据源选择由 MCP 自动完成**，Skill 不接触 Project/Logstore/namespace/AccessKey（详见 `knowledge/environment/log-routing.md`）。
 - 路由原则速记：**国内公有云盘古 prod + 非生产 dev/test → 阿里云 SLS（`obs_sls_query`）；AWS 海外全部环境 → Loki（`obs_log_query`/`obs_log_trace`）**。默认 cn/盘古、默认非 aws。
@@ -149,6 +149,8 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 - Loki 的 traceId 直接按子串匹配（日志正文多为 `[abc]`），不要写死 `traceId=` 前缀；Loki 标签与 SLS 字段不要混用。
 - 首次 `limit` 给 100~200；Loki 的 query 必须带标签过滤（如 `{app="srm-gateway"}`），否则范围过大易超时。
 - SLS 结果的 `meta.complete`（`obs_sls_query`）或 `complete`（`query_script_trace`）为 `false` 时，本次日志可能截断；不要据此断定某阶段或某条响应不存在。只有缺失部分会影响当前结论时，缩小时间窗或加精确过滤再查一次。
+- 查询类接口出现“查不到数据”时，先从 trace 确认执行服务、Mapper 和实际行数；国内盘古 SQL 日志用 `query_sql_trace` 按 traceId、服务、精确时间窗提取完整 `sqlcontent`、`sqlparameters` 和 `<== Total`。`obs_sls_query` 的短 `clip_len` 只适合总览，不能据裁剪内容断言 SQL 不存在；按 trace 检索须覆盖独立的 `sqlcontent` / `sqlparameters` 字段。若 SQL 工具结果 `complete=false`，缩小窗口后再查。
+- 以实际执行 SQL 为准梳理 WHERE、JOIN、EXISTS、租户与权限条件，区分请求参数、服务端追加条件和排序分页。对候选单据按同一租户做有界只读验证：先核实基础业务条件，再核实权限表中的授权值与单据头/行的维度值；必要时比较保留/去掉单一条件的只读查询结果。日志的 `Total: 0` 可证明本次 Mapper 没返回行，不能单凭它证明哪一项谓词排除了记录。
 - 时间对不上时优先用 `time_range`（今天/昨天/最近3天 …）或让 `auto_expand` 自动扩窗，不要因 0 命中就判定"日志不存在"。
 
 ### 代码与数据库脚本
@@ -171,7 +173,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 
 ### 数据库（zhenyun-pangu-mcp：Archery 系列）
 
-- **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 接受单条 `SELECT`、`EXPLAIN SELECT`、`SHOW CREATE TABLE`，SELECT 支持 `CASE WHEN` 和 `IN (...)` / `NOT IN (...)` 值列表，以及 `COUNT/SUM/AVG/MIN/MAX/IFNULL/NULLIF/CONCAT/CONCAT_WS/CAST` 白名单函数；不支持其它 `SHOW/DESC`、`WITH`、多语句、注释、子查询、窗口函数或集合运算；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
+- **只读**：严禁 `UPDATE`/`DELETE`/`INSERT`/DDL。`archery_query` 接受单条 `SELECT`、`EXPLAIN SELECT`、`SHOW CREATE TABLE`；SELECT 可含普通前置 Mapper 标记、JOIN、EXISTS、派生表、IN 子查询、UNION、CASE 和白名单无副作用函数。仍拒绝其它 `SHOW/DESC`、`WITH`、多语句、可执行注释、窗口函数、非白名单函数和写入；查看表结构也可使用 `archery_describe_table` / `archery_list_columns`。
 - **tenant isolation**：每张业务表都必须带租户过滤（通常是 `tenant_id`；适配器脚本表用 `apply_tenant_num`；独立脚本宽表按 `table_code + value2`（value2=租户编码，tenant_id 恒为 0）；以 `archery_describe_table` 实际字段为准）。多表 JOIN 每张表各自带。
 - **明确 WHERE + LIMIT**（≤100）：禁止 `SELECT *`、无 WHERE、无 LIMIT、全表扫描。
 - **索引意识**：优先命中以 `tenant_id` 打头的联合索引；不在索引列套函数/隐式转换；避免前置 `%` 模糊；大表叠加时间范围。

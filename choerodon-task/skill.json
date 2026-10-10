@@ -20,7 +20,7 @@
     "status_map": "取状态名→加密 id 映射，理解状态流转",
     "attachments": "列附件并取签名下载地址",
     "read_mostly": "默认只读查询；不改任务状态或业务库",
-    "controlled_comment": "明确授权后新增、按当前版本编辑或删除本人评论；预览完整最终内容并回读",
+    "controlled_comment": "明确要求写入时核对目标、正文和重复评论后直接新增或编辑，写后回读；预览仅在用户要求时使用",
     "route_on_action": "SRM 标准或纯二开需求开发交给 srm-requirement-delivery；排障和 SQL 交给对应专项 Skill"
   },
   "mcp_servers": [
@@ -42,7 +42,7 @@
         "choerodon_delete_comment",
         "get_workflow_guide"
       ],
-      "description": "猪齿鱼协作平台：项目与任务查询、评论和附件读取；Token 由 .env 凭据登录获取。评论新增、按版本编辑和删除均为写操作，须明确授权并预览完整内容；其余工具为只读查询"
+      "description": "猪齿鱼协作平台：项目与任务查询、评论和附件读取；Token 由 .env 凭据登录获取。用户明确要求写入时，核对目标和正文后直接提交评论并回读，无须强制预览或再次确认；其余工具为只读查询"
     }
   ],
   "entry_point": "SKILL.md",

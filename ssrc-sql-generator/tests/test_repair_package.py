@@ -62,6 +62,13 @@ class RepairPackageTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SET 字段或值"):
             validator.validate(bad)
 
+    def test_rejects_transaction_and_backup_statements(self):
+        for extra in ("BEGIN;", "COMMIT;", "CREATE TABLE bak_quote AS SELECT * FROM ssrc_rfx_quote;"):
+            with self.subTest(extra=extra):
+                bad = package(extra + "\n" + package()["sql"])
+                with self.assertRaisesRegex(ValueError, "只允许 SELECT/UPDATE"):
+                    validator.validate(bad)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -28,7 +28,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 询价、招标、报价、评分、资格预审、寻源结果相关 SQL | `ssrc-sql-generator` |
 | 订单、收货、发货、送货单、状态机、委外相关 SQL | `spuc-sql-generator` |
 | 采购员工作台/角色工作台待办缺失或计数不对、整改模块单据/待办异常、卡片字段展示异常、超级搜索查不到单据、单据动态/关注异常、ES 权限或消费不一致 | `srm-workbench-bug-triage` |
-| 查实例/库/表结构/样本，或确认 Archery 环境映射 | `archery` |
+| 查实例/库/表结构/样本、确认 Archery 环境映射，或提交数据修复 SQL 审批工单 | `archery`；修复 SQL 先由对应领域 Skill 生成并核验 |
 | 查询、沉淀、修正、归档或删除盘古认知库知识 | `knowledge-governance` |
 | 只找类、DTO、方法、文件、适配器或独立脚本实现 | `gitlab-code` |
 
@@ -51,12 +51,12 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | --- | --- |
 | `srm-script-platform` | Script Platform 的权威当前态、历史需求号资产聚合发现、配置资源读取、未保存源码 DEV 调试及显式授权后的安全 CRUD、动作、保存和部署 |
 | `srm-requirement-delivery` | 交付标准业务、标准 Adapter/API 扩展点、Marmot 脚本、Independent 子类型及配套平台资源；已有脚本和历史需求增量局部修改走快捷路径 |
-| `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；仅在用户明确确认后新增评论 |
+| `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；用户明确要求写入且目标与内容可确定时直接新增或编辑评论 |
 | `java-troubleshoot` | Java 微服务日志、调用链、源码和数据的故障定位 |
 | `ssrc-sql-generator` | 采购寻源域查询/修复 SQL |
 | `spuc-sql-generator` | 订单履约域查询/修复 SQL |
 | `srm-workbench-bug-triage` | 采购员工作台（角色工作台）bug 排障：待办/关注/超级搜索/卡片/整改，内置两段式 ES 查询、权限维度模型与库路由 |
-| `archery` | 实例、库、表结构及数据的统一只读访问 |
+| `archery` | 实例、库、表结构及数据的统一只读访问；明确要求时校验并提交修复 SQL 审批工单 |
 | `knowledge-governance` | 盘古认知库的检索、沉淀、修正、归档与受控删除 |
 | `gitlab-code` | 本地源码、适配器脚本、独立脚本和已知 GitLab 路径的只读定位 |
 
@@ -74,6 +74,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 未保存源码 Debug 与受控保存 | Script Platform `*_debug` / `*_save` / `adapter_deploy` | `srm-script-platform`；写操作须两阶段人工确认 |
 | 平台配置与关系 | Script Platform `platform_resource_*` / `platform_definition_get` / `platform_relations_get` / `platform_api_point_list` | `srm-script-platform`；资源类型为封闭枚举，写入和动作须最新版本及两阶段人工确认 |
 | 数据与表结构 | `archery_*`、`search_tables`、`get_table*` | `archery` 和领域 SQL Skill；纯二开编码被具体字段阻塞时可只读核实 |
+| 数据修复工单 | `archery_workflow_sqlcheck` → `archery_submit_workflow` | `archery`；仅提交纯 DML 审批工单，不执行数据库写入 |
 | 日志 | `obs_sls_*`、`obs_log_*` | `java-troubleshoot` |
 | 脚本容器 trace 时间线 | Pangu `query_script_trace` | `java-troubleshoot`；按 traceId 汇总 `srm-script-container` 日志阶段 |
 | Marmot 静态检查 | Pangu `check_marmot_script_static` | `srm-requirement-delivery` 编码后调用；`srm-script-platform` 复用 |

@@ -82,6 +82,8 @@ def validate(package: dict) -> None:
     if len(blocks) != 1 or blocks[0].strip() != sql:
         raise ValueError("评论必须包含且只包含一份与最终 SQL 一致的完整 sql 代码块")
     statements = _statements(sql)
+    if any(not re.match(r"^(?:SELECT|UPDATE)\b", statement, re.I) for statement in statements):
+        raise ValueError("单表 UPDATE 修复包只允许 SELECT/UPDATE，不得混入事务、备份或其它语句")
     updates = [(index, _parse_update(statement)) for index, statement in enumerate(statements)
                if re.match(r"^UPDATE\b", statement, re.I)]
     evidence = package["verified_updates"]
