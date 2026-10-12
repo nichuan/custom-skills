@@ -43,7 +43,7 @@
 
 修复包包含原因与目标不变量、核查 SELECT、预期影响行数、修改 SQL、执行后校验 SELECT。SQL 代码块仅保留必要的简短注释、定位与核验 SELECT、目标 UPDATE/DELETE/INSERT；不输出 BEGIN/COMMIT 等事务控制、备份、回滚、DDL 或会话设置语句，历史模板中的此类语句也应删去。各业务域的写入条件以对应 SQL Skill 为准：采购寻源逐条 UPDATE WHERE 只用已核实的 `tenant_id + 目标表主键`，旧状态、版本和单据关联字段在预查中核对，不进入 UPDATE WHERE；盘古履约沿用其旧状态/版本条件。版本递增本身不防止覆盖并发修改。预期行数不能由 LIMIT 截断结果推断；无法证明完整范围时标未确认，停止生成可直接执行的批量修复。
 
-INSERT 需验证目标缺失、唯一性和引用完整性。任一断言不满足则停止相应修复；已达到目标状态则无需写入。业务写 SQL 不调用通用 SQL 查询工具执行；用户明确要求提交 Archery 数据修复工单时，从已核验的修复 SQL 中仅取 INSERT/UPDATE/DELETE，先调用 `archery_workflow_sqlcheck`，只有通过后才凭一次性 `check_token` 调用 `archery_submit_workflow`。提交审批工单不等于执行 SQL。SQL 文件标明目标环境与查询时间，执行前重跑核查；数据变化需重新核实。不得凭空生成备份表或声称可回滚；无已验证恢复依据时明确记录恢复限制。
+INSERT 需验证目标缺失、唯一性和引用完整性。任一断言不满足则停止相应修复；已达到目标状态则无需写入。业务写 SQL 不调用通用 SQL 查询工具执行；用户明确要求提交 Archery 数据修复工单时，先按用户/界面指定的名称调用 `archery_resolve_workflow_target` 取得当前账号可用的数字 `instance_id` 与 `group_id`，再从已核验的修复 SQL 中仅取 INSERT/UPDATE/DELETE 调用 `archery_workflow_sqlcheck`，只有通过后才凭一次性 `check_token` 调用 `archery_submit_workflow`。名称无精确且唯一匹配时停止，不猜 ID。提交审批工单不等于执行 SQL。SQL 文件标明目标环境与查询时间，执行前重跑核查；数据变化需重新核实。不得凭空生成备份表或声称可回滚；无已验证恢复依据时明确记录恢复限制。
 
 MCP 不可用时仍可交付带占位符的方案，并明确未验证与缺失断言；不把候选方案称作已修复。只有执行回执及执行后校验通过后才能报告修复成功。
 

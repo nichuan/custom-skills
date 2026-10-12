@@ -25,7 +25,7 @@
     "verified_resources": "封闭枚举覆盖 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等已验证平台资源",
     "historical_requirement_discovery": "按历史需求号一次聚合检索 Adapter、Independent、CodeBlock、QueryBlock、API 发布和改写候选，再精确读取当前对象",
     "safe_generic_write": "全部平台写工具强制两阶段人工确认；签名绑定精确参数且短时单次有效，同时保留封闭目标、版本校验与回读验证",
-    "automatic_auth": "复用未过期 Token；已知过期优先 refresh，opaque Token 仅在平台拒绝后自动登录并重试一次",
+    "automatic_auth": "复用未过期 Token；已知过期优先 refresh，opaque Token 被拒绝后恢复认证；仅已登记只读请求自动重试，写入和执行不重放",
     "secret_boundary": "Token 只报告脱敏元数据，常量秘密值不进入模型上下文"
   },
   "mcp_servers": [
@@ -46,6 +46,7 @@
         "platform_resource_get",
         "platform_definition_get",
         "platform_relations_get",
+        "platform_scheduled_script_inspect",
         "platform_api_point_list",
         "platform_resource_create",
         "platform_resource_save",

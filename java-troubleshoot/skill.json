@@ -65,7 +65,8 @@
         "choerodon_list_attachments",
         "choerodon_download_attachment",
         "get_workflow_guide",
-        "query_script_trace"
+        "query_script_trace",
+        "query_sql_trace"
       ],
       "description": "Pangu 统一 MCP：日志、Archery、本地代码、脚本身份发现、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
     },

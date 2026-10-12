@@ -32,6 +32,7 @@
         "archery_list_instances",
         "archery_query_tenant",
         "archery_workflow_sqlcheck",
+        "archery_resolve_workflow_target",
         "archery_submit_workflow",
         "get_workflow_guide"
       ],

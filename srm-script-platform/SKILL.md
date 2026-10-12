@@ -40,6 +40,7 @@ description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的�
 | 搜索/精确读取平台配置资源 | `platform_resource_search` / `platform_resource_get` |
 | 查看字段定义、动作元数据 | `platform_definition_get` |
 | 查脚本、CodeBlock、API 改写之间的引用关系 | `platform_relations_get` |
+| 精确核查同租户调度脚本与调度配置 | `platform_scheduled_script_inspect`（只读，不证明历史写入终态或运行结果） |
 | 查 API 前后置挂载点 | `platform_api_point_list` |
 | 用户明确要求新增/修改/删除平台配置 | `platform_resource_create` / `platform_resource_save` / `platform_resource_delete` |
 | 用户明确要求执行已登记表动作 | `platform_table_action` |
