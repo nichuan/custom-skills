@@ -167,6 +167,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
   - 有明确载体信号时只走对应工具链；拿不准但租户/服务/接口信息足以定位时，先按最强信号查一套，未命中或信号冲突再查另一套。不要机械地读取两套全部源码。
 - 为了获得日志关键字时，只从 `get` 返回的当前源码提取真实、稳定的日志字面量，不要把变量值或推测文案当关键字。
 - Script Platform MCP 已完成平台文本解码；禁止通过通用 SQL 把 Base64 正文返回给 Agent，也不要回退 Pangu 旧正文读取工具。
+- 日志已定位具体脚本并取得当前源码后，可按[Marmot 脚本审查](../marmotscript-js-check/SKILL.md)核对与本次失败相关的入口、调用契约和代码风险，复用当前 trace、身份与证据。静态发现是待验证线索，不能替代实际执行链、最后成功与首次失败的比较，也不能单独证明线上根因；不为审查重跑无关挂载或数据库查询。
 - 命中启用脚本时，以脚本实际逻辑为准。标准库只在验证入参、返回结构、执行入口或默认行为确有必要时作为对照；本地 Java 无命中不能作为“没有实现”的证据。
 - 本地代码报告路径与行号；平台脚本报告租户、运行服务、Header/Line 或 Record ID、`task_code`、版本、源码哈希和关键源码行号。精确 GitLab 读取才使用 `path_with_namespace@branch:file:line`。
 - 标准 vs 二开判定、适配器 JS、独立脚本、虚拟表机制见 `knowledge/architecture/standard-customization.md`、`knowledge/srm/adapter-js.md`、`knowledge/srm/standalone-script.md`、`knowledge/srm/virtual-table.md`。

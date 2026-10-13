@@ -1,6 +1,6 @@
 ---
 name: zhenyun-ops
-description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、脚本与平台配置查询/调试/受控写入、猪齿鱼查询、故障排查、工作台排障、SQL、数据库、认知库和代码定位；意图明确时直接使用对应子 Skill。
+description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法直接命中具体子 Skill 时使用。路由需求开发、Marmot 脚本静态审查与契约核对、平台配置查询/调试/受控写入、猪齿鱼查询、故障排查、工作台排障、SQL、数据库、认知库和代码定位；意图明确时直接使用对应子 Skill。
 ---
 
 # 甄云 SRM 全局路由
@@ -17,6 +17,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | 用户目标 | Skill |
 | --- | --- |
+| 只读审查 Marmot 脚本、checkJs 类型问题或调用契约风险，且无线上故障取证要求 | `marmotscript-js-check` |
 | 查询、读取、远程调试、保存或部署 Script Platform 脚本，或管理 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock 等平台配置 | `srm-script-platform` |
 | 修改需求目录中已有 Marmot JS/SQL 的字段取值、常量、表达式或局部逻辑 | `srm-requirement-delivery` 快速修改；需要平台当前态或远程 Debug 时采用 `srm-script-platform` 路由 |
 | 历史需求增量修改，只有需求号且原脚本、CodeBlock、QueryBlock 或 API 资源未知 | `srm-requirement-delivery` 先按需求号聚合定位平台资产，精确读取后走最小修改或完整链路 |
@@ -36,6 +37,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 - “查需求”和“开发需求”不同：前者走 `choerodon-task`，后者由 `srm-requirement-delivery` 先区分标准业务、标准扩展点、纯二开脚本或混合模式再实现。已有脚本的明确局部修改优先走快速修改；需求号、租户或环境只是附带标识时，不读取猪齿鱼、平台或数据库。历史需求增量只有需求号且目标资产未知时，先按需求号聚合搜索平台候选，不先完整读取任务；零结果再按本地产物、任务中的明确编码和 Pangu 身份发现降级。只有需求正文是事实源、当前增量不足或用户明确要求重新取证时，才完整读取任务。
 - “查脚本/调试脚本/保存或部署脚本”以及不带需求实现的“查或管理平台 API、消费端、调度、常量、OutBound、CodeBlock、QueryBlock”直接走 `srm-script-platform`。若目标是按需求设计、编码和交付这些资源，则走 `srm-requirement-delivery`，由它逐对象组织本地产物并复用平台工具。平台当前态、定义、版本和状态以 Script Platform MCP 为准；Pangu 脚本搜索只在精确身份缺失时发现候选。
+- “审查脚本/核对调用契约/checkJs 类型问题”走 `marmotscript-js-check`，复用用户提供或已读取的源码，只核对本次风险所需的契约与依赖。纯查询当前配置仍走 `srm-script-platform`；线上异常先由 `java-troubleshoot` 定位，再按需复用定向审查；要求修改时由 `srm-requirement-delivery` 决定改动范围。
 - 有异常、报错或日志线索时先排障；纯查询或修复 SQL 才进入 SQL Skill。
 - 普通 Bug 不能直接假定为标准 Bug：只有执行链覆盖故障区段且没有适配器或 API 前/后置挂载调用，才默认检索标准仓库。载体未知时由 `java-troubleshoot` 先按 traceId、明确日志关键字或脚本定位信息取证；信息均不足则追问，不宽泛搜索日志或代码。
 - 独立脚本、适配器、API 挂载、租户定制及外部接口对接 Bug 走 `java-troubleshoot` 的脚本优先路径：日志固定限定 `srm-script-container`；无可靠日志关键字时先取脚本并使用源码中的真实日志字面量；标准仓库只在核实脚本契约/平台行为确有必要或用户明确要求时最后定向检索。
@@ -49,6 +51,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | Skill | 职责 |
 | --- | --- |
+| `marmotscript-js-check` | Marmot 脚本只读静态审查、checkJs 类型问题及调用契约风险核对；按需复用平台当前态，不代替故障取证、需求实现或平台写入 |
 | `srm-script-platform` | Script Platform 的权威当前态、历史需求号资产聚合发现、配置资源读取、未保存源码 DEV 调试及显式授权后的安全 CRUD、动作、保存和部署 |
 | `srm-requirement-delivery` | 交付标准业务、标准 Adapter/API 扩展点、Marmot 脚本、Independent 子类型及配套平台资源；已有脚本和历史需求增量局部修改走快捷路径 |
 | `choerodon-task` | 猪齿鱼任务、评论、状态和附件查询；用户明确要求写入且目标与内容可确定时直接新增或编辑评论 |
@@ -77,7 +80,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 数据修复工单 | `archery_workflow_sqlcheck` → `archery_submit_workflow` | `archery`；仅提交纯 DML 审批工单，不执行数据库写入 |
 | 日志 | `obs_sls_*`、`obs_log_*` | `java-troubleshoot` |
 | 脚本容器 trace 时间线 | Pangu `query_script_trace` | `java-troubleshoot`；按 traceId 汇总 `srm-script-container` 日志阶段 |
-| Marmot 静态检查 | Pangu `check_marmot_script_static` | `srm-requirement-delivery` 编码后调用；`srm-script-platform` 复用 |
+| Marmot 静态检查 | Pangu `check_marmot_script_static` | `marmotscript-js-check` 负责审查与结果解释；`srm-requirement-delivery` 编码后调用，`srm-script-platform` 按需复用 |
 | 字段关联核验 | Pangu `inspect_object_relation` | 领域 SQL Skill 与 `srm-requirement-delivery` 在编码/修复前核验两端字段与受限 JOIN 样例 |
 | 跨流程协作协议 | Pangu `get_workflow_guide` | 全部 Skill 在交接/恢复任务时按 topic 读取 |
 | 业务知识 | `search/get/save/update/delete_knowledge`、`search_pangu`、`diagnose_context` | `knowledge-governance`；专项 Skill 可只读复用 |
@@ -90,6 +93,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 
 | 场景 | 顺序 |
 | --- | --- |
+| 脚本静态审查或调用契约核对 | `marmotscript-js-check` 复用本地或已读取源码；当前平台事实缺失且影响结论时才采用 `srm-script-platform` 路由 |
 | 平台脚本查询或调试 | `srm-script-platform`；身份不完整才用 Pangu 发现，再回到 Script Platform 当前态 |
 | 已有纯二开脚本小改 | `srm-requirement-delivery` 只读目标文件、最小修改并定向检查 |
 | 历史需求增量且目标资产未知 | `srm-requirement-delivery` 按需求号聚合搜索 → 对唯一候选精确 `get` → 最小修改；零结果才降级到本地记录、需求明确编码和 Pangu 发现 |

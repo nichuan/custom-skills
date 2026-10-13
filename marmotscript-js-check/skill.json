@@ -1,0 +1,60 @@
+{
+  "name": "marmotscript-js-check",
+  "version": "1.0.0",
+  "description": "只读审查 SRM Marmot/GraalJS 的 Adapter、Independent Script、CodeBlock 及其 QueryBlock 依赖，核对语法、目标运行时 API、调用场景的入参返回契约、租户隔离和数据副作用。用户要求检查、review 脚本或核对调用契约时使用；纯平台配置查询走 srm-script-platform，故障根因先走 java-troubleshoot，开发修改走 srm-requirement-delivery。",
+  "author": "Zhenyun Engineering",
+  "license": "MIT",
+  "keywords": [
+    "srm",
+    "marmot",
+    "graaljs",
+    "脚本审查",
+    "调用契约",
+    "静态检查"
+  ],
+  "features": {
+    "scoped_review": "按审查对象与实际调用场景选择检查，不强制全量调查",
+    "evidence_boundary": "本地产物、平台当前态和真实执行证据分开报告",
+    "runtime_contract": "按目标版本核对模块包装、helper 重载与输入返回消费者",
+    "static_gate": "复用 Pangu 词法检查与已确认业务规则，精确模块放行不替代运行验证",
+    "read_only": "审查不授权 Debug、保存、部署、绑定、任务执行或评论写入"
+  },
+  "mcp_servers": [
+    {
+      "name": "zhenyun-pangu-mcp",
+      "tools": [
+        "check_marmot_script_static",
+        "search_repo",
+        "archery_describe_table",
+        "archery_list_columns",
+        "archery_query"
+      ],
+      "description": "静态规则与必要源码、表结构和数据的只读核实"
+    },
+    {
+      "name": "zhenyun-script-platform-mcp",
+      "tools": [
+        "adapter_get",
+        "independent_script_get",
+        "platform_resource_search",
+        "platform_resource_get",
+        "platform_capabilities_list",
+        "platform_definition_get",
+        "platform_relations_get",
+        "platform_scheduled_script_inspect",
+        "platform_api_point_list"
+      ],
+      "description": "按实际审查需要读取平台当前脚本、资源定义与有界关系，不执行写入或 Debug"
+    }
+  ],
+  "entry_point": "SKILL.md",
+  "categories": [
+    "development",
+    "code-review"
+  ],
+  "metadata": {
+    "last_updated": "2026-10-13",
+    "scope": "marmot-script-review",
+    "write_policy": "read-only"
+  }
+}

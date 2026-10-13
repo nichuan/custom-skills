@@ -82,7 +82,7 @@
     "configuration"
   ],
   "metadata": {
-    "last_updated": "2026-09-20",
+    "last_updated": "2026-10-13",
     "scope": "script-platform-lifecycle-and-config",
     "write_policy": "mandatory-two-phase-human-confirmation"
   }

@@ -112,9 +112,14 @@ Adapter、API 前置、API 后置和 API 发布必须分别填写，不能复制
   "required_object_parameters": {},
   "required_constants": {},
   "required_log_stages": [],
+  "allowed_runtime_modules": [],
   "full_scope_required": false
 }
 ```
+
+`allowed_runtime_modules` 仅填写目标运行时已核实的精确 `@M/v1/<module>` 或
+`@M/2021/std|biz|other` 路径；只放行对应字面量 require，不允许 Node、相对路径、动态加载或通配。
+模块放行不证明签名或运行正确。审查与静态误报解释见[Marmot 脚本审查](../../marmotscript-js-check/SKILL.md)。
 
 记录最终结果：
 

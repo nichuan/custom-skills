@@ -141,6 +141,7 @@ Debug 不持久化脚本，但脚本自身可能调用 DEV 服务或数据库。
 
 ## 与其它 Skill 协作
 
+- 纯脚本静态审查、checkJs 类型问题和调用契约风险核对由[Marmot 脚本审查](../marmotscript-js-check/SKILL.md)负责；复用已经读取的当前对象，只在缺失事实影响审查结论时补查平台，不因审查请求自动 Debug、保存或部署。
 - 新需求、本地交付目录和产物组织由 `srm-requirement-delivery` 负责；需要平台当前态、真实
   Debug 或用户授权的保存时采用本 Skill 的路由。
 - 历史需求增量由 `srm-requirement-delivery` 决定最小改动范围；目标未知时复用本 Skill 的
