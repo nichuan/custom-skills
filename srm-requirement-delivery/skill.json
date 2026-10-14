@@ -1,6 +1,6 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（API 关系、Constant、CodeBlock、QueryBlock 等）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
@@ -15,6 +15,7 @@
     "api发布"
   ],
   "features": {
+    "delivery_config": "用户指定路径优先，其次读取 MCP .env 的 MARMOT_DELIVERY_ROOT；有效配置直接使用，缺失工具与目录未配置分开诊断",
     "fast_patch": "已有本地脚本的明确局部改动默认不查询猪齿鱼、平台、数据库或完整调用链",
     "historical_requirement_discovery": "历史需求增量先按需求号聚合定位 Adapter、Independent、CodeBlock、QueryBlock 与 API 关系资源，精确读取后再最小修改",
     "mode_routing": "区分标准业务、标准 Adapter 埋点、标准 API 挂载点、纯二开 Adapter、Independent 和混合需求",
@@ -50,7 +51,8 @@
         "inspect_object_relation",
         "check_marmot_script_static",
         "query_script_trace",
-        "get_workflow_guide"
+        "get_workflow_guide",
+        "marmot_get_delivery_config"
       ],
       "description": "只读获取猪齿鱼需求、脚本身份候选、标准调用契约和必要数据库事实。"
     },
