@@ -77,7 +77,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 | 未保存源码 Debug 与受控保存 | Script Platform `*_debug` / `*_save` / `adapter_deploy` | `srm-script-platform`；写操作须两阶段人工确认 |
 | 平台配置与关系 | Script Platform `platform_resource_*` / `platform_definition_get` / `platform_relations_get` / `platform_api_point_list` | `srm-script-platform`；资源类型为封闭枚举，写入和动作须最新版本及两阶段人工确认 |
 | 数据与表结构 | `archery_*`、`search_tables`、`get_table*` | `archery` 和领域 SQL Skill；纯二开编码被具体字段阻塞时可只读核实 |
-| 数据修复工单 | `archery_workflow_sqlcheck` → `archery_submit_workflow` | `archery`；仅提交纯 DML 审批工单，不执行数据库写入 |
+| 数据修复工单 | `archery_resolve_workflow_target` → `archery_workflow_sqlcheck` → `archery_submit_workflow` | `archery`；按已核实实例通过接口自动取参，禁止浏览器取参或索要数字 ID；仅提交纯 DML 审批工单，不执行数据库写入 |
 | 日志 | `obs_sls_*`、`obs_log_*` | `java-troubleshoot` |
 | 脚本容器 trace 时间线 | Pangu `query_script_trace` | `java-troubleshoot`；按 traceId 汇总 `srm-script-container` 日志阶段 |
 | Marmot 静态检查 | Pangu `check_marmot_script_static` | `marmotscript-js-check` 负责审查与结果解释；`srm-requirement-delivery` 编码后调用，`srm-script-platform` 按需复用 |

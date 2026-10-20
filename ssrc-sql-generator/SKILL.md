@@ -37,7 +37,7 @@ description: 生成或核实 SRM 采购寻源域（询价、招标、报价、�
 | 只读调查 + 生成写 SQL | 以前怎么解决过（→ zhenyun-pangu-mcp search_sql_templates） |
 
 > Agent **不直接执行** INSERT/UPDATE/DELETE。MCP 数据库操作默认**只读**（仅 `archery_query` 取数据）。
-> 写 SQL（`ACTION`）生成后交人工执行；用户明确要求提交 Archery 数据修复工单时，按 `archery` Skill 先校验纯 DML，再提交审批工单。提交工单不等于执行 SQL；生成方案无需等待工单评审。
+> 写 SQL（`ACTION`）生成后交人工执行；已核验方案后用户说“提交/提交审批”，按 `archery` Skill 通过接口自动取参、校验纯 DML 并提交审批，不打开浏览器或索要数字 ID。提交工单不等于执行 SQL；生成方案无需等待工单评审。
 
 ---
 

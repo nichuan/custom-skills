@@ -1,6 +1,6 @@
 ---
 name: archery
-description: 使用 Archery 查询真实数据与表结构，并在用户明确要求时校验和提交数据修复 SQL 审批工单；不直接执行写 SQL。
+description: 使用 Archery 查询真实数据与表结构；明确要求提交数据修复审批时，通过接口自动解析参数、校验并提交，不直接执行写 SQL。
 ---
 
 # Archery 数据查询与修复工单助手
@@ -65,14 +65,17 @@ description: 使用 Archery 查询真实数据与表结构，并在用户明确�
 - 不支持其它 SHOW/DESC、WITH、多语句、SQL 行注释、可执行注释、窗口函数或任何写入语法。函数白名单为 `COUNT`、`SUM`、`AVG`、`MIN`、`MAX`、`IFNULL`、`NULLIF`、`CONCAT`、`CONCAT_WS`、`CAST`；白名单外函数一律拒绝。
 - 执行日志 SQL 前确认目标环境与租户，保留原查询的业务和权限条件；分析某条件的影响时仅做有界只读对照，不将去掉权限条件的结果当成正常接口结果。
 - 表结构/字段请使用专用 `archery_describe_table` / `archery_list_columns`，不要拿 `archery_query` 跑 DDL。
-- 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能生成；`archery_query` 不执行写 SQL。用户明确要求提交修复工单时可使用下方两个工单工具，工单提交不等于数据库执行。
+- 任何 INSERT/UPDATE/DELETE 一律由各 SQL 技能生成；`archery_query` 不执行写 SQL。用户明确要求提交修复工单时可使用下方工单流程，工单提交不等于数据库执行。
 
-### 数据修复工单：先校验，再提交
+### 数据修复工单：接口自动取参，先校验再提交
 
-- 仅当用户明确要求“提交数据修复工单”等动作时进入此流程；只要求生成、检查或评论 SQL 时不提交。目标 site、实例名称、库名、审批组名称、租户和影响范围须已有真实证据。用户或当前界面已给出审批组和实例名称时，先调用 `archery_resolve_workflow_target(group_name, instance_name, site)`，按当前账号可见的 SQL 上线选项解析数字 `group_id` 与 `instance_id`；工具必须返回名称的精确唯一匹配，不得按别名猜数字 ID。`workflow_name` 来自用户或工单上下文，缺失时询问。
+- 用户在已核验的修复方案后说“提交”“提交审批”“提交工单”，即授权提交该方案的 Archery 审批，无需再次确认同一动作；只要求生成、检查或评论 SQL 时不提交。复用本次已明确的 site、修复实例、库名、租户和影响范围，不能仅凭查询默认值推定修复环境。
+- **取参全程走 MCP/HTTP，禁止打开或操作浏览器查看表单、历史工单、页面源码或网络请求获取审批参数，也不向用户索要 `group_id`、`instance_id` 等技术参数。** 先调用 `archery_resolve_workflow_target(instance_name=<已核实的实例别名或真实名>, site=<本次站点>)`；无需预先知道审批组。工具实时读取当前账号的可见审批组和 `can_write` 实例，按目标实例精确唯一匹配并返回数字 ID。上下文已有明确审批组名称时才附带 `group_name`，不硬编码历史名称或数字 ID。
+- `workflow_name` 优先用用户指定名称，否则直接用当前完整工单号（如 `prod-bug-123456`）；无工单号时按已确认修复事项生成 50 字符内的简短标题，不仅为标题追问。`demand_url` 有现成链接就复用，没有则省略；`is_backup` 沿用工具默认值。
+- 工具返回多个匹配审批组时，只让用户从返回的名称中选择；无匹配、权限/认证错误、工具缺失或旧版 Schema 仍强制审批组时，报告具体能力缺口，不让用户补数字 ID、不回退浏览器、不猜选审批组。实际修复环境或范围仍不明时才澄清业务范围。
 - 从最终修复 SQL 中提取实际要执行的 `INSERT`、`UPDATE`、`DELETE`，保持原顺序；预查/核验 `SELECT`、注释、事务控制、DDL 和其它语句均不传入工单工具。工具会拒绝混入的非 DML。提交前完成对应 SQL Skill 的只读核验与影响范围检查。
 - 用解析得到的数字 ID 调用 `archery_workflow_sqlcheck(sql_content=<纯DML>, site, instance_id, db_name)`。仅返回 `passed=true` 且有 `check_token` 时，使用同一 `site` 调用 `archery_submit_workflow(check_token, workflow_name, group_id, demand_url?, is_backup?)`；提交工具使用已校验的原文，不接收另一份 SQL。
-- 校验未通过就报告错误/警告，不提交。提交成功只报告实际返回的工单 ID，不声称已审批或执行。提交超时或返回结果不明时先在 Archery 按名称核对，不直接重试；凭证过期或已使用时重新校验。
+- 校验未通过就报告错误/警告，不提交。成功以接口返回的 `workflow_id` 为准，无需打开页面再次核对；只报告已提交审批，不声称已审批或执行。提交超时或结果不明时，先用可用的只读接口按名称查重；缺少查重接口则报告结果待核实并停止，不回退浏览器，也不重新校验后盲目再提交。凭证过期且确认尚未提交时才重新校验。
 
 ---
 
@@ -92,7 +95,7 @@ description: 使用 Archery 查询真实数据与表结构，并在用户明确�
 | `archery_list_columns(table, site, instance, db)` | 列字段名清单 | 生成 UPDATE/WHERE 前核对字段拼写 |
 | `archery_describe_table(table, site, instance, db)` | SHOW CREATE TABLE（结构+注释+索引） | 不确定字段/需完整结构时 |
 | `archery_list_instances(site?)` | `site` 留空返回全部，传 `cn`/`aws` 只返回该站点 | 拿不准实例名时先调 |
-| `archery_resolve_workflow_target(group_name, instance_name, site)` | 按当前账号 SQL 上线选项中的精确名称解析数字审批组和实例 ID；不创建工单、不执行 SQL | 提交审批时名称已确定但数字 ID 未知 |
+| `archery_resolve_workflow_target(instance_name, group_name?, site)` | 按已核实的实例别名/真实名称，通过 HTTP 自动发现唯一审批组并解析数字 ID；不创建工单、不执行 SQL | 提交审批前调用；审批组名称可省略，不打开浏览器取参 |
 | `archery_list_databases(site, instance)` | 列出某实例下所有库 | 确认 `srm` / `srm_logistics_delivery` 等库名 |
 | `archery_query_tenant(tenant, site, instance, db)` | 按租户编码/名称反查 `tenant_id` | 生成 SQL 前确认真实租户，禁止硬编码 |
 | `archery_workflow_sqlcheck(sql_content, instance_id, db_name, site)` | 校验纯 DML，返回校验结果及一次性凭证 | 用户明确要求提交数据修复工单时先调；实例 ID 须已核实 |

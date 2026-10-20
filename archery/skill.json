@@ -1,7 +1,7 @@
 {
   "name": "archery",
-  "version": "1.2.1",
-  "description": "使用 Archery 查询真实数据与表结构，并在用户明确要求时校验和提交数据修复 SQL 审批工单；不直接执行写 SQL。",
+  "version": "1.3.0",
+  "description": "使用 Archery 查询真实数据与表结构；明确要求提交数据修复审批时，通过接口自动解析参数、校验并提交，不直接执行写 SQL。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -19,7 +19,7 @@
     "call_spec": "archery_query / archery_describe_table / archery_list_columns / archery_list_databases / archery_list_instances / archery_query_tenant 的统一调用规范",
     "degradation": "MCP 异常/参数错（如 aws 缺 site）的降级与纠错策略，禁止假装执行通过",
     "read_only": "数据库查询保持只读；工单提交只创建审批单，不执行写 SQL",
-    "repair_workflow": "用户明确要求提交时，仅取 INSERT/UPDATE/DELETE，先调用校验工具，通过后用一次性凭证提交原样 SQL"
+    "repair_workflow": "修复方案后明确提交即进入审批；按已核实实例通过 HTTP 自动发现审批组和数字 ID，不打开浏览器或索要技术参数；标题复用工单号，纯 DML 校验通过后一次性提交原文"
   },
   "mcp_servers": [
     {
@@ -53,6 +53,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-09-23"
+    "last_updated": "2026-10-20"
   }
 }
