@@ -156,7 +156,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 ### 代码与数据库脚本
 
 - 标准类 Bug 才默认用 `search_repo(keyword)` 检索本地 `PG_ROOT`。二开类 Bug 只有在核实脚本入参/返回/平台默认行为或用户明确要求时才定向检索；`unknown` 状态不得宽泛扫描本地仓库。
-- 当前 GitLab 项目/代码搜索未开启，禁止调用 `gitlab_search_projects`、`gitlab_search_code`，也禁止本地无结果后用失败调用探测。
+- GitLab 项目/代码搜索工具已从 Pangu MCP 移除；所有代码搜索都用本地 `search_repo`，本地无结果也不得回退在线搜索。
 - 只有 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确核实；不得遍历大量项目或目录变相实现搜索。
 - 二开脚本有**两套独立体系**，按场景精确路由（判定信号见 `knowledge/architecture/standard-customization.md`）。Pangu 只在身份不完整时发现候选，平台当前源码必须由 Script Platform MCP 读取：
   - **适配器埋点脚本**（挂钩点 BEFORE/AFTER 执行，报文映射、回调、单据前后处理）：
@@ -235,7 +235,7 @@ Evidence            → 本次调查实际获得的事实（每次会话内维�
 | 返回 | 含义 | 处理 |
 |------|------|------|
 | 401 | 凭据缺失/过期 | 提示配置 MCP `.env`/`env`，不让用户在对话粘贴 Token |
-| 403 | 权限不足 | 提示申请对应项目/资源权限；记录已知范围，不调用当前禁用的 GitLab 搜索，不断言资源不存在 |
+| 403 | 权限不足 | 提示申请对应项目/资源权限；记录已知范围，不调用已移除的 GitLab 搜索工具，不断言资源不存在 |
 | 404 | 资源/ID 问题 | 先用列举类工具确认资源是否存在，再决定 |
 | timeout | 范围过大 | 缩小时间范围、补齐标签/租户条件、改走索引字段 |
 | empty | 查询条件 vs 确实无数据 | 判断是条件过严还是真无数据；用户指定时间不擅自扩大 |

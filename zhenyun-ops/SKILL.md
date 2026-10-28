@@ -44,7 +44,7 @@ description: 甄云 SRM 全局智能路由中心，仅在请求跨域或无法�
 - 采购寻源走 `ssrc-sql-generator`；采购订单及下游履约走 `spuc-sql-generator`。
 - 工作台现象（待办/计数、整改模块、卡片字段、超级搜索、单据动态/关注、ES 权限/消费）优先走 `srm-workbench-bug-triage`；仅当现象是工作台服务自身的异常堆栈/traceId/日志报错时，才用 `java-troubleshoot`。
 - 明确要求维护 `knowledge_docs` 或查询已沉淀知识时走 `knowledge-governance`；SQL 模板和表目录仍由对应 SQL Skill 管理。
-- 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接按执行链、task_code 与场景信号选择适配器或独立脚本，第一候选未命中或信号冲突时再扩大。当前 GitLab 搜索禁用，不作为本地无结果时的回退。
+- 普通 Java 实现查本地 `PG_ROOT`；二开、租户定制和外部对接按执行链、task_code 与场景信号选择适配器或独立脚本，第一候选未命中或信号冲突时再扩大。GitLab 项目/代码搜索工具已移除，本地无结果时也不回退在线搜索。
 - 意图仍不唯一时，列出具体分歧及其对交付物的影响，再向用户确认；不凭模块名猜。
 
 ## 子 Skill 清单

@@ -26,7 +26,7 @@
     "stop_condition": "Stop Condition（两类独立证据/一份直接证据/证据饱和即停）+ 调查预算（同类查询连续 3 次未改变假设即停），禁止相同参数原样重调",
     "diagnostic_rules": "rules/diagnostic-rules.yaml：故障信号→调查假设→所需证据→conclusion_requires，规则只给方向不给结论",
     "knowledge_base": "优先按场景读取一份本地精确手册；本地未覆盖时才用 search_knowledge 跨案例检索",
-    "code_routing": "普通代码只用 search_repo 本地检索；GitLab 搜索禁用，仅允许已知 project/ref/path 的精确读取",
+    "code_routing": "普通代码只用 search_repo 本地检索；GitLab 项目/代码搜索工具已移除，仅允许已知 project/ref/path 的精确读取",
     "implementation_routing": "执行链无适配器/API 前后置挂载才判为标准 Bug；载体未知时不默认扫描标准仓库",
     "script_first": "二开优先限定 srm-script-container 查日志；无可靠关键字时由 Pangu 发现身份、Script Platform MCP 读取当前源码，再用真实日志字面量反查",
     "evidence_report": "结构化输出：问题结论/根因分析/证据链（每条标注 source 与 confidence）/Confirmed-Probable-Unknown 分级，禁止把推测写成事实、禁止输出原始日志全文",
@@ -68,7 +68,7 @@
         "query_script_trace",
         "query_sql_trace"
       ],
-      "description": "Pangu 统一 MCP：日志、Archery、本地代码、脚本身份发现、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 搜索当前不提供。"
+      "description": "Pangu 统一 MCP：日志、Archery、本地代码、脚本身份发现、已知 GitLab 路径精确读取、认知层和猪齿鱼。GitLab 项目/代码搜索工具已移除。"
     },
     {
       "name": "zhenyun-script-platform-mcp",

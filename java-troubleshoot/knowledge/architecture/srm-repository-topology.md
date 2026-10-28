@@ -1,6 +1,6 @@
 # SRM 代码库拓扑（标准库 + 租户二开）
 
-> 企业事实层。Agent 据此收敛代码搜索范围。当前 GitLab 项目/代码搜索未开启，普通检索必须使用本地 `PG_ROOT/search_repo`；只有 project/ref/path 已知时才使用 GitLab 精确读取能力。
+> 企业事实层。Agent 据此收敛代码搜索范围。GitLab 项目/代码搜索工具已移除；普通检索必须使用本地 `PG_ROOT/search_repo`，只有 project/ref/path 已知时才使用 GitLab 精确读取能力。
 
 ## 1. 标准业务代码：单一 Group
 
@@ -13,7 +13,7 @@
 - 形式：`operation-srm-{租户}` 下的 `srm-{模块}-{租户}`（以租户代号作为仓库后缀）。
 - 例：奥克斯寻源二开 `operation-srm-aux/srm-source-aux`。
 - 同构示例：`operation-srm-hytera/srm-source-hytera`、`operation-srm-ddmc/srm-source-ddmc`、`operation-srm-luxshareic/srm-source-lsrt`。
-- **注意**：个别租户后缀与 group 后缀不一致，不要凭租户名硬拼。本地 PG_ROOT 未包含目标二开仓时，应报告覆盖范围，不能通过当前禁用的 GitLab 搜索猜测仓库。
+- **注意**：个别租户后缀与 group 后缀不一致，不要凭租户名硬拼。本地 PG_ROOT 未包含目标二开仓时，应报告覆盖范围，不能通过 GitLab 在线搜索猜测仓库。
 - 二开是"有的租户有、有的租户无"：已知租户时，必须先探测该租户是否存在对应二开服务；存在则实际执行逻辑可能被二开覆盖/增强，必须一并排查。
 
 ## 3. 必须排除的噪声 namespace（命中即忽略，除非用户明确点名）

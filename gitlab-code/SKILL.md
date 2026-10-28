@@ -1,6 +1,6 @@
 ---
 name: gitlab-code
-description: 甄云代码与脚本平台实现定位助手。用户要找类、方法、文件、二开逻辑、适配器脚本或外部接口实现时使用。二开身份可用 Pangu 模糊发现，当前脚本正文统一由 zhenyun-script-platform-mcp 读取；只有契约核实或用户明确要求时才定向查标准代码。GitLab 搜索当前禁用。不排障、不生成 SQL、不修改业务代码。
+description: 甄云代码与脚本平台实现定位助手。用户要找类、方法、文件、二开逻辑、适配器脚本或外部接口实现时使用。普通代码检索只使用本地 search_repo；二开身份可用 Pangu 模糊发现，当前脚本正文统一由 zhenyun-script-platform-mcp 读取。GitLab 项目/代码搜索工具已移除。不排障、不生成 SQL、不修改业务代码。
 ---
 
 # 代码与脚本定位
@@ -21,7 +21,7 @@ description: 甄云代码与脚本平台实现定位助手。用户要找类、�
 
 | 请求特征 | 首选证据源 | 补充证据源 |
 |---|---|---|
-| Java 类、方法、DTO、配置、异常文本 | 本地 `search_repo` | 已知路径时精确读取 GitLab 文件 |
+| Java 类、方法、DTO、配置、异常文本 | 本地 `search_repo` | 仅在项目和文件路径已知时精确读取 GitLab 文件，不用于搜索 |
 | 二开、客户定制、租户专属逻辑 | Script Platform 当前脚本 | 本地代码用于确认平台入口 |
 | ERP/WMS/OA/SAP 等外部系统对接 | Script Platform 当前脚本 | 本地代码用于确认调用框架 |
 | 回调、Webhook、推送、同步、报文、字段映射、签名 | Script Platform 当前脚本 | 日志或本地入口代码 |
@@ -31,25 +31,24 @@ description: 甄云代码与脚本平台实现定位助手。用户要找类、�
 
 若本 Skill 是由故障排查转入：只有执行链已确认没有适配器或 API 前/后置挂载调用，才把问题当标准 Bug 并默认检索本地标准仓库。二开 Bug 的标准代码检索必须放在脚本之后，且仅用于核实脚本入参、返回结构、平台入口或默认行为，或响应用户的明确检索要求。实现载体仍为未知时，应返回 `java-troubleshoot` 补证据或追问，不得宽泛扫描本地仓库。
 
-## GitLab 能力硬边界
+## GitLab 远程读取边界
 
-当前环境没有可用的 GitLab 项目搜索和代码搜索能力：
+GitLab 项目搜索和代码搜索工具已从 Pangu MCP 移除，不能由环境变量重新启用：
 
-- 禁止调用 `gitlab_search_projects`、`gitlab_search_code`。
-- 禁止用一次失败调用探测能力。
-- 本地检索无结果时不得自动回退 GitLab 搜索。
+- 普通代码检索、类定位和文件名定位都使用本地 `search_repo`；本地未命中也不回退 GitLab。
 - 不得通过遍历大量 GitLab 项目或目录变相实现全局搜索。
-- 用户明确要求远端搜索时，直接说明当前能力不可用并给出已检索的本地范围。
+- 用户明确要求远端搜索时，说明该搜索工具已移除，并给出已检索的本地范围。
 
-GitLab 只保留精确读取：当 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，
-可使用 `gitlab_list_branches`、`gitlab_list_tree`、`gitlab_get_file` 核实指定内容。
+仅当 `project_id`、`ref`、`path` 已由用户或可靠证据明确提供时，才可用
+`gitlab_list_branches`、`gitlab_list_tree`、`gitlab_get_file` 核实指定内容；这些精确读取能力
+不得用于发现项目或模拟代码搜索。
 
 ## 普通代码检索
 
 1. 使用 `search_repo` 在 `.env` 的 `PG_ROOT` 搜索文件名或内容。
 2. 根据服务、模块和包路径缩小范围，忽略 `op-deliver-*`、构建产物和快照仓库。
 3. 命中后读取足够上下文，不能只凭单行片段下结论。
-4. 无结果时报告关键词、PG_ROOT 和检索范围；不要转向不可用的 GitLab 搜索。
+4. 无结果时报告关键词、PG_ROOT 和检索范围；不要转向 GitLab 在线搜索。
 
 如果 `PG_ROOT` 不存在或未包含目标仓库，应明确指出本地源码不完整。
 

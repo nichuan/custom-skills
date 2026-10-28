@@ -1,7 +1,7 @@
 # 关键代码定位速查
 
 包名前缀：`org.srm.workbench`。
-⚠️ **源码位置**：以 MCP 的 `PG_ROOT` 配置和 `search_repo` 实际返回为准。**排查时优先搜索本地源码**（如 `src/main/java/org/srm/workbench` 下的 `api/app/domain/infra`）。当前 GitLab 项目/代码搜索未启用；只有从用户或可靠证据获得真实 `project_id/ref/path` 后，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确读取。
+⚠️ **源码位置**：以 MCP 的 `PG_ROOT` 配置和 `search_repo` 实际返回为准。**代码搜索只使用本地源码**（如 `src/main/java/org/srm/workbench` 下的 `api/app/domain/infra`）；GitLab 项目/代码搜索工具已移除。只有从用户或可靠证据获得真实 `project_id/ref/path` 后，才可用 `gitlab_list_branches` / `gitlab_list_tree` / `gitlab_get_file` 精确读取。
 
 ## Controller（界面入口）
 - 超级查询：`api/controller/v1/DocDataSearchController`
