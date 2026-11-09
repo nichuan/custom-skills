@@ -1,7 +1,7 @@
 {
   "name": "srm-requirement-delivery",
   "version": "2.2.1",
-  "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（API 关系、Constant、CodeBlock、QueryBlock 等）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
+  "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（包括功能数据导入配置）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
   "keywords": [
@@ -24,6 +24,7 @@
     "adapter_delivery": "覆盖 Adapter 事件前置、多 Line 选择、输入返回契约、Debug 和安全部署",
     "independent_delivery": "按平台实际 quickType 区分 Independent，API 前后置阶段与 quickType 分开记录，并分别处理配套关系资源",
     "platform_relations": "把脚本源码、API 改写绑定和 API 发布资源作为独立产物读取、写入和回读",
+    "data_import_delivery": "功能数据导入必须把逐条校验脚本、导入脚本与 data_import 配置作为独立产物闭环；部署时自动生成配置写入计划，并按平台回读含义校验模式和脚本契约",
     "design_gates": "仅对新增或契约级脚本需求确认身份、字段、关系、事务、幂等、日志和异常",
     "artifact_layout": "新交付按平台资源类型分层，Independent 再按实际 quickType 分型；旧目录原地兼容，artifacts.json 逐对象记录身份、关系和验证",
     "remote_debug": "用户要求且 DEV Input 有效时调试未保存源码，不把 Debug 当作平台发布验证",

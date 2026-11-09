@@ -107,7 +107,10 @@
 - CodeBlock 明确调用方、参数、返回和异常约定；查 `platform_relations_get` 确认引用，不能把修改当作只影响单一脚本。
 - QueryBlock 明确参数、查询/写入意图、租户过滤、结果列与空结果。需要真实表结构时只读核实；禁止用不受控 SQL 替代平台资源流程。
 - Constant 只记录编码、描述、租户、版本、使用方和 `value_status=managed_out_of_band`；平台会屏蔽秘密值，也禁止通过模型上下文创建、修改或落盘该值。
-- Queue Consumer、Scheduler、OutBound 和 Data Import 仅在需求实际涉及且身份/关系已确认时成为交付产物；各自单独保存非秘密 `resource.json`，不并入 Independent 源码。
+- Queue Consumer、Scheduler、OutBound 和 Data Import 各自单独保存非秘密 `resource.json`，不并入 Independent 源码。
+- **功能数据导入必须闭环配置。** 对导入类需求，校验脚本、批量导入脚本和 `data_import` 记录是不同平台对象。实现/部署导入功能时，即使用户最初只提到脚本，也要把配置纳入产物清单；用户明确要求部署时，脚本计划之外还要自动生成 `platform_resource_create(resource_type="data_import")` 计划。先按租户和 `templateCode` 精确读取，已存在时核对并报告，不重复创建。
+- 配置计划需逐字段核对 `tenantNum`、模板编码（平台定义可选，但业务已有模板时应绑定）、`sheetIndex`（平台 wire 值是 JSON 字符串）、`validType`、`validScriptCode`、`importType` 和 `doImportScriptCode`。枚举值必须来自当前平台回读的 `*Meaning`、已验证的选项来源或用户提供的精确请求体；不可从标签猜数字，也不能只按数字判断模式。校验方式的“逐条/批量”必须与验证脚本的单行/数组输入契约一致，导入方式的“批量/逐条”必须与导入脚本调用契约一致。值或含义不一致时停止该配置计划并报告差异。
+- 两阶段确认仍适用：用户明确要求“部署”时，把已确定的 `data_import` 创建计划与其它已明确的写入计划一起展示；执行后精确回读租户、模板编码、枚举含义、脚本编码和版本。若发现记录已由用户手工创建，不再创建；只读核对并报告是否与本地脚本契约一致。
 - 用户要求创建或更新资源时，先读 `platform_definition_get` 和当前版本，再通过对应平台资源工具生成两阶段写计划，写后回读内容与引用关系。
 
 ## 10. 验证细则

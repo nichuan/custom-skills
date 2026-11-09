@@ -1,6 +1,6 @@
 ---
 name: srm-requirement-delivery
-description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（API 关系、Constant、CodeBlock、QueryBlock 等）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。
+description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（包括功能数据导入配置）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。
 ---
 
 # SRM 标准与纯二开需求交付
@@ -22,7 +22,7 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 | 标准新增 API 挂载点 | 在 Controller 增加 `@MarmotApiPoint(apiCode = ...)` | 注解、必要的 `ApiCode` 常量、测试 | API 前置/后置独立脚本与绑定 |
 | 纯二开 Adapter | 已有标准埋点，要求实现租户适配器脚本 | 指定 Header/Line 的脚本、验证记录 | 标准 Java 改造 |
 | 纯二开 Independent | 要求 API 改写/发布、消费端、调度或其它独立脚本 | 独立脚本、平台实际 `quickType` 及其已确认的配套资源 | 把前后置阶段当成固定 `quickType`，或未授权地创建配套资源 |
-| 纯二开平台资源 | 要求新增或修改 CodeBlock、QueryBlock、Constant、API 关系或其它配置资源 | 独立记录的资源内容、身份、版本、引用和验证 | 把资源混入 Independent 源码目录或保存秘密常量值 |
+| 纯二开平台资源 | 要求新增或修改 CodeBlock、QueryBlock、Constant、API 关系、功能数据导入配置或其它配置资源 | 独立记录的资源内容、身份、版本、引用和验证 | 把资源混入 Independent 源码目录或保存秘密常量值 |
 | 混合需求 | 同时要求标准能力和租户脚本，或多个脚本/绑定产物 | 每个产物各自的契约、实现与验证 | 用一个脚本产物代替标准改造 |
 
 “新增埋点”若只给标准类方法、任务编码和触发时机，判为标准新增适配器埋点；“增加 API 埋点/支持前后置挂载”若要求 `@MarmotApiPoint`，判为标准新增 API 挂载点。只有明确给出租户脚本逻辑、脚本编码或平台绑定要求时，才增加纯二开产物。
@@ -89,7 +89,7 @@ description: 交付甄云 SRM 标准业务改造、标准适配器埋点、标�
 
 `valid=false` 时按返回的 `status`、`config_source` 与 `env_file` 说明真实原因：配置文件未加载、键为空、路径不合法或权限不足不能混称为“未配置”。只在有效目录确实缺失且无法从已有上下文确定时询问一次；不回退到当前目录、Skill 目录或固定工程。工具未暴露或调用失败属于插件能力/加载问题，不能据此认定用户未维护 `.env`；有本地读取能力且已知 `MCP_ENV_DIR` 时，只解析该 `.env` 的 `MARMOT_DELIVERY_ROOT` 键作为兼容降级，不读取或输出凭据。MCP 可写性只描述其进程；宿主文件写权限受限时应报告权限问题，不能要求用户重新配置同一路径。
 
-新增、多产物或需要维护交付清单时，读取[产物分类与目录](references/artifact-layout.md)。新交付按平台资源类型分层，并只在 Independent 内按平台实际 `quickType` 分目录；API 前/后置阶段另记在关系资源中。已有需求目录或用户指定路径原地维护，不为套新结构搬迁文件。
+新增、多产物或需要维护交付清单时，读取[产物分类与目录](references/artifact-layout.md)。新交付按平台资源类型分层，并只在 Independent 内按平台实际 `quickType` 分目录；API 前/后置阶段另记在关系资源中。凡需求包含 Marmot 功能数据导入，除校验/导入脚本外，必须把 `data_import` 配置作为独立交付对象检查并纳入部署清单；明确要求部署时为配置自动准备平台写入计划，不要只创建脚本。已有需求目录或用户指定路径原地维护，不为套新结构搬迁文件。
 
 `request.md` 只保留目标、约束与验收点；`design-gates.md` 只填写当前需求适用的门禁；`artifacts.json` 是产物身份和关系清单，每个 Adapter Line、Independent、Block、Constant、绑定或配置资源分别记录 `kind`、子类型、租户、精确身份、平台 ID/版本、实际本地路径、关系和验证哈希。长整型 ID 以字符串保存。目录不能代替清单，也不能把多个平台对象合成一项。
 
