@@ -69,6 +69,8 @@
         "adapter_debug",
         "adapter_extract_input",
         "adapter_deploy",
+        "script_batch_deploy",
+        "script_batch_status",
         "platform_requirement_artifacts_search",
         "platform_resource_search",
         "platform_resource_get",

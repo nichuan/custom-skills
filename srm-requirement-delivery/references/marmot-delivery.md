@@ -77,7 +77,7 @@
 2. 只修改目标 Line；同一 `taskCode` 交付多个 Line 时使用带 `line-id` 的本地路径，避免覆盖。
 3. 核对重复触发、批量范围、数据库写入过滤、异常是否回滚主业务以及外部调用次数。
 4. 执行 `node --check`、入口检查和 `check_marmot_script_static`；用户要求时执行 `adapter_debug`。
-5. 部署只用 `adapter_deploy`，携带最近一次 Header/Line 版本和明确 `line_id`。不使用通用资源 CRUD 绕过停用、完整保存、回读校验和状态恢复。
+5. 同租户多份脚本部署或给 Adapter 追加需求号时，按[批量部署流程](../../srm-script-platform/SKILL.md#保存或部署)使用 `script_batch_deploy`，整批确认一次。单项只改源码可用 `adapter_deploy`，携带最近一次 Header/Line 版本和明确 `line_id`。不使用通用资源 CRUD 绕过停用、完整保存、回读校验和状态恢复。
 
 ## 6. API 前置独立脚本
 

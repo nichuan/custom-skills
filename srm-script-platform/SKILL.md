@@ -34,6 +34,8 @@ description: 查询、读取甄云 SADA/Marmot/GraalJS 脚本与平台配置的�
 | 用户明确要求保存 Independent Script | `independent_script_save` |
 | 用户明确要求新建 Independent Script | `independent_script_create`（写操作，两阶段确认；创建后回读验证） |
 | 用户明确要求部署 Adapter | `adapter_deploy` |
+| 同租户多份现有脚本部署，或 Adapter 描述追加需求号 | `script_batch_deploy`（整个计划一次确认，可同时更新源码） |
+| 跟进已启动的脚本批次 | `script_batch_status(batch_id)`（只读） |
 | 查看目标环境、脱敏认证元数据和写入边界 | `platform_context_get` |
 | 不确定当前 MCP 覆盖范围或 `resource_type` | `platform_capabilities_list` |
 | 已知历史需求号，但不确定关联脚本、CodeBlock、QueryBlock 或 API 资源 | `platform_requirement_artifacts_search`，再按类型精确 `get` |
@@ -104,14 +106,33 @@ Debug 不持久化脚本，但脚本自身可能调用 DEV 服务或数据库。
 
 所有写工具都必须严格执行两阶段人工确认，不能因为用户最初已经说“保存”而跳过第二阶段：
 
-1. 先读取最新对象和版本，再以最终参数调用写工具，但不传 `confirmation_token`。此调用只能返回
-   `requires_confirmation=true` 的签名计划，不会写平台。
+1. 以最终参数调用写工具，但不传 `confirmation_token`。单项工具由调用方先读取最新对象和版本，
+   `script_batch_deploy` 在生成计划时读取并绑定这些版本。计划阶段不写平台。
 2. 向用户完整展示目标、版本、动作/变更摘要、`request_sha256` 和有效期，然后结束当前轮。不得在
    同一轮替用户确认，也不得把第一次返回的 token 立即自动回传。
-3. 只有用户在后续消息中明确确认这份未变化的计划，才用完全相同的业务参数加返回的
-   `confirmation_token` 再调用一次。用户改变范围或参数时，丢弃旧 token 并重新生成计划。
+3. 只有用户在后续消息中明确确认这份未变化的计划，才再次调用对应工具。单项工具带原业务参数和
+   `confirmation_token`，`script_batch_deploy` 只带 `confirmation_token`。用户改变范围或参数时，
+   丢弃旧 token 并重新生成计划。
 4. token 与工具名和完整参数绑定、短时有效且只能使用一次；过期、参数漂移或失败后重试都必须
    重新生成计划并再次确认。不要展示 token 内容之外的任何认证秘密。
+
+同环境、同租户、同一交付中的现有 Adapter 和 Independent Script 按以下规则提交批次计划：
+
+- 收齐已授权部署的目标和明文源码后，调用一次 `script_batch_deploy`。使用 `tenant_num` 和可选的
+  `requirement_code`，按类型填写 `adapters`（`task_code`、`running_service`、目标 `line_id` 和
+  待保存的 `source`）和 `independent_scripts`（`code` 和 `source`）。每批最多 30 项，每个 Adapter
+  最多更新一个 Line，多 Line 时须传 `line_id`。Adapter 仅追加需求号时可省略源码。
+- 预览应列出环境和租户、所有目标、原始版本、源码变更摘要、描述变更和计划最终启用状态。
+  展示整份计划的 `request_sha256` 和有效期。收到一次明确确认后，只传 `confirmation_token` 开始执行，
+  用返回的 `batch_id` 在同一聊天和 MCP 进程中调用 `script_batch_status` 跟进至终态。
+- 工具先直接保存并回读独立脚本，再按清单顺序处理 Adapter。Adapter 禁用后才改描述或源码，
+  验证成功后恢复原启用状态。`requirement_code` 仅对 Adapter 生效，保留原描述和传入的需求号大小写，
+  用 `;` 追加，按分号分段忽略大小写去重。无变更项跳过，已确认批次内的动作无需单独确认。
+- 批次遇到首个失败即停止，尚未执行的项标记为 `not_run`。汇报每项状态、回读结果、Adapter 实际启用
+  状态和需人工处理项。禁用后状态无法验证时报告最后读到的状态，避免盲目启用。批次状态保存在 MCP
+  进程内。进程重启、冲突或结果不明确时，先回读核对真实状态，再为实际待写项目制定新计划。
+
+单项保存仍可使用对应工具：
 
 - Independent Script：把最近一次 `get` 的 `object_version_number` 作为
   `expected_version` 调用 `independent_script_save`。
@@ -126,7 +147,7 @@ Debug 不持久化脚本，但脚本自身可能调用 DEV 服务或数据库。
 普通“查一下、分析、给方案、确认配置”只授权读取。只有用户明确要求创建、修改、删除、启停、
 执行动作或更新 DEV 时，才能按上述两阶段协议调用对应写工具：
 
-- 脚本源码继续使用 `independent_script_save` 或 `adapter_deploy`；不要用通用资源 CRUD 绕过源码
+- 脚本源码继续使用 `script_batch_deploy`、`independent_script_save` 或 `adapter_deploy`；不要用通用资源 CRUD 绕过源码
   编解码、完整对象保存、停用恢复和回读校验。
 - 通用 `save/delete`、`platform_table_action`、`adapter_update/toggle/delete` 必须使用刚刚读取的
   `objectVersionNumber` 作为 `expected_version`；冲突后重新读取并报告，不自动覆盖。
