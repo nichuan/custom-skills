@@ -1,6 +1,6 @@
 {
   "name": "srm-requirement-delivery",
-  "version": "2.2.1",
+  "version": "2.2.3",
   "description": "交付甄云 SRM 标准业务改造、标准适配器埋点、标准 API 挂载点，以及 Marmot Adapter、Independent Script 和配套平台资源（包括功能数据导入配置）。用于需求分析、编码、验证和交付；先判定标准、脚本或混合模式。平台当前态与受控写入使用 zhenyun-script-platform-mcp。仅查询平台配置用 srm-script-platform，故障排查和单纯 SQL 修复不使用本 Skill。",
   "author": "Zhenyun Engineering",
   "license": "MIT",
@@ -28,7 +28,8 @@
     "design_gates": "仅对新增或契约级脚本需求确认身份、字段、关系、事务、幂等、日志和异常",
     "artifact_layout": "新交付按平台资源类型分层，Independent 再按实际 quickType 分型；旧目录原地兼容，artifacts.json 逐对象记录身份、关系和验证",
     "remote_debug": "用户要求且 DEV Input 有效时调试未保存源码，不把 Debug 当作平台发布验证",
-    "two_phase_write": "平台创建、保存、绑定、发布和部署都要求最新版本、签名计划与后续人工确认"
+    "two_phase_write": "平台创建、保存、绑定、发布和部署都要求最新版本、签名计划与后续人工确认",
+    "post_deploy_marmot_subtasks": "用户明确要求部署 Marmot 产物后，读取平台当前租户编码、Marmot 类型与原始产物编码，统一生成完整唯一编码后按变更 diff 中本次新增的需求号查重补建；历史编号忽略，裸编码旧任务报告格式不符且不重复创建"
   },
   "mcp_servers": [
     {
@@ -37,6 +38,7 @@
         "choerodon_list_projects",
         "choerodon_list_issue",
         "choerodon_query_issue",
+        "choerodon_ensure_marmot_subtask",
         "choerodon_list_comments",
         "choerodon_list_attachments",
         "choerodon_download_attachment",
@@ -55,7 +57,7 @@
         "get_workflow_guide",
         "marmot_get_delivery_config"
       ],
-      "description": "只读获取猪齿鱼需求、脚本身份候选、标准调用契约和必要数据库事实。"
+      "description": "读取猪齿鱼需求、脚本身份候选、标准调用契约和必要数据库事实；用户明确要求部署 Marmot 产物后，允许按本次新增需求号查重并补建缺失子任务。"
     },
     {
       "name": "zhenyun-script-platform-mcp",
@@ -89,7 +91,7 @@
     "delivery"
   ],
   "metadata": {
-    "last_updated": "2026-10-13",
+    "last_updated": "2026-11-24",
     "scope": "srm-standard-and-marmot-delivery",
     "release_integration": "not-integrated"
   }

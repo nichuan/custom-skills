@@ -1,7 +1,7 @@
 {
   "name": "choerodon-task",
-  "version": "1.4.1",
-  "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手。直接发送 prod-bug、cro、H-SAAS、saas 等完整任务编号时，自动按前缀定位项目并精确查询；也支持按经办人、关键词或状态查询 issue、评论和附件，经明确授权可维护评论。SRM 需求开发使用 srm-requirement-delivery。",
+  "version": "1.4.3",
+  "description": "猪齿鱼（Choerodon）跨项目协作任务查询助手。直接发送 prod-bug、cro、H-SAAS、saas 等完整任务编号时，自动按前缀定位项目并精确查询；也支持按经办人、关键词或状态查询 issue、评论和附件。用户明确要求时可维护评论；SRM Marmot 产物明确部署后，可按本次新增需求号查重并补建子任务。SRM 需求开发使用 srm-requirement-delivery。",
   "author": "WorkBuddy",
   "license": "MIT",
   "keywords": [
@@ -19,8 +19,9 @@
     "query_by_filter": "按关键词/状态/经办人组合列 issue",
     "status_map": "取状态名→加密 id 映射，理解状态流转",
     "attachments": "列附件并取签名下载地址",
-    "read_mostly": "默认只读查询；不改任务状态或业务库",
+    "read_mostly": "默认只读查询；不改任务状态或业务库，仅按约束执行评论写入和 Marmot 部署后的子任务补建",
     "controlled_comment": "明确要求写入时核对目标、正文和重复评论后直接新增或编辑，写后回读；预览仅在用户要求时使用",
+    "marmot_subtask_ensure": "Marmot 产物明确部署后，读取真实租户编码、类型和产物编码拼成完整唯一编码；仅按本次新增需求号查重，已有跳过，裸编码旧任务报告格式不符且不重复创建",
     "route_on_action": "SRM 标准或纯二开需求开发交给 srm-requirement-delivery；排障和 SQL 交给对应专项 Skill",
     "issue_prefix_routing": "完整编号按真实项目编码自动定位并精确检索，支持大小写及 sass 到 saas 兼容别名；返回项目上下文，未知前缀或项目冲突不回退默认项目",
     "history_reference_lookup": "提取正文、评论、链接或已读取附件中的相关历史编号，各自自动定项目并核实详情；不继承主工单项目和状态过滤，已完成任务同样可查"
@@ -31,6 +32,7 @@
       "tools": [
         "choerodon_list_projects",
         "choerodon_query_issue",
+        "choerodon_ensure_marmot_subtask",
         "choerodon_search_tasks_by_person",
         "choerodon_list_issue",
         "choerodon_search_users",
@@ -44,7 +46,7 @@
         "choerodon_delete_comment",
         "get_workflow_guide"
       ],
-      "description": "猪齿鱼协作平台：项目与任务查询、评论和附件读取；Token 由 .env 凭据登录获取。用户明确要求写入时，核对目标和正文后直接提交评论并回读，无须强制预览或再次确认；其余工具为只读查询"
+      "description": "猪齿鱼协作平台：项目与任务查询、评论和附件读取，以及受限的 Marmot 子任务补建；Token 由 .env 凭据登录获取。子任务仅用于用户明确要求的本次产物部署，先精确查重、缺失才创建；评论写入按用户授权执行"
     }
   ],
   "entry_point": "SKILL.md",
@@ -58,6 +60,6 @@
     "template_store": "none",
     "sql_templates_count": 0,
     "sql_examples_count": 0,
-    "last_updated": "2026-10-14"
+    "last_updated": "2026-11-24"
   }
 }
